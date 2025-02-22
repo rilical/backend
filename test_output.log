@@ -1,0 +1,96 @@
+test_get_catalog_data (apps.providers.tests.providers.western_union_test.TestWesternUnionProvider.test_get_catalog_data)
+Test the get_catalog_data() method for Western Union with India as receive country. ... 2025-02-13 03:40:34,710 - apps.providers.scrapers.western_union - INFO - Initialized with User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0
+2025-02-13 03:40:34,710 - apps.providers.scrapers.western_union - INFO - Generated correlation_id: web-936a7217-fa3d-4ab5-84eb-7de7fbf8d0c1
+2025-02-13 03:40:34,710 - apps.providers.scrapers.western_union - INFO - Generated transaction_id: web-936a7217-fa3d-4ab5-84eb-7de7fbf8d0c1-1739436034710
+2025-02-13 03:40:34,710 - apps.providers.scrapers.western_union - INFO - Initializing session...
+2025-02-13 03:40:34,710 - apps.providers.scrapers.western_union - INFO - Making initial request to get session cookies...
+2025-02-13 03:40:35,289 - apps.providers.scrapers.western_union - INFO - Making OPTIONS request to API endpoint...
+2025-02-13 03:40:35,664 - apps.providers.scrapers.western_union - INFO - ✅ Session initialized successfully
+2025-02-13 03:40:35,664 - apps.providers.scrapers.western_union - INFO - Initializing session...
+INFO:apps.providers.scrapers.western_union:Initializing session...
+2025-02-13 03:40:35,664 - apps.providers.scrapers.western_union - INFO - Making initial request to get session cookies...
+INFO:apps.providers.scrapers.western_union:Making initial request to get session cookies...
+2025-02-13 03:40:36,003 - apps.providers.scrapers.western_union - INFO - Making OPTIONS request to API endpoint...
+INFO:apps.providers.scrapers.western_union:Making OPTIONS request to API endpoint...
+2025-02-13 03:40:36,415 - apps.providers.scrapers.western_union - INFO - ✅ Session initialized successfully
+INFO:apps.providers.scrapers.western_union:✅ Session initialized successfully
+2025-02-13 03:40:36,415 - apps.providers.scrapers.western_union - INFO - Attempt 1/3 to get catalog data
+INFO:apps.providers.scrapers.western_union:Attempt 1/3 to get catalog data
+ok
+test_get_exchange_rate (apps.providers.tests.providers.western_union_test.TestWesternUnionProvider.test_get_exchange_rate)
+Test the get_exchange_rate() method for Western Union. ... 2025-02-13 03:40:36,828 - apps.providers.scrapers.western_union - INFO - Initialized with User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0
+INFO:apps.providers.scrapers.western_union:Initialized with User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0
+2025-02-13 03:40:36,829 - apps.providers.scrapers.western_union - INFO - Generated correlation_id: web-cc9ccd09-2717-4e0e-a45c-110052fa0b8b
+INFO:apps.providers.scrapers.western_union:Generated correlation_id: web-cc9ccd09-2717-4e0e-a45c-110052fa0b8b
+2025-02-13 03:40:36,829 - apps.providers.scrapers.western_union - INFO - Generated transaction_id: web-cc9ccd09-2717-4e0e-a45c-110052fa0b8b-1739436036829
+INFO:apps.providers.scrapers.western_union:Generated transaction_id: web-cc9ccd09-2717-4e0e-a45c-110052fa0b8b-1739436036829
+2025-02-13 03:40:36,829 - apps.providers.scrapers.western_union - INFO - Initializing session...
+INFO:apps.providers.scrapers.western_union:Initializing session...
+2025-02-13 03:40:36,829 - apps.providers.scrapers.western_union - INFO - Making initial request to get session cookies...
+INFO:apps.providers.scrapers.western_union:Making initial request to get session cookies...
+2025-02-13 03:40:37,013 - apps.providers.scrapers.western_union - INFO - Making OPTIONS request to API endpoint...
+INFO:apps.providers.scrapers.western_union:Making OPTIONS request to API endpoint...
+2025-02-13 03:40:37,081 - apps.providers.scrapers.western_union - INFO - ✅ Session initialized successfully
+INFO:apps.providers.scrapers.western_union:✅ Session initialized successfully
+2025-02-13 03:40:37,082 - apps.providers.scrapers.western_union - INFO - Initializing session...
+INFO:apps.providers.scrapers.western_union:Initializing session...
+2025-02-13 03:40:37,082 - apps.providers.scrapers.western_union - INFO - Making initial request to get session cookies...
+INFO:apps.providers.scrapers.western_union:Making initial request to get session cookies...
+2025-02-13 03:40:37,225 - apps.providers.scrapers.western_union - INFO - Making OPTIONS request to API endpoint...
+INFO:apps.providers.scrapers.western_union:Making OPTIONS request to API endpoint...
+2025-02-13 03:40:37,317 - apps.providers.scrapers.western_union - INFO - ✅ Session initialized successfully
+INFO:apps.providers.scrapers.western_union:✅ Session initialized successfully
+2025-02-13 03:40:37,317 - apps.providers.scrapers.western_union - INFO - Attempt 1/3 to get catalog data
+INFO:apps.providers.scrapers.western_union:Attempt 1/3 to get catalog data
+2025-02-13 03:40:37,753 - apps.providers.scrapers.western_union - DEBUG - Found 2 service groups
+DEBUG:apps.providers.scrapers.western_union:Found 2 service groups
+2025-02-13 03:40:37,754 - apps.providers.scrapers.western_union - DEBUG - Service Money In Minutes: 5 pay groups
+DEBUG:apps.providers.scrapers.western_union:Service Money In Minutes: 5 pay groups
+2025-02-13 03:40:37,754 - apps.providers.scrapers.western_union - DEBUG - Pay group rate: 50.9747, fee: 25
+DEBUG:apps.providers.scrapers.western_union:Pay group rate: 50.9747, fee: 25
+2025-02-13 03:40:37,754 - apps.providers.scrapers.western_union - DEBUG - Pay group rate: 50.9747, fee: 0
+DEBUG:apps.providers.scrapers.western_union:Pay group rate: 50.9747, fee: 0
+2025-02-13 03:40:37,754 - apps.providers.scrapers.western_union - DEBUG - Pay group rate: 50.9747, fee: 0
+DEBUG:apps.providers.scrapers.western_union:Pay group rate: 50.9747, fee: 0
+2025-02-13 03:40:37,754 - apps.providers.scrapers.western_union - DEBUG - Pay group rate: 48.9321, fee: 8
+DEBUG:apps.providers.scrapers.western_union:Pay group rate: 48.9321, fee: 8
+2025-02-13 03:40:37,754 - apps.providers.scrapers.western_union - DEBUG - Pay group rate: 50.9747, fee: 0
+DEBUG:apps.providers.scrapers.western_union:Pay group rate: 50.9747, fee: 0
+2025-02-13 03:40:37,754 - apps.providers.scrapers.western_union - DEBUG - Service Direct to Bank: 5 pay groups
+DEBUG:apps.providers.scrapers.western_union:Service Direct to Bank: 5 pay groups
+2025-02-13 03:40:37,754 - apps.providers.scrapers.western_union - DEBUG - Pay group rate: 51.7888, fee: 25
+DEBUG:apps.providers.scrapers.western_union:Pay group rate: 51.7888, fee: 25
+2025-02-13 03:40:37,754 - apps.providers.scrapers.western_union - DEBUG - Pay group rate: 51.7888, fee: 0
+DEBUG:apps.providers.scrapers.western_union:Pay group rate: 51.7888, fee: 0
+2025-02-13 03:40:37,754 - apps.providers.scrapers.western_union - DEBUG - Pay group rate: 51.7888, fee: 0
+DEBUG:apps.providers.scrapers.western_union:Pay group rate: 51.7888, fee: 0
+2025-02-13 03:40:37,754 - apps.providers.scrapers.western_union - DEBUG - Pay group rate: 48.9321, fee: 8
+DEBUG:apps.providers.scrapers.western_union:Pay group rate: 48.9321, fee: 8
+2025-02-13 03:40:37,754 - apps.providers.scrapers.western_union - DEBUG - Pay group rate: 51.7888, fee: 0
+DEBUG:apps.providers.scrapers.western_union:Pay group rate: 51.7888, fee: 0
+2025-02-13 03:40:37,754 - apps.providers.scrapers.western_union - INFO - 💱 Exchange rate info retrieved successfully
+INFO:apps.providers.scrapers.western_union:💱 Exchange rate info retrieved successfully
+ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 3.045s
+
+OK
+Starting test runner...
+
+Starting provider tests...
+
+Running Western Union tests...
+Traceback (most recent call last):
+  File "/Users/omarghabyen/Desktop/RemitScout/backend/apps/providers/tests/test_providers.py", line 67, in <module>
+    main()
+  File "/Users/omarghabyen/Desktop/RemitScout/backend/apps/providers/tests/test_providers.py", line 62, in main
+    results = test_all()
+              ^^^^^^^^^^
+  File "/Users/omarghabyen/Desktop/RemitScout/backend/apps/providers/tests/test_providers.py", line 19, in test_all
+    wu_results = test_western_union()
+                 ^^^^^^^^^^^^^^^^^^^^
+  File "/Users/omarghabyen/Desktop/RemitScout/backend/apps/providers/tests/providers/western_union_test.py", line 127, in test_western_union
+    all_test_names = [t.id().split('.')[-1] for t in suite]
+                      ^^^^
+AttributeError: 'NoneType' object has no attribute 'id'

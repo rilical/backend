@@ -1,0 +1,12 @@
+{
+  "provider": "Western Union",
+  "timestamp": "2025-02-22T02:17:15.793046+00:00",
+  "send_amount": 400.0,
+  "send_currency": "GBP",
+  "receive_country": "IN",
+  "exchange_rate": 111.1412347,
+  "transfer_fee": 0.0,
+  "service_name": "Direct to Bank",
+  "delivery_time": "1 Business Days",
+  "receive_amount": 44456.49
+}

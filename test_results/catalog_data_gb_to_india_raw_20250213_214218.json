@@ -1,0 +1,268 @@
+{
+  "header_reply": {
+    "response_type": "not_present",
+    "source_app": "defaultSource",
+    "correlation_id": "3e8e699d-d8ac-48f7-912d-447164497f7f"
+  },
+  "response_status": {
+    "status": 0,
+    "code": "P0000",
+    "message": "OK.SUCCESSFUL PROCESSING",
+    "long_message": "NO ERRORS--NO WARNINGS.2261327.2025-02-14 02:42:17.999_2025-02-14 02:42:18.037"
+  },
+  "sender": {
+    "channel": "WWEB",
+    "client": "WUCOM",
+    "cty_iso2_ext": "GB",
+    "curr_iso3": "GBP",
+    "cpc": "UKD",
+    "funds_in": "*",
+    "segment": "N00",
+    "send_amount": 1000,
+    "city": "LONDON",
+    "postal_code": "EC1A1BB"
+  },
+  "receiver": {
+    "cty_iso2_ext": "IN",
+    "curr_iso3": "INR"
+  },
+  "available_funds_in": "CC,PA,GP,EB,TR,AP",
+  "services_groups": [
+    {
+      "service": "000",
+      "service_name": "Money In Minutes",
+      "fund_out": "000",
+      "fund_out_mnem": "MM",
+      "cpc": "IND",
+      "dir_flag": "N",
+      "test_question": "P",
+      "test_q_max_amnt": 99999999.99,
+      "fx_fix_flag": "S",
+      "max_payout": 214023.63,
+      "speed_days": 1,
+      "pay_groups": [
+        {
+          "fund_in": "CC",
+          "pricing_context": "/WWEB/WUCOM/UKD//IND//000/NA/CC/N00/WWEBCC000N0/2YR2FJ3DHW-null/GBININRCC0N0W:N0:N0/1000.00/108722.27/S/0.79859447/86.82500000/0.0/108.7222655/////",
+          "fx_rate": 108.7222655,
+          "send_amount": 1000,
+          "receive_amount": 108722.27,
+          "gross_amount": 1000,
+          "gross_fee": 0,
+          "base_fee": 0,
+          "surcharge_fee": 0,
+          "msg_fee": 0,
+          "min_amount": 0,
+          "max_amount": 9999999,
+          "speed_indicator": "0"
+        },
+        {
+          "fund_in": "PA",
+          "pricing_context": "/WWEB/WUCOM/UKD//IND//000/NA/PA/N00/WWEBPA000N0/2YR2FJ3DHW-null/GBININRPA0N0W:N0:N0/1000.00/108722.27/S/0.79859447/86.82500000/0.0/108.7222655/////",
+          "fx_rate": 108.7222655,
+          "send_amount": 1000,
+          "receive_amount": 108722.27,
+          "gross_amount": 1000,
+          "gross_fee": 0,
+          "base_fee": 0,
+          "surcharge_fee": 0,
+          "msg_fee": 0,
+          "min_amount": 0,
+          "max_amount": 9999999,
+          "speed_indicator": "0"
+        },
+        {
+          "fund_in": "GP",
+          "pricing_context": "/WWEB/WUCOM/UKD//IND//000/NA/GP/N00/WWEBGP000N0/2YR2FJ3DHW-null/GBININRGP0N0W:N0:N0/1000.00/108722.27/S/0.79859447/86.82500000/0.0/108.7222655/////",
+          "fx_rate": 108.7222655,
+          "send_amount": 1000,
+          "receive_amount": 108722.27,
+          "gross_amount": 1000,
+          "gross_fee": 0,
+          "base_fee": 0,
+          "surcharge_fee": 0,
+          "msg_fee": 0,
+          "min_amount": 0,
+          "max_amount": 9999999,
+          "speed_indicator": "0"
+        },
+        {
+          "fund_in": "EB",
+          "pricing_context": "/WWEB/WUCOM/UKD//IND//000/NA/EB/N00/WWEBEB000N0/2YR2FJ3DHW-null/GBININREB0N0W:N0:N0/1000.00/108722.27/S/0.79859447/86.82500000/0.0/108.7222655/////",
+          "fx_rate": 108.7222655,
+          "send_amount": 1000,
+          "receive_amount": 108722.27,
+          "gross_amount": 1000,
+          "gross_fee": 0,
+          "base_fee": 0,
+          "surcharge_fee": 0,
+          "msg_fee": 0,
+          "min_amount": 0,
+          "max_amount": 9999999,
+          "speed_indicator": "0"
+        },
+        {
+          "fund_in": "TR",
+          "pricing_context": "/WWEB/WUCOM/UKD//IND//000/NA/TR/N00/WWEBTR000N0/2YR2FJ3DHW-null/GBININRTR0N0W:N0:N0/1000.00/108722.27/S/0.79859447/86.82500000/0.0/108.7222655/////",
+          "fx_rate": 108.7222655,
+          "send_amount": 1000,
+          "receive_amount": 108722.27,
+          "gross_amount": 1000,
+          "gross_fee": 0,
+          "base_fee": 0,
+          "surcharge_fee": 0,
+          "msg_fee": 0,
+          "min_amount": 0,
+          "max_amount": 9999999,
+          "speed_indicator": "0"
+        },
+        {
+          "fund_in": "AP",
+          "pricing_context": "/WWEB/WUCOM/UKD//IND//000/NA/AP/N00/WWEBAP000N0/2YR2FJ3DHW-null/GBININRAP0N0W:N0:N0/1000.00/108722.27/S/0.79859447/86.82500000/0.0/108.7222655/////",
+          "fx_rate": 108.7222655,
+          "send_amount": 1000,
+          "receive_amount": 108722.27,
+          "gross_amount": 1000,
+          "gross_fee": 0,
+          "base_fee": 0,
+          "surcharge_fee": 0,
+          "msg_fee": 0,
+          "min_amount": 0,
+          "max_amount": 9999999,
+          "speed_indicator": "0"
+        }
+      ]
+    },
+    {
+      "service": "500",
+      "service_name": "Direct to Bank",
+      "fund_out": "500",
+      "fund_out_mnem": "DB",
+      "cpc": "IND",
+      "dir_flag": "N",
+      "test_question": "P",
+      "test_q_max_amnt": 99999999.99,
+      "fx_fix_flag": "S",
+      "max_payout": 99999999.99,
+      "speed_days": 1,
+      "pay_groups": [
+        {
+          "fund_in": "CC",
+          "pricing_context": "/WWEB/WUCOM/UKD//IND//500/\\EBD/CC/N00/WWEBCC500N0/2YR2FJ3DHW-null/GBININRCC5N0W:N0:N0/1000.00/108722.27/S/0.79859447/86.82500000/0.0/108.7222655/////",
+          "fx_rate": 108.7222655,
+          "send_amount": 1000,
+          "receive_amount": 108722.27,
+          "gross_amount": 1000,
+          "gross_fee": 0,
+          "base_fee": 0,
+          "surcharge_fee": 0,
+          "msg_fee": 0,
+          "min_amount": 0,
+          "max_amount": 9999999,
+          "speed_indicator": "0"
+        },
+        {
+          "fund_in": "PA",
+          "pricing_context": "/WWEB/WUCOM/UKD//IND//500/\\EBD/PA/N00/WWEBPA500N0/2YR2FJ3DHW-null/GBININRPA5N0W:N0:N0/1000.00/108722.27/S/0.79859447/86.82500000/0.0/108.7222655/////",
+          "fx_rate": 108.7222655,
+          "send_amount": 1000,
+          "receive_amount": 108722.27,
+          "gross_amount": 1000,
+          "gross_fee": 0,
+          "base_fee": 0,
+          "surcharge_fee": 0,
+          "msg_fee": 0,
+          "min_amount": 0,
+          "max_amount": 9999999,
+          "speed_indicator": "0"
+        },
+        {
+          "fund_in": "GP",
+          "pricing_context": "/WWEB/WUCOM/UKD//IND//500/\\EBD/GP/N00/WWEBGP500N0/2YR2FJ3DHW-null/GBININRGP5N0W:N0:N0/1000.00/108722.27/S/0.79859447/86.82500000/0.0/108.7222655/////",
+          "fx_rate": 108.7222655,
+          "send_amount": 1000,
+          "receive_amount": 108722.27,
+          "gross_amount": 1000,
+          "gross_fee": 0,
+          "base_fee": 0,
+          "surcharge_fee": 0,
+          "msg_fee": 0,
+          "min_amount": 0,
+          "max_amount": 9999999,
+          "speed_indicator": "0"
+        },
+        {
+          "fund_in": "EB",
+          "pricing_context": "/WWEB/WUCOM/UKD//IND//500/\\EBD/EB/N00/WWEBEB500N0/2YR2FJ3DHW-null/GBININREB5N0W:N0:N0/1000.00/108722.27/S/0.79859447/86.82500000/0.0/108.7222655/////",
+          "fx_rate": 108.7222655,
+          "send_amount": 1000,
+          "receive_amount": 108722.27,
+          "gross_amount": 1000,
+          "gross_fee": 0,
+          "base_fee": 0,
+          "surcharge_fee": 0,
+          "msg_fee": 0,
+          "min_amount": 0,
+          "max_amount": 9999999,
+          "speed_indicator": "0"
+        },
+        {
+          "fund_in": "TR",
+          "pricing_context": "/WWEB/WUCOM/UKD//IND//500/\\EBD/TR/N00/WWEBTR500N0/2YR2FJ3DHW-null/GBININRTR5N0W:N0:N0/1000.00/108722.27/S/0.79859447/86.82500000/0.0/108.7222655/////",
+          "fx_rate": 108.7222655,
+          "send_amount": 1000,
+          "receive_amount": 108722.27,
+          "gross_amount": 1000,
+          "gross_fee": 0,
+          "base_fee": 0,
+          "surcharge_fee": 0,
+          "msg_fee": 0,
+          "min_amount": 0,
+          "max_amount": 9999999,
+          "speed_indicator": "0"
+        },
+        {
+          "fund_in": "AP",
+          "pricing_context": "/WWEB/WUCOM/UKD//IND//500/\\EBD/AP/N00/WWEBAP500N0/2YR2FJ3DHW-null/GBININRAP5N0W:N0:N0/1000.00/108722.27/S/0.79859447/86.82500000/0.0/108.7222655/////",
+          "fx_rate": 108.7222655,
+          "send_amount": 1000,
+          "receive_amount": 108722.27,
+          "gross_amount": 1000,
+          "gross_fee": 0,
+          "base_fee": 0,
+          "surcharge_fee": 0,
+          "msg_fee": 0,
+          "min_amount": 0,
+          "max_amount": 9999999,
+          "speed_indicator": "0"
+        }
+      ]
+    }
+  ],
+  "categories": [
+    {
+      "name": "Best FX",
+      "type": "bestfx",
+      "services": [
+        {
+          "fx_rate": 108.7222655,
+          "pay_in": "CC",
+          "pay_out": "500",
+          "pay_out_mnem": "DB"
+        },
+        {
+          "fx_rate": 108.7222655,
+          "pay_in": "CC",
+          "pay_out": "000",
+          "pay_out_mnem": "MM"
+        },
+        {
+          "fx_rate": 108.7222655,
+          "pay_in": "AP",
+          "pay_out": "500",
+          "pay_out_mnem": "DB"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "provider": "Western Union",
+  "timestamp": "2025-02-22T06:16:17.961802+00:00",
+  "send_amount": 500.0,
+  "send_currency": "USD",
+  "receive_country": "EG",
+  "exchange_rate": 50.9125,
+  "transfer_fee": 0.0,
+  "service_name": "Money In Minutes",
+  "delivery_time": "1 Business Days",
+  "receive_amount": 25456.25
+}

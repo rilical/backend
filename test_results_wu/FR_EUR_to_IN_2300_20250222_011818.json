@@ -1,0 +1,12 @@
+{
+  "provider": "Western Union",
+  "timestamp": "2025-02-22T06:18:18.201391+00:00",
+  "send_amount": 2300.0,
+  "send_currency": "EUR",
+  "receive_country": "IN",
+  "exchange_rate": 90.6326076,
+  "transfer_fee": 0.0,
+  "service_name": "Money In Minutes",
+  "delivery_time": "1 Business Days",
+  "receive_amount": 208455.0
+}

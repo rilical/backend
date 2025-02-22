@@ -1,0 +1,12 @@
+{
+  "provider": "Western Union",
+  "timestamp": "2025-02-22T02:16:25.562536+00:00",
+  "send_amount": 700.0,
+  "send_currency": "EUR",
+  "receive_country": "MX",
+  "exchange_rate": 21.2244978,
+  "transfer_fee": 0.0,
+  "service_name": "Direct to Bank",
+  "delivery_time": "1 Business Days",
+  "receive_amount": 14858.0
+}
