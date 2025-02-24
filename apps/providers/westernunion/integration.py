@@ -1,3 +1,39 @@
+"""
+Western Union Money Transfer Integration
+
+This module implements the integration with Western Union's money transfer API.
+Unlike other providers that have explicit delivery methods, Western Union uses
+service groups (delivery channels) with different naming conventions:
+
+DELIVERY METHODS (service groups):
+---------------------------------
+- CASH_PICKUP: Cash pickup at agent locations
+- ACCOUNT_DEPOSIT: Bank account deposit
+- WALLET_ACCOUNT: Mobile wallet transfer
+- MOBILE_MONEY: Mobile money services (specific to certain markets)
+- PREPAID_CARD: Transfer to prepaid cards
+- CASH_HOME_DELIVERY: Cash delivery to home address (specific markets only)
+- UPI: Unified Payments Interface (specific to India)
+
+Each delivery method supports specific payment methods, which vary by corridor.
+
+PAYMENT METHODS (fund_in types):
+-------------------------------
+- BANKACCOUNT: Bank account 
+- CREDITCARD: Credit card payment
+- DEBITCARD: Debit card payment
+- CASH: Cash payment at agent location
+
+Important API notes:
+1. The catalog_data endpoint returns all available service groups and payment methods
+2. Each corridor (send country → receive country) supports different combinations
+3. Some options may be rate-limited or have minimum/maximum amount restrictions
+4. Exchange rates and fees vary by delivery method and payment method
+5. Always check transferOptions before assuming a payment/delivery combination works
+
+For more details, see the test_discover_supported_methods test method in tests.py
+"""
+
 import json
 import logging
 import os
@@ -356,6 +392,7 @@ class WesternUnionProvider(RemittanceProvider):
                             "fee": float(pay_group.get("gross_fee", 0)),
                             "receive_amount": float(pay_group.get("receive_amount", 0)),
                             "delivery_time": f"{group.get('speed_days', 1)} Business Days"
+                            
                         }
         return None
 

@@ -1,3 +1,21 @@
+"""
+Western Union Money Transfer API Tests
+
+HOW TO RUN THESE TESTS PROPERLY:
+---------------------------------
+To run all tests:
+    python3 -m unittest apps.providers.westernunion.tests
+
+To run the new method that discovers supported delivery options:
+    python3 -m unittest apps.providers.westernunion.tests.TestWesternUnionProviderRealAPI.test_discover_supported_methods
+
+To run a specific test:
+    python3 -m unittest apps.providers.westernunion.tests.TestWesternUnionProviderRealAPI.<test_method_name>
+
+NOTE: Using 'python3 -m unittest apps/providers/westernunion/tests.py' will NOT work correctly.
+      Always use dot notation (apps.providers.westernunion.tests) not file paths with slashes.
+"""
+
 import json
 import logging
 import random
@@ -112,6 +130,335 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
         self.assertGreaterEqual(rate_data["exchange_rate"], 0.0, "exchange_rate < 0")
         self.assertGreaterEqual(rate_data["transfer_fee"], 0.0, "transfer_fee < 0")
         self.assertGreaterEqual(rate_data["receive_amount"], 0.0, "receive_amount < 0")
+
+    def test_discover_supported_methods(self):
+        """
+        Discover supported delivery methods and payment combinations for Western Union.
+        
+        This test analyzes the catalog data response to identify which combinations of:
+        - Send country/currency
+        - Receive country
+        - Delivery method (cash pickup, bank account, mobile wallet)
+        - Payment method (bank account, credit card, debit card)
+        
+        are actually supported. Unlike the RIA API which has explicit fields for
+        delivery and payment methods, Western Union uses service groups with different
+        delivery channel names.
+        """
+        test_method_log = os.path.join(self.logs_dir, f"test_discover_supported_methods_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+        
+        # Create a file handler specific to this test
+        file_handler = logging.FileHandler(test_method_log)
+        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        test_logger = logging.getLogger(f"{__name__}.{self._testMethodName}")
+        test_logger.addHandler(file_handler)
+        test_logger.setLevel(logging.DEBUG)
+        
+        try:
+            # Test key corridors 
+            test_corridors = [
+                ("US", "USD", "MX"),      # US to Mexico
+                ("US", "USD", "PH"),      # US to Philippines 
+                ("US", "USD", "IN"),      # US to India
+                ("GB", "GBP", "IN"),      # UK to India
+                ("CA", "CAD", "PH"),      # Canada to Philippines
+                ("DE", "EUR", "TR"),      # Germany to Turkey
+                ("AU", "AUD", "PH"),      # Australia to Philippines
+                ("FR", "EUR", "MA"),      # France to Morocco
+                ("IT", "EUR", "NG"),      # Italy to Nigeria
+                ("ES", "EUR", "CO")       # Spain to Colombia
+            ]
+            
+            test_logger.info(f"Testing {len(test_corridors)} corridors to discover supported delivery methods")
+            
+            all_results = {}
+            
+            for send_country, send_currency, receive_country in test_corridors:
+                corridor_label = f"{send_country}({send_currency})->{receive_country}"
+                test_logger.info(f"Testing corridor: {corridor_label}")
+                
+                try:
+                    # Step 1: Make initial catalog request with higher amount to increase success chance
+                    test_logger.info(f"Making initial catalog request for {corridor_label}")
+                    
+                    # Use a higher amount to get more delivery options
+                    test_amount = Decimal("500.00")
+                    
+                    catalog_data = self.provider.get_catalog_data(
+                        send_amount=test_amount,
+                        send_currency=send_currency,
+                        receive_country=receive_country,
+                        send_country=send_country
+                    )
+                    
+                    # Save the raw catalog response
+                    catalog_file = self.save_response_data(
+                        catalog_data, 
+                        f"CATALOG_{send_country}_{send_currency}_to_{receive_country}"
+                    )
+                    test_logger.info(f"Catalog response saved to {catalog_file}")
+                    
+                    # Step 2: Extract service groups (delivery methods)
+                    service_groups = catalog_data.get("services_groups", [])
+                    
+                    if not service_groups:
+                        test_logger.warning(f"No service groups found for {corridor_label}")
+                        all_results[corridor_label] = {
+                            "supported": False,
+                            "reason": "No service groups found",
+                            "options": []
+                        }
+                        continue
+                    
+                    test_logger.info(f"Found {len(service_groups)} service groups")
+                    
+                    # Identify unique delivery methods and payment methods
+                    delivery_methods = {}
+                    for group in service_groups:
+                        service_name = group.get("service_name", "Unknown")
+                        service_code = group.get("service", "Unknown")
+                        delivery_methods[service_code] = {
+                            "name": service_name,
+                            "payment_methods": []
+                        }
+                        
+                        # Extract payment methods for this delivery method
+                        for pay_group in group.get("pay_groups", []):
+                            pay_method = pay_group.get("fund_in", "Unknown")
+                            pay_method_name = pay_group.get("fund_in_name", pay_method)
+                            
+                            if pay_method not in delivery_methods[service_code]["payment_methods"]:
+                                delivery_methods[service_code]["payment_methods"].append({
+                                    "code": pay_method,
+                                    "name": pay_method_name
+                                })
+                    
+                    # Log available methods
+                    test_logger.info(f"Available delivery methods for {corridor_label}:")
+                    for code, details in delivery_methods.items():
+                        payment_methods = [pm["name"] for pm in details["payment_methods"]]
+                        test_logger.info(f"  - {details['name']} ({code}): {', '.join(payment_methods)}")
+                    
+                    # Step 3: Test different amounts with each delivery/payment combination
+                    test_amounts = [50, 200, 500, 1000]
+                    corridor_results = {
+                        "supported": True,
+                        "delivery_methods": {},
+                        "test_results": []
+                    }
+                    
+                    for service_code, service_details in delivery_methods.items():
+                        service_name = service_details["name"]
+                        test_logger.info(f"Testing delivery method: {service_name} ({service_code})")
+                        
+                        corridor_results["delivery_methods"][service_code] = {
+                            "name": service_name,
+                            "payment_methods": {},
+                            "successful_tests": 0,
+                            "failed_tests": 0
+                        }
+                        
+                        for payment_method in service_details["payment_methods"]:
+                            pay_code = payment_method["code"]
+                            pay_name = payment_method["name"]
+                            test_logger.info(f"  Testing payment method: {pay_name} ({pay_code})")
+                            
+                            corridor_results["delivery_methods"][service_code]["payment_methods"][pay_code] = {
+                                "name": pay_name,
+                                "results": []
+                            }
+                            
+                            # Test with different amounts
+                            for amount in test_amounts:
+                                test_label = f"{corridor_label} {amount}{send_currency} via {service_name}/{pay_name}"
+                                test_logger.info(f"    Testing amount: {amount} {send_currency}")
+                                
+                                try:
+                                    # Request the catalog with this specific amount
+                                    catalog_specific = self.provider.get_catalog_data(
+                                        send_amount=Decimal(str(amount)),
+                                        send_currency=send_currency,
+                                        receive_country=receive_country,
+                                        send_country=send_country
+                                    )
+                                    
+                                    # Find the matching service group and payment method
+                                    result = None
+                                    for group in catalog_specific.get("services_groups", []):
+                                        if group.get("service") == service_code:
+                                            for pay_group in group.get("pay_groups", []):
+                                                if pay_group.get("fund_in") == pay_code:
+                                                    # Found a match!
+                                                    fx_rate = float(pay_group.get("fx_rate", 0))
+                                                    fee = float(pay_group.get("gross_fee", 0))
+                                                    receive_amount = float(pay_group.get("receive_amount", 0))
+                                                    
+                                                    if fx_rate > 0 and receive_amount > 0:
+                                                        result = {
+                                                            "amount": amount,
+                                                            "exchange_rate": fx_rate,
+                                                            "fee": fee,
+                                                            "receive_amount": receive_amount,
+                                                            "delivery_days": group.get("speed_days", "Unknown"),
+                                                            "success": True
+                                                        }
+                                                        test_logger.info(f"    SUCCESS: XR={fx_rate}, Fee={fee}, Receive={receive_amount}")
+                                                        corridor_results["delivery_methods"][service_code]["successful_tests"] += 1
+                                                    else:
+                                                        result = {
+                                                            "amount": amount,
+                                                            "success": False,
+                                                            "reason": "Invalid rate or receive amount"
+                                                        }
+                                                        test_logger.warning(f"    FAILED: Invalid rate or receive amount")
+                                                        corridor_results["delivery_methods"][service_code]["failed_tests"] += 1
+                                    
+                                    if not result:
+                                        result = {
+                                            "amount": amount,
+                                            "success": False,
+                                            "reason": "Service/payment combination not found"
+                                        }
+                                        test_logger.warning(f"    FAILED: Service/payment combination not found")
+                                        corridor_results["delivery_methods"][service_code]["failed_tests"] += 1
+                                    
+                                    corridor_results["delivery_methods"][service_code]["payment_methods"][pay_code]["results"].append(result)
+                                    corridor_results["test_results"].append({
+                                        "corridor": corridor_label,
+                                        "amount": amount,
+                                        "service_code": service_code,
+                                        "service_name": service_name,
+                                        "payment_code": pay_code,
+                                        "payment_name": pay_name,
+                                        "result": result
+                                    })
+                                    
+                                except Exception as e:
+                                    test_logger.error(f"    ERROR testing {test_label}: {str(e)}")
+                                    test_logger.error(traceback.format_exc())
+                                    
+                                    corridor_results["delivery_methods"][service_code]["payment_methods"][pay_code]["results"].append({
+                                        "amount": amount,
+                                        "success": False,
+                                        "error": str(e)
+                                    })
+                                    corridor_results["delivery_methods"][service_code]["failed_tests"] += 1
+                                
+                                # Brief pause between amounts to avoid rate limits
+                                time.sleep(random.uniform(1.0, 2.0))
+                            
+                            # Brief pause between payment methods
+                            time.sleep(random.uniform(1.0, 1.5))
+                    
+                    # Save the corridor results
+                    all_results[corridor_label] = corridor_results
+                    
+                except Exception as e:
+                    test_logger.error(f"Failed to test corridor {corridor_label}: {str(e)}")
+                    test_logger.error(traceback.format_exc())
+                    all_results[corridor_label] = {
+                        "supported": False,
+                        "error": str(e)
+                    }
+                
+                # Pause between corridors to avoid overloading the API
+                time.sleep(random.uniform(3.0, 5.0))
+            
+            # Step 4: Save the complete results and summarize findings
+            summary_file = self.save_response_data(all_results, "WU_DISCOVERY_SUMMARY")
+            test_logger.info(f"Complete discovery results saved to {summary_file}")
+            
+            # Print a summary of the findings
+            test_logger.info("\n=== DELIVERY METHOD DISCOVERY SUMMARY ===")
+            supported_corridors = [corridor for corridor, results in all_results.items() 
+                                if results.get("supported", False)]
+            
+            test_logger.info(f"Tested {len(test_corridors)} corridors, {len(supported_corridors)} supported")
+            
+            for corridor in supported_corridors:
+                results = all_results[corridor]
+                if "delivery_methods" not in results:
+                    continue
+                    
+                total_successful = sum(
+                    method.get("successful_tests", 0) 
+                    for method in results["delivery_methods"].values()
+                )
+                total_failed = sum(
+                    method.get("failed_tests", 0) 
+                    for method in results["delivery_methods"].values()
+                )
+                
+                test_logger.info(f"\n{corridor}:")
+                test_logger.info(f"  Total tests: {total_successful + total_failed}")
+                test_logger.info(f"  Successful: {total_successful}")
+                test_logger.info(f"  Failed: {total_failed}")
+                
+                for service_code, service_data in results["delivery_methods"].items():
+                    success_rate = 0
+                    if service_data["successful_tests"] + service_data["failed_tests"] > 0:
+                        success_rate = (service_data["successful_tests"] * 100) / (
+                            service_data["successful_tests"] + service_data["failed_tests"]
+                        )
+                    
+                    test_logger.info(f"  - {service_data['name']} ({service_code}): " +
+                                   f"{service_data['successful_tests']} successes, " +
+                                   f"{service_data['failed_tests']} failures " +
+                                   f"({success_rate:.1f}% success rate)")
+                    
+                    # Show payment methods with successful tests
+                    for pay_code, pay_data in service_data["payment_methods"].items():
+                        successful_results = [r for r in pay_data["results"] if r.get("success", False)]
+                        if successful_results:
+                            test_logger.info(f"    * {pay_data['name']} ({pay_code}): {len(successful_results)} successful tests")
+                            
+                            # Show one successful example if available
+                            if successful_results:
+                                best_result = max(successful_results, key=lambda x: x.get("exchange_rate", 0))
+                                test_logger.info(f"      Best rate: {best_result.get('exchange_rate')} " +
+                                               f"Fee: {best_result.get('fee')} " +
+                                               f"Send: {best_result.get('amount')} " +
+                                               f"Receive: {best_result.get('receive_amount')}")
+            
+            test_logger.info("\n=== SUPPORTED METHODS SUMMARY ===")
+            # Create a dictionary to track which delivery methods work in each corridor
+            corridor_methods = {}
+            
+            for corridor, results in all_results.items():
+                if not results.get("supported", False) or "delivery_methods" not in results:
+                    continue
+                
+                corridor_methods[corridor] = []
+                
+                for service_code, service_data in results["delivery_methods"].items():
+                    if service_data["successful_tests"] > 0:
+                        # Find which payment methods work
+                        working_payment_methods = []
+                        for pay_code, pay_data in service_data["payment_methods"].items():
+                            if any(r.get("success", False) for r in pay_data["results"]):
+                                working_payment_methods.append(pay_data["name"])
+                        
+                        corridor_methods[corridor].append({
+                            "delivery_method": service_data["name"],
+                            "payment_methods": working_payment_methods
+                        })
+            
+            # Display the summary
+            for corridor, methods in corridor_methods.items():
+                test_logger.info(f"\n{corridor}:")
+                for method in methods:
+                    test_logger.info(f"  - {method['delivery_method']}: {', '.join(method['payment_methods'])}")
+            
+            test_logger.info("\n=== END SUMMARY ===")
+            
+        except Exception as e:
+            test_logger.error(f"Discovery test failed: {str(e)}")
+            test_logger.error(traceback.format_exc())
+            raise
+        finally:
+            test_logger.removeHandler(file_handler)
+            file_handler.close()
+            test_logger.info(f"Test logs saved to: {test_method_log}")
 
     def test_20_valid_combinations(self):
         """

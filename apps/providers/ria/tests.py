@@ -1,3 +1,21 @@
+"""
+RIA Money Transfer API Tests
+
+HOW TO RUN THESE TESTS PROPERLY:
+---------------------------------
+To run all tests:
+    python3 -m unittest apps.providers.ria.tests
+
+To run the most reliable test that discovers supported delivery methods:
+    python3 -m unittest apps.providers.ria.tests.TestRIAProviderRealAPI.test_discover_supported_methods
+
+To run a specific test:
+    python3 -m unittest apps.providers.ria.tests.TestRIAProviderRealAPI.<test_method_name>
+
+NOTE: Using 'python3 -m unittest apps/providers/ria/tests.py' will NOT work correctly.
+      Always use dot notation (apps.providers.ria.tests) not file paths with slashes.
+"""
+
 import json
 import logging
 import random
@@ -188,6 +206,8 @@ class TestRIAProviderRealAPI(unittest.TestCase):
             file_handler.close()
             test_logger.info(f"Test logs saved to: {test_method_log}")
 
+    # NOTE: This test method is kept for reference but may not work reliably.
+    # Use test_discover_supported_methods instead for better results.
     def test_available_delivery_methods(self):
         """Discover available delivery methods for each corridor"""
         test_method_log = os.path.join(self.logs_dir, f"test_available_delivery_methods_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
@@ -242,9 +262,9 @@ class TestRIAProviderRealAPI(unittest.TestCase):
                             test_logger.info(f"Raw response saved to {raw_file}")
                             
                             # Check which field contains calculations
-                            if "model" in raw_response and "calculations" in raw_response["model"]:
-                                model_calcs = raw_response["model"]["calculations"]
-                                test_logger.debug(f"Found calculations in model.calculations: {list(model_calcs.keys())}")
+                            if "model" in raw_response and "transferDetails" in raw_response["model"] and "calculations" in raw_response["model"]["transferDetails"]:
+                                model_calcs = raw_response["model"]["transferDetails"]["calculations"]
+                                test_logger.debug(f"Found calculations in model.transferDetails.calculations: {list(model_calcs.keys())}")
                                 test_logger.debug(f"Exchange rate: {model_calcs.get('exchangeRate')}")
                                 test_logger.debug(f"Transfer fee: {model_calcs.get('transferFee')}")
                             
@@ -254,8 +274,8 @@ class TestRIAProviderRealAPI(unittest.TestCase):
                                 test_logger.debug(f"Exchange rate: {direct_calcs.get('exchangeRate')}")
                                 
                             # Check for delivery methods info in the response
-                            if "transferOptions" in raw_response.get("model", {}):
-                                options = raw_response["model"]["transferOptions"]
+                            if "transferOptions" in raw_response.get("model", {}).get("transferDetails", {}):
+                                options = raw_response["model"]["transferDetails"]["transferOptions"]
                                 test_logger.info(f"Found transfer options: {options}")
                     else:
                         test_logger.warning(f"Initial calculation for {test_label} returned no results")
@@ -318,10 +338,10 @@ class TestRIAProviderRealAPI(unittest.TestCase):
                                             test_logger.warning(f"Null values in response for {method}! Checking raw structure...")
                                             
                                             # Check both possible locations for calculations
-                                            model_calcs = raw.get("model", {}).get("calculations", {})
+                                            model_calcs = raw.get("model", {}).get("transferDetails", {}).get("calculations", {})
                                             direct_calcs = raw.get("calculations", {})
                                             
-                                            test_logger.warning(f"model.calculations: {model_calcs if model_calcs else 'None'}")
+                                            test_logger.warning(f"model.transferDetails.calculations: {model_calcs if model_calcs else 'None'}")
                                             test_logger.warning(f"top-level calculations: {direct_calcs if direct_calcs else 'None'}")
                                             
                                             # Check status message
@@ -420,17 +440,27 @@ class TestRIAProviderRealAPI(unittest.TestCase):
                         model = raw_response["model"]
                         test_logger.info(f"Model keys: {', '.join(model.keys())}")
                         
-                        # Check calculations in model
-                        if "calculations" in model:
-                            model_calc = model["calculations"]
-                            test_logger.info(f"Model.calculations keys: {', '.join(model_calc.keys())}")
+                        # Check for transferDetails which contains most important data
+                        if "transferDetails" in model:
+                            transfer_details = model["transferDetails"]
+                            test_logger.info(f"TransferDetails keys: {', '.join(transfer_details.keys())}")
                             
-                            # Important fields to check
-                            check_fields = ["exchangeRate", "transferFee", "amountTo", "totalFeesAndTaxes"]
-                            for field in check_fields:
-                                test_logger.info(f"Model.calculations.{field}: {model_calc.get(field)}")
+                            # Check calculations in transferDetails
+                            if "calculations" in transfer_details:
+                                calcs = transfer_details["calculations"]
+                                test_logger.info(f"TransferDetails.calculations keys: {', '.join(calcs.keys())}")
+                                
+                                # Important fields to check
+                                check_fields = ["exchangeRate", "transferFee", "amountTo", "totalFeesAndTaxes"]
+                                for field in check_fields:
+                                    test_logger.info(f"TransferDetails.calculations.{field}: {calcs.get(field)}")
+                        
+                        # Check for transferOptions
+                        if "transferDetails" in model and "transferOptions" in model["transferDetails"]:
+                            options = model["transferDetails"]["transferOptions"]
+                            test_logger.info(f"TransferOptions: {json.dumps(options, indent=2)}")
                     
-                    # Check direct calculations object
+                    # Check direct calculations object (mostly obsolete but kept for compatibility)
                     if "calculations" in raw_response:
                         calc = raw_response["calculations"]
                         test_logger.info(f"Direct calculation keys: {', '.join(calc.keys())}")
@@ -503,6 +533,9 @@ class TestRIAProviderRealAPI(unittest.TestCase):
         """
         Discover actually supported delivery and payment method combinations
         by parsing transferOptions from the initial response.
+        
+        This is the RECOMMENDED test method for detecting available methods,
+        as it uses the proper API response structure to check what's supported.
         """
         test_method_log = os.path.join(self.logs_dir, f"test_discover_supported_methods_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
         
