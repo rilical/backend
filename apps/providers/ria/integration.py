@@ -1,3 +1,34 @@
+"""
+RIA Money Transfer Integration
+
+This module implements the integration with RIA Money Transfer API for remittance services.
+Unlike Western Union, RIA provides explicit delivery methods and payment methods.
+
+DELIVERY METHODS:
+---------------------------------
+- BankDeposit: Bank account deposit
+- CashPickup: Cash pickup at agent locations
+- HomeDelivery: Cash delivery to home (select markets)
+- MobileWallet: Mobile wallet transfer
+- OfficePickup: Pickup at RIA office
+- MobilePayment: Mobile payment services
+
+PAYMENT METHODS:
+---------------------------------
+- BankAccount: Bank account transfer
+- DebitCard: Debit card payment
+- CreditCard: Credit card payment
+
+Important API notes:
+1. RIA requires token-based authentication via the /Authorization/session endpoint
+2. The calculator must be initialized to get country codes and options
+3. Each corridor (send country → receive country) supports different combinations
+4. Exchange rates and fees vary by delivery method and payment method
+5. The API response structure has calculations in two possible locations
+
+For more details, see the test_discover_supported_methods test method in tests.py
+"""
+
 import logging
 import requests
 import time
@@ -12,10 +43,20 @@ import string
 from datetime import datetime
 import uuid
 import certifi
+from typing import Dict, Optional, Any
 
-urllib3.add_stderr_logger()  # Keep for debugging
+from apps.providers.ria.exceptions import (
+    RIAError,
+    RIAAuthenticationError,
+    RIAValidationError,
+    RIAConnectionError
+)
+
+# Enable debug logging for urllib3 if needed
+urllib3.add_stderr_logger()
 
 class TLSAdapter(HTTPAdapter):
+    """Custom adapter to handle RIA's TLS requirements."""
     def init_poolmanager(self, *args, **kwargs):
         ctx = create_urllib3_context()
         ctx.options |= 0x4  # OP_LEGACY_SERVER_CONNECT
@@ -26,18 +67,17 @@ class TLSAdapter(HTTPAdapter):
         kwargs["ssl_context"] = create_urllib3_context()
         return super().proxy_manager_for(*args, **kwargs)
 
-class RIAError(Exception):
-    """Generic RIA error."""
-    pass
-
 class RIAProvider:
+    """RIA Money Transfer API integration provider."""
+    
     BASE_URL = "https://public.riamoneytransfer.com"
 
     def __init__(self, timeout: int = 30):
         """
-        Initialize RIA provider with automatic token retrieval from /Authorization/session.
+        Initialize RIA provider with automatic token retrieval.
         
-        :param timeout: Request timeout in seconds
+        Args:
+            timeout: Request timeout in seconds
         """
         self.name = "RIA"
         self.timeout = timeout
@@ -46,7 +86,7 @@ class RIAProvider:
         self.bearer_token = None
         self.token_expiry = None
         self.calculator_data = None
-        self.debug_mode = True  # FIXED: Always on debug mode to capture full responses
+        self.debug_mode = True  # Always on debug mode to capture full responses
 
         # Use certifi's CA bundle for SSL verification
         self._session.verify = certifi.where()
@@ -55,7 +95,7 @@ class RIAProvider:
         # Set default Country/ISO headers to US
         country_code = "US"
         
-        # Updated headers to match Safari-based browser behavior
+        # Safari-based browser headers for better compatibility
         self._session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15',
             'Accept-Language': 'en-US,en;q=0.9',
@@ -101,7 +141,7 @@ class RIAProvider:
         self.initialize_calculator()
 
     def _configure_tls(self):
-        """Force modern TLS configuration"""
+        """Force modern TLS configuration."""
         ctx = create_urllib3_context()
         ctx.options |= (
             0x4  # OP_LEGACY_SERVER_CONNECT
@@ -110,7 +150,16 @@ class RIAProvider:
         ctx.load_default_certs()
 
     def get_session_info(self) -> dict:
-        """Get session info and bearer token via GET /Authorization/session"""
+        """
+        Get session info and bearer token via GET /Authorization/session.
+        
+        Returns:
+            Dict containing session information.
+        
+        Raises:
+            RIAConnectionError: If connection to API fails
+            RIAError: For other RIA-specific errors
+        """
         try:
             self.logger.debug("Getting session info and token from /Authorization/session")
             
@@ -120,7 +169,6 @@ class RIAProvider:
             )
             response.raise_for_status()
             
-            # Save all response headers for debugging
             self.logger.debug("Response headers: %s", dict(response.headers))
             
             session_data = response.json()
@@ -148,10 +196,21 @@ class RIAProvider:
             
         except requests.RequestException as e:
             self.logger.error("Session initialization failed: %s", str(e), exc_info=True)
-            raise RIAError("Failed to get session info") from e
+            if hasattr(e, 'response') and e.response is not None:
+                raise RIAConnectionError(f"Failed to get session info: {e.response.status_code}")
+            raise RIAConnectionError(f"Failed to get session info: {str(e)}")
 
     def initialize_calculator(self) -> dict:
-        """Initialize calculator and handle any new token from response"""
+        """
+        Initialize calculator and handle any new token from response.
+        
+        Returns:
+            Dict containing calculator initialization data.
+            
+        Raises:
+            RIAConnectionError: If connection to API fails
+            RIAError: For other RIA-specific errors
+        """
         try:
             response = self._session.get(
                 f"{self.BASE_URL}/Calculator/Initialize",
@@ -159,7 +218,6 @@ class RIAProvider:
             )
             response.raise_for_status()
             
-            # Log all headers again for debugging
             self.logger.debug("Initialize calculator headers: %s", dict(response.headers))
             
             init_data = response.json()
@@ -184,13 +242,20 @@ class RIAProvider:
             
         except requests.RequestException as e:
             self.logger.error("Calculator init failed: %s", str(e), exc_info=True)
-            raise RIAError("Failed to initialize calculator") from e
+            if hasattr(e, 'response') and e.response is not None:
+                raise RIAConnectionError(f"Failed to initialize calculator: {e.response.status_code}")
+            raise RIAConnectionError(f"Failed to initialize calculator: {str(e)}")
 
     def _ensure_valid_token(self):
-        """Check token expiry and refresh if needed"""
+        """
+        Check token expiry and refresh if needed.
+        
+        Raises:
+            RIAAuthenticationError: If no bearer token is available
+        """
         if not self.bearer_token:
             self.logger.error("No bearer token available")
-            raise RIAError("No bearer token available")
+            raise RIAAuthenticationError("No bearer token available")
             
         if self.token_expiry and time.time() > (self.token_expiry - 60):
             self.logger.debug("Token expired or about to expire; refreshing session")
@@ -198,16 +263,19 @@ class RIAProvider:
 
     def get_available_delivery_methods(self, receive_country: str, send_country: str = "US") -> dict:
         """
-        Get all available delivery methods for a specific corridor
+        Get all available delivery methods for a specific corridor.
         
-        :param receive_country: 2-letter country code for destination
-        :param send_country: 2-letter country code for source (default: US)
-        :return: Dictionary of available delivery methods with supported payment methods
+        Args:
+            receive_country: 2-letter country code for destination
+            send_country: 2-letter country code for source (default: US)
+            
+        Returns:
+            Dictionary of available delivery methods with supported payment methods
         """
         if not self.calculator_data:
             self.initialize_calculator()
             
-        # First, try each standard delivery method
+        # Standard delivery methods to test
         delivery_methods = {
             "BankDeposit": "Bank Deposit",
             "CashPickup": "Cash Pickup",
@@ -222,7 +290,7 @@ class RIAProvider:
         
         results = {}
         
-        # Try with a higher amount to improve success rate
+        # Use a higher amount to improve success rate
         test_amount = 300
         send_currency = "USD" if send_country == "US" else "EUR"
         
@@ -233,8 +301,8 @@ class RIAProvider:
                 send_amount=test_amount,
                 send_currency=send_currency,
                 receive_country=receive_country,
-                payment_method="DebitCard",  # Most common
-                delivery_method="BankDeposit",  # Most common
+                payment_method="DebitCard",
+                delivery_method="BankDeposit",
                 send_country=send_country
             )
             
@@ -246,8 +314,6 @@ class RIAProvider:
                 if "transferOptions" in general_result["raw_response"].get("model", {}):
                     options = general_result["raw_response"]["model"]["transferOptions"]
                     self.logger.info(f"Found transfer options in response: {options}")
-                    # Parse available methods from the response
-                    # Implementation would depend on the response structure
             
         except Exception as e:
             self.logger.error(f"Error checking general availability: {str(e)}")
@@ -298,8 +364,10 @@ class RIAProvider:
                         result = response.json()
                         
                         # Check if there's valid calculation data
-                        if "model" in result and "calculations" in result["model"]:
-                            calculations = result["model"]["calculations"]
+                        has_calculations = False
+                        
+                        if "model" in result and "transferDetails" in result["model"] and "calculations" in result["model"]["transferDetails"]:
+                            calculations = result["model"]["transferDetails"]["calculations"]
                             
                             # If we have a valid exchange rate, this method works
                             if calculations.get("exchangeRate") is not None:
@@ -332,15 +400,18 @@ class RIAProvider:
                       payment_method: str = "DebitCard", delivery_method: str = "BankDeposit",
                       send_country: str = "US") -> dict:
         """
-        Calculate rate via POST /MoneyTransferCalculator/Calculate
+        Calculate rate via POST /MoneyTransferCalculator/Calculate.
         
-        :param send_amount: Amount to send
-        :param send_currency: Currency code to send (e.g., USD)
-        :param receive_country: Country code to receive money (e.g., MX)
-        :param payment_method: Payment method (DebitCard, CreditCard, BankAccount)
-        :param delivery_method: Delivery method (BankDeposit, CashPickup, etc.)
-        :param send_country: Source country code (default: US)
-        :return: Dictionary with rate details or None if calculation failed
+        Args:
+            send_amount: Amount to send
+            send_currency: Currency code to send (e.g., USD)
+            receive_country: Country code to receive money (e.g., MX)
+            payment_method: Payment method (DebitCard, CreditCard, BankAccount)
+            delivery_method: Delivery method (BankDeposit, CashPickup, etc.)
+            send_country: Source country code (default: US)
+            
+        Returns:
+            Dictionary with rate details or None if calculation failed
         """
         try:
             self._ensure_valid_token()
@@ -382,7 +453,7 @@ class RIAProvider:
                 self.logger.warning(f"Error in calculate response: {full_response['errorResponse']}")
                 return None
                 
-            # FIXED: Extract fields from the correct model.calculations path
+            # Extract fields from the correct model.calculations path
             model_calcs = full_response.get("model", {}).get("calculations", {})
             direct_calcs = full_response.get("calculations", {})
             
@@ -410,17 +481,22 @@ class RIAProvider:
             
             return result
 
+        except RIAAuthenticationError:
+            raise
         except (requests.RequestException, ValueError, KeyError) as e:
             self.logger.error(f"Calculation failed: {str(e)}", exc_info=True)
             return None
 
     def _do_calculate(self, payload: dict, return_full: bool = True) -> dict:
         """
-        Execute calculation request
+        Execute calculation request.
         
-        :param payload: Request payload
-        :param return_full: If True, return full response instead of just calculations (Default: True)
-        :return: Full response JSON or just calculations based on return_full (or None if request fails)
+        Args:
+            payload: Request payload
+            return_full: If True, return full response instead of just calculations (Default: True)
+            
+        Returns:
+            Full response JSON or just calculations based on return_full (or None if request fails)
         """
         correlation_id = str(uuid.uuid4())
         
@@ -434,7 +510,6 @@ class RIAProvider:
                 timeout=self.timeout
             )
             
-            # Save COMPLETE HTTP response details for debugging
             self.logger.debug(f"HTTP Response Status: {response.status_code}")
             self.logger.debug(f"HTTP Response Headers: {dict(response.headers)}")
             
@@ -458,7 +533,7 @@ class RIAProvider:
             if return_full:
                 return result
             else:
-                # FIXED: Check both possible locations for calculation data
+                # Check both possible locations for calculation data
                 model_calcs = result.get("model", {}).get("calculations", {})
                 direct_calcs = result.get("calculations", {})
                 

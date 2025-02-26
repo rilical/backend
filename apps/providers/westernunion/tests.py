@@ -1,19 +1,9 @@
 """
 Western Union Money Transfer API Tests
 
-HOW TO RUN THESE TESTS PROPERLY:
----------------------------------
-To run all tests:
-    python3 -m unittest apps.providers.westernunion.tests
-
-To run the new method that discovers supported delivery options:
-    python3 -m unittest apps.providers.westernunion.tests.TestWesternUnionProviderRealAPI.test_discover_supported_methods
-
-To run a specific test:
-    python3 -m unittest apps.providers.westernunion.tests.TestWesternUnionProviderRealAPI.<test_method_name>
-
-NOTE: Using 'python3 -m unittest apps/providers/westernunion/tests.py' will NOT work correctly.
-      Always use dot notation (apps.providers.westernunion.tests) not file paths with slashes.
+HOW TO RUN:
+python3 -m unittest apps.providers.westernunion.tests
+python3 -m unittest apps.providers.westernunion.tests.TestWesternUnionProviderRealAPI.test_discover_supported_methods
 """
 
 import json
@@ -26,7 +16,6 @@ import traceback
 from datetime import datetime
 from decimal import Decimal
 
-# Import real WU provider & exceptions
 from apps.providers.westernunion.integration import WesternUnionProvider
 from apps.providers.westernunion.exceptions import (
     WUError,
@@ -36,26 +25,19 @@ from apps.providers.westernunion.exceptions import (
 )
 
 class TestWesternUnionProviderRealAPI(unittest.TestCase):
-    """
-    Real-API tests for Western Union Provider.
-    Includes short sleeps to reduce blocking, and logs success/failure in detail.
-    """
+    """Real-API tests for Western Union Provider."""
 
     @classmethod
     def setUpClass(cls):
-        # Configure logging at INFO to see more logs
         logging.basicConfig(level=logging.INFO)
         cls.logger = logging.getLogger(__name__)
         
-        # Set up results and logs directories
         cls.results_dir = "test_results_wu"
         cls.logs_dir = os.path.join(cls.results_dir, "logs")
         
-        # Create both directories
         os.makedirs(cls.results_dir, exist_ok=True)
         os.makedirs(cls.logs_dir, exist_ok=True)
         
-        # Set up a root file handler to capture all logs
         root_log_file = os.path.join(cls.logs_dir, f"wu_tests_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
         file_handler = logging.FileHandler(root_log_file)
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
@@ -68,7 +50,6 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        # Close the file handler
         if hasattr(cls, 'file_handler') and cls.file_handler:
             cls.file_handler.close()
             logging.getLogger().removeHandler(cls.file_handler)
@@ -76,20 +57,16 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
         cls.logger.info("Test run completed.")
 
     def setUp(self):
-        # Create a fresh provider before each test
         self.provider = WesternUnionProvider(timeout=30)
         self.logger = logging.getLogger(__name__)
         self.logger.info(f"=== Starting test: {self._testMethodName} ===")
 
     def tearDown(self):
-        # Create a specific log file for this test
         test_log_file = os.path.join(self.logs_dir, f"{self._testMethodName}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
         self.logger.info(f"=== Ending test: {self._testMethodName} ===")
         
-        # Try to export logs from the provider's session
         if hasattr(self, 'provider') and hasattr(self.provider, 'logger'):
             try:
-                # Export HTTP request/response logs if available
                 session_logs = []
                 if hasattr(self.provider, '_session') and hasattr(self.provider._session, 'history'):
                     for req in self.provider._session.history:
@@ -104,9 +81,7 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
                 self.logger.warning(f"Could not export session logs: {str(e)}")
 
     def save_response_data(self, data, prefix):
-        """
-        Saves the JSON response to a timestamped file for reference.
-        """
+        """Saves the JSON response to a timestamped file for reference."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{self.results_dir}/{prefix}_{timestamp}.json"
         with open(filename, 'w') as f:
@@ -115,9 +90,7 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
         return filename
 
     def assertValidRateData(self, rate_data: dict):
-        """
-        Basic verification that required fields exist and are non-negative.
-        """
+        """Basic verification that required fields exist and are non-negative."""
         required_keys = {
             "provider", "timestamp", "send_amount", "send_currency",
             "receive_country", "exchange_rate", "transfer_fee",
@@ -132,22 +105,9 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
         self.assertGreaterEqual(rate_data["receive_amount"], 0.0, "receive_amount < 0")
 
     def test_discover_supported_methods(self):
-        """
-        Discover supported delivery methods and payment combinations for Western Union.
-        
-        This test analyzes the catalog data response to identify which combinations of:
-        - Send country/currency
-        - Receive country
-        - Delivery method (cash pickup, bank account, mobile wallet)
-        - Payment method (bank account, credit card, debit card)
-        
-        are actually supported. Unlike the RIA API which has explicit fields for
-        delivery and payment methods, Western Union uses service groups with different
-        delivery channel names.
-        """
+        """Discover supported delivery methods and payment combinations."""
         test_method_log = os.path.join(self.logs_dir, f"test_discover_supported_methods_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
         
-        # Create a file handler specific to this test
         file_handler = logging.FileHandler(test_method_log)
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         test_logger = logging.getLogger(f"{__name__}.{self._testMethodName}")
@@ -155,7 +115,6 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
         test_logger.setLevel(logging.DEBUG)
         
         try:
-            # Test key corridors 
             test_corridors = [
                 ("US", "USD", "MX"),      # US to Mexico
                 ("US", "USD", "PH"),      # US to Philippines 
@@ -178,10 +137,8 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
                 test_logger.info(f"Testing corridor: {corridor_label}")
                 
                 try:
-                    # Step 1: Make initial catalog request with higher amount to increase success chance
                     test_logger.info(f"Making initial catalog request for {corridor_label}")
                     
-                    # Use a higher amount to get more delivery options
                     test_amount = Decimal("500.00")
                     
                     catalog_data = self.provider.get_catalog_data(
@@ -191,14 +148,12 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
                         send_country=send_country
                     )
                     
-                    # Save the raw catalog response
                     catalog_file = self.save_response_data(
                         catalog_data, 
                         f"CATALOG_{send_country}_{send_currency}_to_{receive_country}"
                     )
                     test_logger.info(f"Catalog response saved to {catalog_file}")
                     
-                    # Step 2: Extract service groups (delivery methods)
                     service_groups = catalog_data.get("services_groups", [])
                     
                     if not service_groups:
@@ -212,7 +167,6 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
                     
                     test_logger.info(f"Found {len(service_groups)} service groups")
                     
-                    # Identify unique delivery methods and payment methods
                     delivery_methods = {}
                     for group in service_groups:
                         service_name = group.get("service_name", "Unknown")
@@ -222,7 +176,6 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
                             "payment_methods": []
                         }
                         
-                        # Extract payment methods for this delivery method
                         for pay_group in group.get("pay_groups", []):
                             pay_method = pay_group.get("fund_in", "Unknown")
                             pay_method_name = pay_group.get("fund_in_name", pay_method)
@@ -233,13 +186,11 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
                                     "name": pay_method_name
                                 })
                     
-                    # Log available methods
                     test_logger.info(f"Available delivery methods for {corridor_label}:")
                     for code, details in delivery_methods.items():
                         payment_methods = [pm["name"] for pm in details["payment_methods"]]
                         test_logger.info(f"  - {details['name']} ({code}): {', '.join(payment_methods)}")
                     
-                    # Step 3: Test different amounts with each delivery/payment combination
                     test_amounts = [50, 200, 500, 1000]
                     corridor_results = {
                         "supported": True,
@@ -268,13 +219,11 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
                                 "results": []
                             }
                             
-                            # Test with different amounts
                             for amount in test_amounts:
                                 test_label = f"{corridor_label} {amount}{send_currency} via {service_name}/{pay_name}"
                                 test_logger.info(f"    Testing amount: {amount} {send_currency}")
                                 
                                 try:
-                                    # Request the catalog with this specific amount
                                     catalog_specific = self.provider.get_catalog_data(
                                         send_amount=Decimal(str(amount)),
                                         send_currency=send_currency,
@@ -282,13 +231,11 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
                                         send_country=send_country
                                     )
                                     
-                                    # Find the matching service group and payment method
                                     result = None
                                     for group in catalog_specific.get("services_groups", []):
                                         if group.get("service") == service_code:
                                             for pay_group in group.get("pay_groups", []):
                                                 if pay_group.get("fund_in") == pay_code:
-                                                    # Found a match!
                                                     fx_rate = float(pay_group.get("fx_rate", 0))
                                                     fee = float(pay_group.get("gross_fee", 0))
                                                     receive_amount = float(pay_group.get("receive_amount", 0))
@@ -344,13 +291,10 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
                                     })
                                     corridor_results["delivery_methods"][service_code]["failed_tests"] += 1
                                 
-                                # Brief pause between amounts to avoid rate limits
                                 time.sleep(random.uniform(1.0, 2.0))
                             
-                            # Brief pause between payment methods
                             time.sleep(random.uniform(1.0, 1.5))
                     
-                    # Save the corridor results
                     all_results[corridor_label] = corridor_results
                     
                 except Exception as e:
@@ -361,14 +305,11 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
                         "error": str(e)
                     }
                 
-                # Pause between corridors to avoid overloading the API
                 time.sleep(random.uniform(3.0, 5.0))
             
-            # Step 4: Save the complete results and summarize findings
             summary_file = self.save_response_data(all_results, "WU_DISCOVERY_SUMMARY")
             test_logger.info(f"Complete discovery results saved to {summary_file}")
             
-            # Print a summary of the findings
             test_logger.info("\n=== DELIVERY METHOD DISCOVERY SUMMARY ===")
             supported_corridors = [corridor for corridor, results in all_results.items() 
                                 if results.get("supported", False)]
@@ -406,13 +347,11 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
                                    f"{service_data['failed_tests']} failures " +
                                    f"({success_rate:.1f}% success rate)")
                     
-                    # Show payment methods with successful tests
                     for pay_code, pay_data in service_data["payment_methods"].items():
                         successful_results = [r for r in pay_data["results"] if r.get("success", False)]
                         if successful_results:
                             test_logger.info(f"    * {pay_data['name']} ({pay_code}): {len(successful_results)} successful tests")
                             
-                            # Show one successful example if available
                             if successful_results:
                                 best_result = max(successful_results, key=lambda x: x.get("exchange_rate", 0))
                                 test_logger.info(f"      Best rate: {best_result.get('exchange_rate')} " +
@@ -421,7 +360,6 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
                                                f"Receive: {best_result.get('receive_amount')}")
             
             test_logger.info("\n=== SUPPORTED METHODS SUMMARY ===")
-            # Create a dictionary to track which delivery methods work in each corridor
             corridor_methods = {}
             
             for corridor, results in all_results.items():
@@ -432,7 +370,6 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
                 
                 for service_code, service_data in results["delivery_methods"].items():
                     if service_data["successful_tests"] > 0:
-                        # Find which payment methods work
                         working_payment_methods = []
                         for pay_code, pay_data in service_data["payment_methods"].items():
                             if any(r.get("success", False) for r in pay_data["results"]):
@@ -443,7 +380,6 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
                             "payment_methods": working_payment_methods
                         })
             
-            # Display the summary
             for corridor, methods in corridor_methods.items():
                 test_logger.info(f"\n{corridor}:")
                 for method in methods:
@@ -461,13 +397,9 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
             test_logger.info(f"Test logs saved to: {test_method_log}")
 
     def test_20_valid_combinations(self):
-        """
-        Test 20 different valid combos. Each sub-test does a real call,
-        logs success or error, and then sleeps ~2 seconds to reduce rate-limit risk.
-        """
+        """Test 20 different valid combinations of send countries, currencies, and receive countries."""
         test_method_log = os.path.join(self.logs_dir, f"test_20_valid_combinations_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
         
-        # Create a file handler specific to this test
         file_handler = logging.FileHandler(test_method_log)
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         test_logger = logging.getLogger(f"{__name__}.{self._testMethodName}")
@@ -519,7 +451,6 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
                             saved_file = self.save_response_data(rate_data, file_prefix)
                             test_logger.info(f"Test PASSED: {subtest_label} - Rate data saved to {saved_file}")
                             
-                            # Log key rate information
                             test_logger.info(f"Exchange rate: {rate_data.get('exchange_rate')}")
                             test_logger.info(f"Transfer fee: {rate_data.get('transfer_fee')}")
                             test_logger.info(f"Receive amount: {rate_data.get('receive_amount')}")
@@ -535,7 +466,6 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
                         test_logger.error(traceback.format_exc())
                         raise
                     finally:
-                        # Sleep ~2 seconds to help avoid rate-limiting
                         test_logger.debug(f"Sleeping 2 seconds after {subtest_label}")
                         time.sleep(2)
             
@@ -551,13 +481,9 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
             test_logger.info(f"Test logs saved to: {test_method_log}")
 
     def test_5_invalid_inputs(self):
-        """
-        Test 5 clearly invalid inputs. 
-        We expect either None or an exception to be raised.
-        """
+        """Test 5 invalid input combinations that should fail gracefully."""
         test_method_log = os.path.join(self.logs_dir, f"test_5_invalid_inputs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
         
-        # Create a file handler specific to this test
         file_handler = logging.FileHandler(test_method_log)
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         test_logger = logging.getLogger(f"{__name__}.{self._testMethodName}")
@@ -566,11 +492,11 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
         
         try:
             invalid_scenarios = [
-                (-100, "USD", "MX", "US"),   # Negative amount
-                (5000, "???", "EG", "US"),   # Invalid currency
-                (400, "USD", "XX", "US"),    # Unknown country
-                (400, "XYZ", "EG", "US"),    # Another unknown currency
-                (-50, "GBP", "ZZ", "GB"),    # Negative + unknown
+                (-100, "USD", "MX", "US"),
+                (5000, "???", "EG", "US"),
+                (400, "USD", "XX", "US"),
+                (400, "XYZ", "EG", "US"),
+                (-50, "GBP", "ZZ", "GB"),
             ]
 
             test_logger.info(f"Testing {len(invalid_scenarios)} invalid scenarios")
@@ -585,7 +511,6 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
                         result = self.provider.get_exchange_rate(
                             Decimal(str(amt)), curr, rcountry, scountry
                         )
-                        # Expect None or an exception
                         self.assertIsNone(
                             result,
                             f"Expected None but got {result} for scenario: {subtest_label}"

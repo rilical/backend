@@ -1,12 +1,10 @@
-"""
-RIA-specific exceptions, mirroring the Western Union pattern.
-"""
-
-from typing import Dict, Any
+"""RIA Money Transfer-specific exceptions."""
+from typing import Optional, Dict, Any
 from apps.providers.base.exceptions import ProviderError
 
+
 class RIAError(ProviderError):
-    """Base exception for RIA-specific errors."""
+    """Exception raised for RIA Money Transfer-specific errors."""
     def __init__(self, message: str, error_code: str = None, details: Dict[str, Any] = None):
         super().__init__(
             message=message,
@@ -16,13 +14,13 @@ class RIAError(ProviderError):
         )
 
 class RIAAuthenticationError(RIAError):
-    """Raised when there are authentication/session issues with RIA."""
+    """Raised when there are authentication/session issues."""
     pass
 
 class RIAValidationError(RIAError):
-    """Raised when RIA's API rejects or finds invalid input."""
+    """Raised when the API rejects our input parameters."""
     pass
 
 class RIAConnectionError(RIAError):
-    """Raised when we fail to connect or receive a valid response from RIA."""
+    """Raised when we can't connect to RIA's API."""
     pass 
