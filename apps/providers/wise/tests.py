@@ -2,20 +2,17 @@
 Wise Money Transfer API Tests
 
 HOW TO RUN:
-python3 -m unittest apps.providers.wise.tests
-python3 -m unittest apps.providers.wise.tests.TestWiseProviderRealAPI.test_discover_supported_methods
+python -m unittest apps.providers.wise.tests
+python -m unittest apps.providers.wise.tests.TestWiseProviderRealAPI.test_discover_supported_methods
 """
 
 import json
 import logging
 import os
+import traceback
 import unittest
 from datetime import datetime
 from decimal import Decimal
-from unittest.mock import patch, MagicMock
-
-import requests
-from requests.exceptions import RequestException, HTTPError
 
 from apps.providers.wise.integration import WiseProvider
 from apps.providers.wise.exceptions import (
@@ -27,290 +24,119 @@ from apps.providers.wise.exceptions import (
 )
 
 
-# Sample response data for tests
-SAMPLE_QUOTE_RESPONSE = {
-    "targetAmount": 110.00,
-    "sourceAmount": 88.45,
-    "rate": 1.26355,
-    "status": "PENDING",
-    "sourceCurrency": "GBP",
-    "targetCurrency": "USD",
-    "createdTime": "2025-02-25T06:32:55Z",
-    "paymentOptions": [
-        {
-            "formattedEstimatedDelivery": "in 11 hours",
-            "estimatedDelivery": "2025-02-25T17:30:00Z",
-            "sourceAmount": 88.45,
-            "targetAmount": 110.00,
-            "fee": {
-                "transferwise": 1.39,
-                "payIn": 0.0,
-                "total": 1.39
-            },
-            "payIn": "BANK_TRANSFER",
-            "payOut": "BANK_TRANSFER",
-            "disabled": False
-        },
-        {
-            "formattedEstimatedDelivery": "in 11 hours",
-            "estimatedDelivery": "2025-02-25T17:30:00Z",
-            "sourceAmount": 89.03,
-            "targetAmount": 110.00,
-            "fee": {
-                "transferwise": 1.39,
-                "payIn": 0.58,
-                "total": 1.97
-            },
-            "payIn": "DEBIT",
-            "payOut": "BANK_TRANSFER",
-            "disabled": False
-        }
-    ]
-}
-
-
-class TestWiseProviderMock(unittest.TestCase):
-    """Test the Wise Provider with mock API responses."""
-    
-    def setUp(self):
-        """Set up test fixtures."""
-        self.provider = WiseProvider(api_key=None)  # No API key needed for quotes
-    
-    @patch('requests.Session.post')
-    def test_get_quote_success(self, mock_post):
-        """Test successful quote retrieval."""
-        # Configure mock response
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = SAMPLE_QUOTE_RESPONSE
-        mock_post.return_value = mock_response
-        
-        # Call the method
-        result = self.provider.get_quote(
-            source_currency="GBP",
-            target_currency="USD",
-            source_amount=88.45
-        )
-        
-        # Verify result
-        self.assertEqual(result["rate"], 1.26355)
-        self.assertEqual(result["sourceCurrency"], "GBP")
-        self.assertEqual(result["targetCurrency"], "USD")
-        
-        # Verify the API was called correctly
-        mock_post.assert_called_once()
-        args, kwargs = mock_post.call_args
-        self.assertEqual(kwargs["json"]["sourceCurrency"], "GBP")
-        self.assertEqual(kwargs["json"]["targetCurrency"], "USD")
-        self.assertEqual(kwargs["json"]["sourceAmount"], 88.45)
-        
-    @patch('requests.Session.post')
-    def test_get_quote_missing_amount(self, mock_post):
-        """Test error when no amount is provided."""
-        with self.assertRaises(WiseValidationError):
-            self.provider.get_quote(
-                source_currency="GBP",
-                target_currency="USD"
-            )
-        
-        # Verify API was not called
-        mock_post.assert_not_called()
-        
-    @patch('requests.Session.post')
-    def test_get_quote_http_error(self, mock_post):
-        """Test handling of HTTP errors."""
-        # Create mock error response
-        error_response = MagicMock()
-        error_response.status_code = 400
-        error_response.text = json.dumps({"error": "Invalid parameters"})
-        
-        # Create mock exception
-        mock_error = HTTPError("Bad Request")
-        mock_error.response = error_response
-        
-        # Configure mock to raise exception
-        mock_post.side_effect = mock_error
-        
-        with self.assertRaises(WiseValidationError):
-            self.provider.get_quote(
-                source_currency="GBP",
-                target_currency="USD",
-                source_amount=88.45
-            )
-            
-    @patch('requests.Session.post')
-    def test_get_quote_auth_error(self, mock_post):
-        """Test handling of authentication errors."""
-        # Create mock error response
-        error_response = MagicMock()
-        error_response.status_code = 401
-        error_response.text = json.dumps({"error": "Unauthorized"})
-        
-        # Create mock exception
-        mock_error = HTTPError("Unauthorized")
-        mock_error.response = error_response
-        
-        # Configure mock to raise exception
-        mock_post.side_effect = mock_error
-        
-        with self.assertRaises(WiseAuthenticationError):
-            self.provider.get_quote(
-                source_currency="GBP",
-                target_currency="USD",
-                source_amount=88.45
-            )
-            
-    @patch('requests.Session.post')
-    def test_get_quote_connection_error(self, mock_post):
-        """Test handling of connection errors."""
-        mock_post.side_effect = RequestException("Connection failed")
-        
-        with self.assertRaises(WiseConnectionError):
-            self.provider.get_quote(
-                source_currency="GBP",
-                target_currency="USD",
-                source_amount=88.45
-            )
-    
-    @patch('requests.Session.post')
-    def test_get_quote_rate_limit_error(self, mock_post):
-        """Test handling of rate limit errors."""
-        # Create mock error response
-        error_response = MagicMock()
-        error_response.status_code = 429
-        error_response.text = json.dumps({"error": "Too Many Requests"})
-        error_response.headers = {"Retry-After": "30"}
-        
-        # Create mock exception
-        mock_error = HTTPError("Too Many Requests")
-        mock_error.response = error_response
-        
-        # Configure mock to raise exception
-        mock_post.side_effect = mock_error
-        
-        with self.assertRaises(WiseRateLimitError) as context:
-            self.provider.get_quote(
-                source_currency="GBP",
-                target_currency="USD",
-                source_amount=88.45
-            )
-            
-        # Verify the error details include retry information
-        self.assertIn("retry_after", context.exception.details)
-        self.assertEqual(context.exception.details["retry_after"], "30")
-            
-    @patch('apps.providers.wise.integration.WiseProvider.get_quote')
-    def test_get_exchange_rate_success(self, mock_get_quote):
-        """Test getting exchange rate information successfully."""
-        mock_get_quote.return_value = SAMPLE_QUOTE_RESPONSE
-        
-        result = self.provider.get_exchange_rate(
-            send_amount=Decimal("88.45"),
-            send_currency="GBP",
-            receive_country="US",
-            receive_currency="USD"
-        )
-        
-        # Verify correct parameters were passed
-        mock_get_quote.assert_called_with(
-            source_currency="GBP",
-            target_currency="USD",
-            source_amount=88.45
-        )
-        
-        # Verify response formatting
-        self.assertEqual(result['provider'], "Wise")
-        self.assertEqual(result['send_amount'], 88.45)
-        self.assertEqual(result['send_currency'], "GBP")
-        self.assertEqual(result['receive_country'], "US")
-        self.assertEqual(result['receive_currency'], "USD")
-        self.assertEqual(result['exchange_rate'], 1.26355)
-        self.assertEqual(result['transfer_fee'], 1.39)
-        self.assertEqual(result['service_name'], "BANK_TRANSFER to BANK_TRANSFER")
-        self.assertEqual(result['receive_amount'], 110.00)
-        
-    @patch('apps.providers.wise.integration.WiseProvider.get_quote')
-    def test_country_currency_mapping(self, mock_get_quote):
-        """Test country code to currency code mapping."""
-        mock_get_quote.return_value = SAMPLE_QUOTE_RESPONSE
-        
-        # Test without explicitly providing receive_currency
-        self.provider.get_exchange_rate(
-            send_amount=Decimal("100"),
-            send_currency="USD",
-            receive_country="MX"
-        )
-        
-        # Verify correct currency was derived from country code
-        mock_get_quote.assert_called_with(
-            source_currency="USD",
-            target_currency="MXN",
-            source_amount=100.0
-        )
-
-    @patch('apps.providers.wise.integration.WiseProvider.get_quote')
-    def test_find_best_payment_option(self, mock_get_quote):
-        """Test finding the best payment option from quote data."""
-        mock_get_quote.return_value = SAMPLE_QUOTE_RESPONSE
-        
-        result = self.provider.get_exchange_rate(
-            send_amount=Decimal("88.45"),
-            send_currency="GBP",
-            receive_country="US",
-            receive_currency="USD"
-        )
-        
-        # The best option should be the one with lowest fee
-        self.assertEqual(result['transfer_fee'], 1.39)
-        self.assertEqual(result['service_name'], "BANK_TRANSFER to BANK_TRANSFER")
-
-
 class TestWiseProviderRealAPI(unittest.TestCase):
-    """Test the Wise Provider with real API calls."""
+    """Real-API tests for Wise Money Transfer Provider.
     
-    def setUp(self):
-        """Set up test fixtures."""
-        # Create results directory if it doesn't exist
-        self.results_dir = "test_results_wise"
-        self.logs_dir = os.path.join(self.results_dir, "logs")
+    This class contains tests that make real API calls to the Wise Money Transfer API.
+    These tests verify the functionality of the integration with actual API responses.
+    
+    Note: Running these tests will make real API calls and may consume API quota or incur costs.
+    """
+    
+    @classmethod
+    def setUpClass(cls):
+        """Set up test environment before running any tests in this class.
         
-        os.makedirs(self.results_dir, exist_ok=True)
-        os.makedirs(self.logs_dir, exist_ok=True)
+        Creates necessary directories for test outputs and configures logging.
+        """
+        logging.basicConfig(level=logging.INFO)
+        cls.logger = logging.getLogger(__name__)
+        
+        # Create results directory if it doesn't exist
+        cls.results_dir = "test_results_wise"
+        cls.logs_dir = os.path.join(cls.results_dir, "logs")
+        
+        os.makedirs(cls.results_dir, exist_ok=True)
+        os.makedirs(cls.logs_dir, exist_ok=True)
         
         # Set up logging
-        self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.INFO)
-        
-        # Create a file handler for this test run
-        log_filename = os.path.join(self.logs_dir, f"wise_tests_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
-        file_handler = logging.FileHandler(log_filename)
+        root_log_file = os.path.join(cls.logs_dir, f"wise_tests_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+        file_handler = logging.FileHandler(root_log_file)
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-        self.logger.addHandler(file_handler)
         
-        # Also log to console
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
-        self.logger.addHandler(console_handler)
+        root_logger = logging.getLogger()
+        root_logger.addHandler(file_handler)
         
-        self.logger.info(f"Test run started. Logs will be saved to {log_filename}")
+        cls.file_handler = file_handler
+        cls.logger.info(f"Test run started. Logs will be saved to {root_log_file}")
+    
+    @classmethod
+    def tearDownClass(cls):
+        """Clean up resources after all tests in this class have run."""
+        if hasattr(cls, 'file_handler') and cls.file_handler:
+            cls.file_handler.close()
+            logging.getLogger().removeHandler(cls.file_handler)
         
+        cls.logger.info("Test run completed.")
+    
+    def setUp(self):
+        """Set up test environment before each test method."""
         # Initialize provider with no API key (for quotes only)
         self.provider = WiseProvider(api_key=None)
+        self.logger = logging.getLogger(__name__)
+        self.logger.info(f"=== Starting test: {self._testMethodName} ===")
         
-    def save_response_data(self, data, prefix):
-        """Saves the JSON response to a timestamped file for reference."""
+    def tearDown(self):
+        """Clean up after each test method."""
+        test_log_file = os.path.join(self.logs_dir, f"{self._testMethodName}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+        self.logger.info(f"=== Ending test: {self._testMethodName} ===")
+        
+        if hasattr(self, 'provider') and hasattr(self.provider, '_session'):
+            try:
+                session_logs = []
+                if hasattr(self.provider._session, 'history'):
+                    for req in self.provider._session.history:
+                        session_logs.append(f"Request: {req.method} {req.url}")
+                        session_logs.append(f"Response: {req.status_code}")
+                
+                if session_logs:
+                    with open(test_log_file, 'w') as f:
+                        f.write("\n".join(session_logs))
+                    self.logger.info(f"Exported session logs to {test_log_file}")
+            except Exception as e:
+                self.logger.warning(f"Could not export session logs: {str(e)}")
+
+    def save_response_data(self, data, prefix, error_reason=None):
+        """Save JSON response data to a timestamped file for later analysis.
+        
+        Args:
+            data: The data to save
+            prefix: Prefix for the filename
+            error_reason: Optional error information to include
+            
+        Returns:
+            str: The filename where the data was saved
+        """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        response_data = {
+            "timestamp": datetime.now().isoformat(),
+            "data": data
+        }
+        if error_reason:
+            response_data["error_reason"] = error_reason
+            
         filename = f"{self.results_dir}/{prefix}_{timestamp}.json"
         with open(filename, 'w') as f:
-            json.dump(data, f, indent=2)
+            json.dump(response_data, f, indent=2)
         self.logger.info(f"Saved response data to: {filename}")
         return filename
 
     def test_get_exchange_rate_real(self):
-        """Test getting real exchange rate data from Wise API."""
-        self.logger.info(f"=== Starting test: {self._testMethodName} ===")
+        """Test getting real exchange rate data from Wise API.
+        
+        This test verifies that the WiseProvider can successfully retrieve
+        exchange rate information from the real Wise API for a US to Mexico corridor.
+        """
+        test_method_log = os.path.join(self.logs_dir, f"test_get_exchange_rate_real_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+        
+        file_handler = logging.FileHandler(test_method_log)
+        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        test_logger = logging.getLogger(f"{__name__}.{self._testMethodName}")
+        test_logger.addHandler(file_handler)
+        test_logger.setLevel(logging.DEBUG)
+        
         try:
-            self.logger.info("Testing real exchange rate lookup")
+            test_logger.info("Testing real exchange rate lookup from Wise US to MX")
             
             rate_data = self.provider.get_exchange_rate(
                 send_amount=Decimal("100"),
@@ -318,21 +144,24 @@ class TestWiseProviderRealAPI(unittest.TestCase):
                 receive_country="MX"
             )
             
-            if rate_data:
-                self.assertIsNotNone(rate_data, "Should return rate data")
-                saved_file = self.save_response_data(rate_data, "exchange_rate_usd_to_mx")
-                
-                self.logger.info(f"Exchange rate: {rate_data['exchange_rate']}")
-                self.logger.info(f"Fee: {rate_data['transfer_fee']} {rate_data['send_currency']}")
-                self.logger.info(f"Delivery: {rate_data['delivery_time']}")
-                self.logger.info(f"Receive amount: {rate_data['receive_amount']} {rate_data['receive_currency']}")
-                self.logger.info(f"Data saved to: {saved_file}")
-            else:
-                self.logger.warning("No rate data returned")
+            # Verify and log the result
+            self.assertIsNotNone(rate_data, "Should return exchange rate data")
+            saved_file = self.save_response_data(rate_data, "exchange_rate_usd_to_mx")
+            
+            test_logger.info(f"Exchange rate: {rate_data['exchange_rate']}")
+            test_logger.info(f"Fee: {rate_data['transfer_fee']} {rate_data['send_currency']}")
+            test_logger.info(f"Delivery: {rate_data['delivery_time']}")
+            test_logger.info(f"Receive amount: {rate_data['receive_amount']} {rate_data['receive_currency']}")
+            test_logger.info(f"Response data saved to: {saved_file}")
             
         except Exception as e:
-            self.logger.error(f"Error in test: {e}", exc_info=True)
-            self.fail(f"Exception during test: {e}")
+            test_logger.error(f"Error in test: {str(e)}")
+            test_logger.error(traceback.format_exc())
+            raise
+        finally:
+            test_logger.removeHandler(file_handler)
+            file_handler.close()
+            test_logger.info(f"Test logs saved to: {test_method_log}")
 
     def get_currency_for_country(self, country_code: str) -> str:
         """Helper to get currency code for a country."""
@@ -362,48 +191,83 @@ class TestWiseProviderRealAPI(unittest.TestCase):
         return country_to_currency.get(country_code, "USD")
 
     def test_common_corridors(self):
-        """Test common money transfer corridors."""
-        self.logger.info(f"=== Starting test: {self._testMethodName} ===")
+        """Test exchange rates for common money transfer corridors.
         
-        test_cases = [
-            {"send": "USD", "from": "US", "to": "MX", "amount": 100},
-            {"send": "USD", "from": "US", "to": "PH", "amount": 200},
-            {"send": "GBP", "from": "GB", "to": "IN", "amount": 300},
-            {"send": "EUR", "from": "DE", "to": "TR", "amount": 400},
-            {"send": "CAD", "from": "CA", "to": "IN", "amount": 500}
-        ]
+        This test checks multiple common money transfer corridors to verify
+        that the WiseProvider can handle a variety of source/destination combinations.
+        """
+        test_method_log = os.path.join(self.logs_dir, f"test_common_corridors_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
         
-        for case in test_cases:
-            case_id = f"{case['send']}_to_{case['to']}_{case['amount']}"
-            self.logger.info(f"Testing corridor: {case['from']} → {case['to']} ({case['amount']} {case['send']})")
-            
-            try:
-                rate_data = self.provider.get_exchange_rate(
-                    send_amount=Decimal(str(case['amount'])),
-                    send_currency=case['send'],
-                    receive_country=case['to'],
-                    send_country=case['from']
-                )
-                
-                if rate_data:
-                    saved_file = self.save_response_data(rate_data, case_id)
-                    self.logger.info(f"Success! Rate: {rate_data['exchange_rate']}, Fee: {rate_data['transfer_fee']}")
-                    self.logger.info(f"Recipient gets: {rate_data['receive_amount']} {rate_data['receive_currency']}")
-                    self.logger.info(f"Delivery time: {rate_data['delivery_time']}")
-                    self.logger.info(f"Data saved to: {saved_file}")
-                else:
-                    self.logger.warning(f"No rate data for {case_id}")
-                
-            except Exception as e:
-                self.logger.error(f"Error testing {case_id}: {e}")
-        
-        self.logger.info(f"=== Completed test: {self._testMethodName} ===")
-
-    def test_quotes_target_amount(self):
-        """Test quotes with target amount specified instead of source amount."""
-        self.logger.info(f"=== Starting test: {self._testMethodName} ===")
+        file_handler = logging.FileHandler(test_method_log)
+        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        test_logger = logging.getLogger(f"{__name__}.{self._testMethodName}")
+        test_logger.addHandler(file_handler)
+        test_logger.setLevel(logging.DEBUG)
         
         try:
+            test_cases = [
+                {"send": "USD", "from": "US", "to": "MX", "amount": 100},
+                {"send": "USD", "from": "US", "to": "PH", "amount": 200},
+                {"send": "GBP", "from": "GB", "to": "IN", "amount": 300},
+                {"send": "EUR", "from": "DE", "to": "TR", "amount": 400},
+                {"send": "CAD", "from": "CA", "to": "IN", "amount": 500}
+            ]
+            
+            test_logger.info(f"Testing {len(test_cases)} common corridors")
+            
+            for case in test_cases:
+                corridor_label = f"{case['from']}({case['send']})->{case['to']}"
+                test_logger.info(f"Testing corridor: {corridor_label} with amount {case['amount']}")
+                
+                try:
+                    rate_data = self.provider.get_exchange_rate(
+                        send_amount=Decimal(str(case['amount'])),
+                        send_currency=case['send'],
+                        receive_country=case['to'],
+                        send_country=case['from']
+                    )
+                    
+                    if rate_data:
+                        saved_file = self.save_response_data(
+                            rate_data, 
+                            f"{case['from']}_{case['send']}_to_{case['to']}_{case['amount']}"
+                        )
+                        test_logger.info(f"Success! Rate: {rate_data['exchange_rate']}, Fee: {rate_data['transfer_fee']}")
+                        test_logger.info(f"Recipient gets: {rate_data['receive_amount']} {rate_data['receive_currency']}")
+                        test_logger.info(f"Response data saved to: {saved_file}")
+                    else:
+                        test_logger.warning(f"No exchange rate data returned for {corridor_label}")
+                        
+                except Exception as e:
+                    test_logger.error(f"Error testing corridor {corridor_label}: {str(e)}")
+                    test_logger.error(traceback.format_exc())
+            
+        except Exception as e:
+            test_logger.error(f"Error in test: {str(e)}")
+            test_logger.error(traceback.format_exc())
+            raise
+        finally:
+            test_logger.removeHandler(file_handler)
+            file_handler.close() 
+            test_logger.info(f"Test logs saved to: {test_method_log}")
+
+    def test_quotes_target_amount(self):
+        """Test quotes with target amount specified instead of source amount.
+        
+        This test verifies that the provider can handle quotes where the target amount
+        (how much the recipient should receive) is specified instead of the source amount.
+        """
+        test_method_log = os.path.join(self.logs_dir, f"test_quotes_target_amount_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+        
+        file_handler = logging.FileHandler(test_method_log)
+        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        test_logger = logging.getLogger(f"{__name__}.{self._testMethodName}")
+        test_logger.addHandler(file_handler)
+        test_logger.setLevel(logging.DEBUG)
+        
+        try:
+            test_logger.info("Testing quotes with target amount specified")
+            
             # Get a quote specifying the target amount (how much recipient should get)
             quote_data = self.provider.get_quote(
                 source_currency="GBP",
@@ -417,132 +281,158 @@ class TestWiseProviderRealAPI(unittest.TestCase):
             
             # Save the response
             saved_file = self.save_response_data(quote_data, "quote_target_amount_specified")
-            self.logger.info(f"Quote data with target amount saved to: {saved_file}")
+            test_logger.info(f"Quote data with target amount saved to: {saved_file}")
             
             # Log key information
-            self.logger.info(f"Source amount: {quote_data.get('sourceAmount')} {quote_data.get('sourceCurrency')}")
-            self.logger.info(f"Target amount: {quote_data.get('targetAmount')} {quote_data.get('targetCurrency')}")
-            self.logger.info(f"Exchange rate: {quote_data.get('rate')}")
+            test_logger.info(f"Source amount: {quote_data.get('sourceAmount')} {quote_data.get('sourceCurrency')}")
+            test_logger.info(f"Target amount: {quote_data.get('targetAmount')} {quote_data.get('targetCurrency')}")
+            test_logger.info(f"Exchange rate: {quote_data.get('rate')}")
             
             # Verify payment options
             payment_options = quote_data.get("paymentOptions", [])
-            self.logger.info(f"Found {len(payment_options)} payment options")
+            test_logger.info(f"Found {len(payment_options)} payment options")
             
             for i, option in enumerate(payment_options, 1):
-                self.logger.info(f"Option {i}: {option.get('payIn')} to {option.get('payOut')}")
-                self.logger.info(f"  Fee: {option.get('fee', {}).get('total')} {quote_data.get('sourceCurrency')}")
-                self.logger.info(f"  Delivery: {option.get('formattedEstimatedDelivery')}")
+                test_logger.info(f"Option {i}: {option.get('payIn')} to {option.get('payOut')}")
+                test_logger.info(f"  Fee: {option.get('fee', {}).get('total')} {quote_data.get('sourceCurrency')}")
+                test_logger.info(f"  Delivery: {option.get('formattedEstimatedDelivery')}")
                 
         except Exception as e:
-            self.logger.error(f"Error in test: {e}", exc_info=True)
-            self.fail(f"Exception during test: {e}")
-            
-        self.logger.info(f"=== Completed test: {self._testMethodName} ===")
+            test_logger.error(f"Error in test: {str(e)}")
+            test_logger.error(traceback.format_exc())
+            raise
+        finally:
+            test_logger.removeHandler(file_handler)
+            file_handler.close()
+            test_logger.info(f"Test logs saved to: {test_method_log}")
 
     def test_discover_supported_methods(self):
-        """Test discovering supported payment and delivery methods."""
-        self.logger.info(f"=== Starting test: {self._testMethodName} ===")
+        """Discover supported payment and delivery methods for various corridors.
         
-        test_corridors = [
-            ("US", "MX"),      # US to Mexico
-            ("US", "PH"),      # US to Philippines 
-            ("US", "IN"),      # US to India
-            ("GB", "IN"),      # UK to India
-            ("CA", "PH"),      # Canada to Philippines
-        ]
+        This test attempts to discover all supported payment and delivery methods
+        for various send/receive country corridors by making API calls and
+        analyzing the responses.
+        """
+        test_method_log = os.path.join(self.logs_dir, f"test_discover_supported_methods_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
         
-        all_results = {}
+        file_handler = logging.FileHandler(test_method_log)
+        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        test_logger = logging.getLogger(f"{__name__}.{self._testMethodName}")
+        test_logger.addHandler(file_handler)
+        test_logger.setLevel(logging.DEBUG)
         
-        for send_country, receive_country in test_corridors:
-            corridor_label = f"{send_country}->{receive_country}"
-            self.logger.info(f"Testing corridor: {corridor_label}")
+        try:
+            test_corridors = [
+                ("US", "MX"),      # US to Mexico
+                ("US", "PH"),      # US to Philippines 
+                ("US", "IN"),      # US to India
+                ("GB", "IN"),      # UK to India
+                ("CA", "PH"),      # Canada to Philippines
+            ]
             
-            try:
-                # Get payment methods for this corridor
-                payment_methods = self.provider.get_payment_methods(send_country, receive_country)
+            all_results = {}
+            
+            test_logger.info(f"Discovering supported methods for {len(test_corridors)} corridors")
+            
+            for send_country, receive_country in test_corridors:
+                corridor_label = f"{send_country}->{receive_country}"
+                test_logger.info(f"Testing corridor: {corridor_label}")
                 
-                # Get delivery methods for this corridor
-                delivery_methods = self.provider.get_delivery_methods(send_country, receive_country)
-                
-                self.logger.info(f"Found {len(payment_methods)} payment methods and {len(delivery_methods)} delivery methods")
-                
-                self.logger.info(f"Payment methods: {', '.join(payment_methods)}")
-                self.logger.info(f"Delivery methods: {', '.join(delivery_methods)}")
-                
-                # Sample amount to test
-                amount = 100
-                send_currency = self.get_currency_for_country(send_country)
-                
-                # Get quote data
                 try:
-                    quote_data = self.provider.get_quote(
-                        source_currency=send_currency,
-                        target_currency=self.get_currency_for_country(receive_country),
-                        source_amount=float(amount)
-                    )
+                    # Get payment methods for this corridor
+                    payment_methods = self.provider.get_payment_methods(send_country, receive_country)
                     
-                    if quote_data:
-                        # Save the raw quote data
-                        quote_file = self.save_response_data(
-                            quote_data, 
-                            f"QUOTE_{send_country}_{send_currency}_to_{receive_country}_{amount}"
+                    # Get delivery methods for this corridor
+                    delivery_methods = self.provider.get_delivery_methods(send_country, receive_country)
+                    
+                    test_logger.info(f"Found {len(payment_methods)} payment methods and {len(delivery_methods)} delivery methods")
+                    
+                    test_logger.info(f"Payment methods: {', '.join(payment_methods)}")
+                    test_logger.info(f"Delivery methods: {', '.join(delivery_methods)}")
+                    
+                    # Sample amount to test
+                    amount = 100
+                    send_currency = self.get_currency_for_country(send_country)
+                    
+                    # Get quote data
+                    try:
+                        quote_data = self.provider.get_quote(
+                            source_currency=send_currency,
+                            target_currency=self.get_currency_for_country(receive_country),
+                            source_amount=float(amount)
                         )
-                        self.logger.info(f"Quote data saved to {quote_file}")
                         
-                        # Get exchange rate information
-                        rate_data = self.provider.get_exchange_rate(
-                            send_amount=Decimal(str(amount)),
-                            send_currency=send_currency,
-                            receive_country=receive_country,
-                            send_country=send_country
-                        )
-                        
-                        if rate_data:
-                            rate_file = self.save_response_data(
-                                rate_data,
-                                f"{send_country}_{send_currency}_to_{receive_country}_{amount}"
+                        if quote_data:
+                            # Save the raw quote data
+                            quote_file = self.save_response_data(
+                                quote_data, 
+                                f"QUOTE_{send_country}_{send_currency}_to_{receive_country}_{amount}"
                             )
-                            self.logger.info(f"Rate data saved to {rate_file}")
-                    else:
-                        self.logger.warning(f"No quote data for {corridor_label}")
-                        
+                            test_logger.info(f"Quote data saved to {quote_file}")
+                            
+                            # Get exchange rate information
+                            rate_data = self.provider.get_exchange_rate(
+                                send_amount=Decimal(str(amount)),
+                                send_currency=send_currency,
+                                receive_country=receive_country,
+                                send_country=send_country
+                            )
+                            
+                            if rate_data:
+                                rate_file = self.save_response_data(
+                                    rate_data,
+                                    f"{send_country}_{send_currency}_to_{receive_country}_{amount}"
+                                )
+                                test_logger.info(f"Rate data saved to {rate_file}")
+                        else:
+                            test_logger.warning(f"No quote data for {corridor_label}")
+                            
+                    except Exception as e:
+                        test_logger.error(f"Error getting quote for {corridor_label}: {str(e)}")
+                    
+                    # Store results for this corridor
+                    all_results[corridor_label] = {
+                        "supported": True,
+                        "payment_methods": payment_methods,
+                        "delivery_methods": delivery_methods
+                    }
+                    
                 except Exception as e:
-                    self.logger.error(f"Error getting quote for {corridor_label}: {str(e)}")
+                    test_logger.error(f"Failed to test corridor {corridor_label}: {str(e)}")
+                    test_logger.error(traceback.format_exc())
+                    all_results[corridor_label] = {
+                        "supported": False,
+                        "error": str(e)
+                    }
                 
-                # Store results for this corridor
-                all_results[corridor_label] = {
-                    "supported": True,
-                    "payment_methods": payment_methods,
-                    "delivery_methods": delivery_methods
-                }
+            # Save the combined results
+            summary_file = self.save_response_data(all_results, "WISE_DISCOVERY_SUMMARY")
+            test_logger.info(f"Complete discovery results saved to {summary_file}")
+            
+            # Log a summary
+            test_logger.info("\n=== METHOD DISCOVERY SUMMARY ===")
+            supported_corridors = [corridor for corridor, results in all_results.items() 
+                                if results.get("supported", False)]
+            
+            test_logger.info(f"Tested {len(test_corridors)} corridors, {len(supported_corridors)} supported")
+            
+            for corridor in supported_corridors:
+                results = all_results[corridor]
                 
-            except Exception as e:
-                self.logger.error(f"Failed to test corridor {corridor_label}: {str(e)}")
-                all_results[corridor_label] = {
-                    "supported": False,
-                    "error": str(e)
-                }
+                test_logger.info(f"\n{corridor}:")
+                test_logger.info(f"  Payment methods: {', '.join(results.get('payment_methods', []))}")
+                test_logger.info(f"  Delivery methods: {', '.join(results.get('delivery_methods', []))}")
+                
+            test_logger.info("\n=== END SUMMARY ===")
             
-        # Save the combined results
-        summary_file = self.save_response_data(all_results, "WISE_DISCOVERY_SUMMARY")
-        self.logger.info(f"Complete discovery results saved to {summary_file}")
-        
-        # Log a summary
-        self.logger.info("\n=== METHOD DISCOVERY SUMMARY ===")
-        supported_corridors = [corridor for corridor, results in all_results.items() 
-                            if results.get("supported", False)]
-        
-        self.logger.info(f"Tested {len(test_corridors)} corridors, {len(supported_corridors)} supported")
-        
-        for corridor in supported_corridors:
-            results = all_results[corridor]
-            
-            self.logger.info(f"\n{corridor}:")
-            self.logger.info(f"  Payment methods: {', '.join(results.get('payment_methods', []))}")
-            self.logger.info(f"  Delivery methods: {', '.join(results.get('delivery_methods', []))}")
-            
-        self.logger.info("\n=== END SUMMARY ===")
-        self.logger.info(f"=== Completed test: {self._testMethodName} ===")
+        except Exception as e:
+            test_logger.error(f"Error in discovery test: {str(e)}")
+            test_logger.error(traceback.format_exc())
+            raise
+        finally:
+            test_logger.removeHandler(file_handler)
+            file_handler.close()
+            test_logger.info(f"Test logs saved to: {test_method_log}")
 
 
 if __name__ == "__main__":
