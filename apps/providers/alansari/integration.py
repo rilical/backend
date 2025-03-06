@@ -371,9 +371,8 @@ class AlAnsariProvider(RemittanceProvider):
             return quote_result
 
         try:
-            # Ensure we have a security token
-            if not self.security_token:
-                self.security_token = self.fetch_security_token()
+            # Always fetch a fresh security token for each request
+            self.security_token = self.fetch_security_token()
 
             # Get currency IDs from mappings
             source_currency_id = self.CURRENCY_ID_MAPPING.get(source_currency.upper())
