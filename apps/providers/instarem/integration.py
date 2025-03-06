@@ -23,7 +23,13 @@ logger = logging.getLogger(__name__)
 class InstaRemProvider(RemittanceProvider):
     """
     Integration with InstaRem's public transaction computed-value endpoint.
-    Provides aggregator-ready responses.
+    Provides aggregator-ready responses with standardized fields.
+    
+    This provider implements the RemittanceProvider interface and ensures:
+    - All responses follow a consistent format expected by aggregators
+    - Error handling is standardized across all methods
+    - Currency and country codes are properly normalized
+    - Field naming follows aggregator conventions
     
     Example usage:
         provider = InstaRemProvider()
@@ -34,6 +40,12 @@ class InstaRemProvider(RemittanceProvider):
             source_country="US",
             dest_country="IN"
         )
+        
+        # Access standardized fields
+        if quote["success"]:
+            print(f"Exchange rate: {quote['exchange_rate']}")
+            print(f"Destination amount: {quote['destination_amount']} {quote['destination_currency']}")
+            print(f"Fee: {quote['fee']} {quote['source_currency']}")
     """
 
     BASE_URL = "https://www.instarem.com"
@@ -274,7 +286,12 @@ class InstaRemProvider(RemittanceProvider):
         amount: Decimal = Decimal("1000")
     ) -> Dict[str, Any]:
         """
-        Get aggregator-friendly dictionary with minimal fields for exchange rate tests.
+        Get aggregator-friendly dictionary with exchange rate information.
+        
+        This method returns a standardized response that aligns with aggregator
+        expectations for exchange rate queries. It provides the essential fields
+        required by aggregators while maintaining consistency with the get_quote
+        response format.
         
         Args:
             source_currency: ISO-4217 currency code (e.g., "USD")
@@ -284,7 +301,14 @@ class InstaRemProvider(RemittanceProvider):
             amount: Amount to convert (defaults to 1000)
             
         Returns:
-            Dictionary with fields: success, error_message, rate, etc.
+            Dictionary with standardized fields including:
+            - success: Boolean indicating if request succeeded
+            - error_message: Explanation if success is False
+            - rate: Exchange rate between currencies
+            - source_currency: Uppercase source currency code
+            - target_currency: Uppercase target currency code
+            - provider_id: Provider identifier
+            - Other standard fields as defined in standardize_response
         """
         try:
             # We'll call get_quote with include_raw=True, then unify fields
@@ -296,54 +320,64 @@ class InstaRemProvider(RemittanceProvider):
                 dest_country=target_country,
                 include_raw=True
             )
-            # aggregator typically wants "rate" (not just "exchange_rate")
-            # We'll build a small dict capturing the essential fields
+            
+            # Create a specific exchange rate response with appropriate fields
             rate_info = {
                 "success": quote.get("success", False),
                 "error_message": quote.get("error_message"),
                 "source_currency": quote.get("source_currency", ""),
                 "target_currency": quote.get("destination_currency", ""),
-                # aggregator expects "rate" to check in tests:
+                # Rate is required for exchange rate calls
                 "rate": quote.get("exchange_rate"),
-                "fee": quote.get("fee"),
-                "timestamp": datetime.now().isoformat()
+                "fee": quote.get("fee", 0.0),
+                "timestamp": datetime.now().isoformat(),
+                "send_amount": amount
             }
             return self.standardize_response(raw_result=rate_info)
         except Exception as exc:
             error_msg = f"Exchange rate error: {exc}"
             logger.error(error_msg)
+            # Return standardized error response
             return self.standardize_response(raw_result={
                 "success": False,
                 "error_message": error_msg,
                 "source_currency": source_currency.upper(),
-                "target_currency": target_currency.upper()
+                "target_currency": target_currency.upper(),
+                "send_amount": amount,
+                "timestamp": datetime.now().isoformat()
             })
 
     def standardize_response(self, raw_result: Dict[str, Any], provider_specific_data: bool = False) -> Dict[str, Any]:
         """
         Convert the local raw_result dict into aggregator-standard shape.
-        aggregator might check keys like:
-          - provider_id
-          - success
-          - error_message
-          - send_amount
-          - source_currency
-          - destination_amount
-          - destination_currency
-          - exchange_rate
-          - fee
-          - rate
-          - target_currency
-          - timestamp
+        Aggregators typically expect:
+        {
+          "provider_id",
+          "success",
+          "error_message",
+          "send_amount",
+          "source_currency",
+          "destination_amount",
+          "destination_currency",
+          "exchange_rate",
+          "fee",
+          "payment_method",
+          "delivery_method",
+          "delivery_time_minutes",
+          "timestamp",
+          "rate",               # mirrors exchange_rate for aggregator tests that specifically look for "rate"
+          "target_currency",    # often used in aggregator's get_exchange_rate validations
+          (optional) "raw_response"
+        }
         """
-        # aggregator might want both "exchange_rate" and "rate" to unify references
-        # for get_exchange_rate vs get_quote calls:
+        # Some aggregator tests specifically look for "rate" 
+        # (mirroring "exchange_rate"), and "target_currency" (mirroring "destination_currency").
         final_exchange_rate = raw_result.get("exchange_rate")  # from a quote
         final_rate = raw_result.get("rate")                    # from an exchange rate call
         if final_rate is None:
             final_rate = final_exchange_rate  # fallback
 
-        # aggregator might also want "target_currency" in get_exchange_rate calls
+        # Handle target_currency for exchange rate calls
         final_target_currency = raw_result.get("target_currency") or raw_result.get("destination_currency", "")
 
         # Build the aggregator-standard output
@@ -353,16 +387,16 @@ class InstaRemProvider(RemittanceProvider):
             "error_message": raw_result.get("error_message"),
 
             "send_amount": raw_result.get("send_amount", 0.0),
-            "source_currency": raw_result.get("source_currency", ""),
+            "source_currency": (raw_result.get("source_currency") or "").upper(),
             "destination_amount": raw_result.get("destination_amount"),
-            "destination_currency": raw_result.get("destination_currency", ""),
+            "destination_currency": (raw_result.get("destination_currency") or "").upper(),
             "exchange_rate": final_exchange_rate,
 
-            # aggregator specifically looks for "rate" in get_exchange_rate tests
+            # Additional fields to match aggregator expectations
             "rate": final_rate,
-            "target_currency": final_target_currency,
+            "target_currency": final_target_currency.upper() if final_target_currency else "",
 
-            "fee": raw_result.get("fee"),
+            "fee": raw_result.get("fee", 0.0),
             "payment_method": raw_result.get("payment_method"),
             "delivery_method": raw_result.get("delivery_method"),
             "delivery_time_minutes": raw_result.get("delivery_time_minutes"),
