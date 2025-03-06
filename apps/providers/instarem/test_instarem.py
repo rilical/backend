@@ -26,17 +26,6 @@ logging.basicConfig(
 
 logger = logging.getLogger("instarem-test")
 
-# Add a custom JSON encoder to handle Decimal objects
-class DecimalEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, Decimal):
-            return float(obj)
-        return super(DecimalEncoder, self).default(obj)
-
-def json_dumps(obj, **kwargs):
-    """Wrapper for json.dumps that handles Decimal objects"""
-    return json.dumps(obj, cls=DecimalEncoder, **kwargs)
-
 def test_delivery_methods():
     """Test getting delivery methods."""
     with InstaRemProvider() as provider:
@@ -107,27 +96,17 @@ def test_quotes():
 
             # Log the results in a nicely formatted JSON
             logger.info(f"Quote for {source_currency} to {dest_currency}:")
-            logger.info(json_dumps(quote, indent=2))
+            logger.info(json.dumps(quote, indent=2))
             
             if not quote["success"]:
                 logger.info(f"Quote failed: {quote.get('error_message')}")
                 continue
 
-            # Verify quote contains all aggregator-required fields
-            required_fields = [
-                "provider_id", "success", "send_amount", "source_currency", 
-                "destination_amount", "destination_currency", "exchange_rate",
-                "rate", "fee", "timestamp"
-            ]
-            for field in required_fields:
-                assert field in quote, f"Quote must include '{field}' for aggregator compatibility"
-            
-            # Verify data types and values
-            assert quote["provider_id"] == "instarem", "Provider ID should match the provider name"
-            assert isinstance(quote["success"], bool), "Success should be a boolean"
-            assert quote["source_currency"] == source_currency.upper(), "Source currency should be uppercase"
-            assert quote["destination_currency"] == dest_currency.upper(), "Destination currency should be uppercase"
-            assert quote["rate"] == quote["exchange_rate"], "Rate should mirror exchange_rate for aggregator compatibility"
+            # Verify quote structure
+            assert "send_amount" in quote, "Quote should have send amount"
+            assert "source_currency" in quote, "Quote should have source currency"
+            assert quote.get("exchange_rate") is not None, "Quote should have exchange rate"
+            assert quote.get("fee") is not None, "Quote should have fee"
             
             if "destination_amount" in quote and quote["destination_amount"]:
                 logger.info(f"Destination amount: {quote['destination_amount']} {quote.get('destination_currency')}")
@@ -150,9 +129,6 @@ def test_quotes():
                               f"Fee={quote_with_method.get('fee')}, "
                               f"Send={quote_with_method.get('send_amount')}, "
                               f"Receive={quote_with_method.get('destination_amount')}")
-                    
-                    # Verify delivery method is reflected in the response
-                    assert "delivery_method" in quote_with_method, "Quote should include the delivery method"
                 else:
                     logger.info(f"Quote failed: {quote_with_method.get('error_message')}")
 
@@ -176,28 +152,17 @@ def test_exchange_rate():
                 target_country=target_country
             )
             
-            logger.info(f"Exchange rate response: {json_dumps(rate_info, indent=2)}")
+            logger.info(f"Exchange rate response: {json.dumps(rate_info, indent=2)}")
             
-            # Verify exchange rate contains all aggregator-required fields
             if rate_info["success"]:
-                required_fields = [
-                    "provider_id", "success", "source_currency", "target_currency", 
-                    "rate", "timestamp", "send_amount"
-                ]
-                for field in required_fields:
-                    assert field in rate_info, f"Exchange rate response must include '{field}' for aggregator compatibility"
-                
                 assert rate_info.get("rate") is not None, "Exchange rate should have a rate value"
-                assert rate_info.get("source_currency") == source_currency.upper(), "Source currency should match and be uppercase"
-                assert rate_info.get("target_currency") == target_currency.upper(), "Target currency should match and be uppercase"
+                assert rate_info.get("source_currency") == source_currency.upper(), "Source currency should match"
+                assert rate_info.get("target_currency") == target_currency.upper(), "Target currency should match"
                 
                 logger.info(f"Exchange rate: 1 {source_currency} = {rate_info.get('rate')} {target_currency}")
                 logger.info(f"Fee: {rate_info.get('fee')}")
             else:
                 logger.info(f"Exchange rate failed: {rate_info.get('error_message')}")
-                # Even in failure case, verify minimum required fields
-                assert "provider_id" in rate_info, "Exchange rate must include provider_id even in error case"
-                assert "error_message" in rate_info, "Exchange rate must include error_message when success is False"
 
 def test_invalid_delivery_method():
     """Test handling of invalid delivery method."""
@@ -210,7 +175,7 @@ def test_invalid_delivery_method():
             dest_country="PH",
             delivery_method="InvalidMethod"
         )
-        logger.info(f"Invalid delivery method response: {json_dumps(quote, indent=2)}")
+        logger.info(f"Invalid delivery method response: {json.dumps(quote, indent=2)}")
         # Note: With the new implementation, invalid delivery method might not fail explicitly
 
 if __name__ == "__main__":

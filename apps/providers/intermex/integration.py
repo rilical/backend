@@ -69,56 +69,8 @@ class IntermexProvider(RemittanceProvider):
     - CHF: Swiss Franc
     """
     
-    BASE_URL = "https://api.intermexonline.com/api"  # Updated endpoint
+    BASE_URL = "https://api.imxi.com"  # Corrected endpoint for live API access
     API_VERSION = "v1"
-    
-    # Supported countries
-    SUPPORTED_COUNTRIES = {
-        "US": "United States",
-        "MX": "Mexico",
-        "GT": "Guatemala",
-        "HN": "Honduras",
-        "SV": "El Salvador",
-        "NI": "Nicaragua",
-        "CR": "Costa Rica",
-        "PA": "Panama",
-        "CO": "Colombia",
-        "PE": "Peru",
-        "EC": "Ecuador",
-        "BO": "Bolivia",
-        "BR": "Brazil",
-        "AR": "Argentina",
-        "UY": "Uruguay",
-        "PY": "Paraguay",
-        "CL": "Chile",
-        "DO": "Dominican Republic",
-        "HT": "Haiti",
-        "JM": "Jamaica"
-    }
-    
-    # Supported currencies
-    SUPPORTED_CURRENCIES = {
-        "USD": "US Dollar",
-        "MXN": "Mexican Peso",
-        "GTQ": "Guatemalan Quetzal",
-        "HNL": "Honduran Lempira",
-        "SVC": "Salvadoran Colon",
-        "NIO": "Nicaraguan Cordoba",
-        "CRC": "Costa Rican Colon",
-        "PAB": "Panamanian Balboa",
-        "COP": "Colombian Peso",
-        "PEN": "Peruvian Sol",
-        "BOB": "Bolivian Boliviano",
-        "BRL": "Brazilian Real",
-        "ARS": "Argentine Peso",
-        "UYU": "Uruguayan Peso",
-        "PYG": "Paraguayan Guarani",
-        "CLP": "Chilean Peso",
-        "DOP": "Dominican Peso",
-        "HTG": "Haitian Gourde",
-        "JMD": "Jamaican Dollar"
-    }
-    
     # Payment methods
     PAYMENT_METHODS = {
         "debitCard": "Debit Card",
@@ -147,18 +99,92 @@ class IntermexProvider(RemittanceProvider):
     def _setup_session(self):
         """Set up the session with required headers."""
         self.session.headers.update({
-            "Accept": f"application/vnd.intermex.{self.API_VERSION}+json",
-            "Accept-Language": "en",
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15"
+            "Pragma": "no-cache",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Cache-Control": "no-cache",
+            "Origin": "https://www.intermexonline.com",
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15"
+            ),
+            "Referer": "https://www.intermexonline.com/"
         })
     
     def _get_request_headers(self) -> Dict[str, str]:
-        """Get headers for API request."""
+        """Get headers for API requests."""
         return {
-            "Cache-Control": "no-cache",
-            "Pragma": "no-cache"
+            "Ocp-Apim-Subscription-Key": self.config.get("api_key", "2162a586e2164623a1cd9b6b2d300b4c"),
+            "PartnerId": "1",
+            "ChannelId": "1",
+            "LanguageId": "1",
+            "Priority": "u=3, i",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "cross-site"
         }
     
+    # -------------------------
+    # Aggregator Helper Methods
+    # -------------------------
+    def standardize_response(
+        self,
+        raw_data: Dict[str, Any],
+        provider_specific_data: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Convert local result dict into aggregator-friendly fields:
+          "provider_id", "success", "error_message",
+          "send_amount", "source_currency",
+          "destination_amount", "destination_currency",
+          "exchange_rate", "rate", "target_currency",
+          "fee", "payment_method", "delivery_method",
+          "delivery_time_minutes", "timestamp", ...
+        """
+        # aggregator might want "rate" in some tests; we mirror "exchange_rate"
+        final_exchange_rate = raw_data.get("exchange_rate")
+        final_rate = raw_data.get("rate")
+        if final_rate is None:
+            final_rate = final_exchange_rate
+        
+        # aggregator might want "target_currency" (mirroring destination currency)
+        final_target_currency = raw_data.get("target_currency") or raw_data.get("receive_currency") or ""
+        
+        # Make sure we have the source_currency
+        final_source_currency = raw_data.get("source_currency") or raw_data.get("send_currency") or ""
+
+        standardized = {
+            "provider_id": self.name,
+            "success": raw_data.get("success", False),
+            "error_message": raw_data.get("error_message"),
+
+            "send_amount": raw_data.get("send_amount", 0.0),
+            "source_currency": final_source_currency.upper(),
+
+            "destination_amount": raw_data.get("receive_amount"),
+            "destination_currency": (raw_data.get("receive_currency") or "").upper(),
+
+            "exchange_rate": final_exchange_rate,
+            "rate": final_rate,
+            "target_currency": final_target_currency.upper() if final_target_currency else "",
+
+            "fee": raw_data.get("fee", 0.0),
+            "payment_method": raw_data.get("payment_method"),
+            "delivery_method": raw_data.get("delivery_method"),
+            "delivery_time_minutes": raw_data.get("delivery_time_minutes"),
+            
+            "timestamp": raw_data.get("timestamp", datetime.now().isoformat()),
+        }
+
+        # Include raw response if aggregator wants it
+        if provider_specific_data and "raw_response" in raw_data:
+            standardized["raw_response"] = raw_data["raw_response"]
+
+        return standardized
+
+    # ---------------------------
+    # Public Aggregator Methods
+    # ---------------------------
     def get_supported_countries(self) -> List[str]:
         """Get list of supported destination countries."""
         return list(self.SUPPORTED_COUNTRIES.keys())
@@ -174,7 +200,7 @@ class IntermexProvider(RemittanceProvider):
     def get_supported_receiving_methods(self) -> List[str]:
         """Get list of supported receiving methods."""
         return list(self.RECEIVING_METHODS.keys())
-    
+
     def get_delivery_methods(
         self,
         source_country: str,
@@ -183,47 +209,31 @@ class IntermexProvider(RemittanceProvider):
         dest_currency: str
     ) -> Dict[str, Any]:
         """
-        Get available delivery methods for a corridor.
-        
-        Args:
-            source_country: Source country code
-            dest_country: Destination country code
-            source_currency: Source currency code
-            dest_currency: Destination currency code
-            
-        Returns:
-            Dictionary containing delivery methods
+        Fetch possible delivery methods for a corridor (aggregator style).
         """
         try:
-            # Validate corridor
-            is_valid, error = validate_corridor(
-                source_country,
-                source_currency,
-                dest_country,
-                dest_currency
-            )
+            # corridor validation
+            is_valid, error = validate_corridor(source_country, source_currency, dest_country, dest_currency)
             if not is_valid:
                 return {
                     "success": False,
                     "error": error,
-                    "provider": "intermex"
+                    "provider": self.name
                 }
-            
-            # Map country codes
-            mapped_source = map_country_code(source_country)
-            mapped_dest = map_country_code(dest_country)
-            
-            # Prepare query parameters
+
+            mapped_source = "USA" if source_country.upper() == "US" else source_country
+            mapped_dest = dest_country
+
             params = {
-                "sourceCountry": mapped_source,
-                "destinationCountry": mapped_dest,
-                "sourceCurrency": source_currency.upper(),
-                "destinationCurrency": dest_currency.upper()
+                "DestCountryAbbr": mapped_dest,
+                "DestCurrency": dest_currency.upper(),
+                "OriCountryAbbr": mapped_source,
+                "OriStateAbbr": "NY",  # Default to New York
+                "ChannelId": "1"
             }
-            
-            # Make API request
+
             response = self.session.get(
-                f"{self.BASE_URL}/delivery-methods",
+                f"{self.BASE_URL}/pricing/api/deliveryandpayments",
                 params=params,
                 headers=self._get_request_headers(),
                 timeout=30
@@ -235,30 +245,38 @@ class IntermexProvider(RemittanceProvider):
                     status_code=response.status_code,
                     response=response.json() if response.text else None
                 )
+
+            data = response.json()
             
-            # Parse response
-            methods = response.json()
-            if not methods or not isinstance(methods, list):
-                raise IntermexAPIError("Invalid delivery methods response format")
-            
-            # Map delivery methods to standard format
+            # Convert to aggregator-friendly structures
             delivery_methods = []
-            for method in methods:
-                mapped_method = map_delivery_method(method.get("name"))
-                if mapped_method:
+            if "deliveryMethodsList" in data:
+                for method in data["deliveryMethodsList"]:
                     delivery_methods.append({
-                        "id": mapped_method["tranTypeId"],
-                        "name": mapped_method["tranTypeName"],
-                        "type": mapped_method["deliveryType"],
-                        "estimated_minutes": method.get("estimatedMinutes", 60),
-                        "description": method.get("description", ""),
-                        "is_default": method.get("isDefault", False)
+                        "id": method.get("tranTypeId"),
+                        "name": method.get("tranTypeName"),
+                        "type": method.get("deliveryMethod"),
+                        "estimated_minutes": 60,  # Default to 60 minutes
+                        "description": "",
+                        "is_default": method.get("isSelected", False)
                     })
-            
+
+            # Extract payment methods if present
+            payment_methods = []
+            if "paymentMethods" in data:
+                for method in data["paymentMethods"]:
+                    payment_methods.append({
+                        "id": method.get("senderPaymentMethodId"),
+                        "name": method.get("senderPaymentMethodName"),
+                        "fee": method.get("feeAmount", 0.0),
+                        "is_available": method.get("isAvailable", False)
+                    })
+
             return {
                 "success": True,
                 "delivery_methods": delivery_methods,
-                "provider": "intermex",
+                "payment_methods": payment_methods,
+                "provider": self.name,
                 "timestamp": datetime.now().isoformat()
             }
             
@@ -267,15 +285,14 @@ class IntermexProvider(RemittanceProvider):
             return {
                 "success": False,
                 "error": f"API request failed: {str(e)}",
-                "provider": "intermex"
+                "provider": self.name
             }
-        
         except (KeyError, ValueError, TypeError) as e:
             logger.error(f"Error parsing Intermex response: {e}")
             return {
                 "success": False,
                 "error": f"Error parsing response: {str(e)}",
-                "provider": "intermex"
+                "provider": self.name
             }
     
     def get_quote(
@@ -291,68 +308,110 @@ class IntermexProvider(RemittanceProvider):
         **kwargs
     ) -> Dict[str, Any]:
         """
-        Get a quote for a money transfer from Intermex.
-        
-        Args:
-            send_amount: Amount to send (in source currency)
-            receive_amount: Amount to receive (in target currency)
-            send_currency: Currency to send (e.g., "USD")
-            receive_currency: Currency to receive (e.g., "MXN")
-            send_country: Sending country code (e.g., "US")
-            receive_country: Receiving country code (e.g., "MX")
-            payment_method: Method of payment (e.g., "debitCard")
-            delivery_method: Method of delivery (e.g., "bankDeposit")
-            **kwargs: Additional parameters
-            
-        Returns:
-            Dictionary containing standardized quote information
+        Get a quote for a money transfer from Intermex in aggregator-ready format.
         """
+        # Validate that at least one of send_amount or receive_amount is provided
         if send_amount is None and receive_amount is None:
             return self.standardize_response({
                 "success": False,
                 "error_message": "Either send_amount or receive_amount must be provided"
             })
 
-        is_amount_receiving = send_amount is None
-        amount = Decimal(str(receive_amount if is_amount_receiving else send_amount))
+        # corridor validation
+        is_valid, error = validate_corridor(send_country, send_currency, receive_country, receive_currency)
+        if not is_valid:
+            return self.standardize_response({
+                "success": False,
+                "error_message": error
+            })
+
+        # Validate payment and receiving methods
+        if payment_method not in self.PAYMENT_METHODS:
+            return self.standardize_response({
+                "success": False,
+                "error_message": f"Invalid or unsupported payment method: {payment_method}"
+            })
+
+        if delivery_method not in self.RECEIVING_METHODS:
+            return self.standardize_response({
+                "success": False,
+                "error_message": f"Invalid or unsupported receiving method: {delivery_method}"
+            })
+
+        # Decide which amount is provided
+        is_amount_receiving = (send_amount is None)
+        raw_amount = receive_amount if is_amount_receiving else send_amount
+        if raw_amount is not None:
+            amt_dec = Decimal(str(raw_amount))
+            # Arbitrary validation: 0 < amount <= 999999.99
+            if amt_dec <= 0 or amt_dec > Decimal("999999.99"):
+                return self.standardize_response({
+                    "success": False,
+                    "error_message": f"Invalid send/receive amount: {raw_amount}"
+                })
+
+        # Map the delivery method to TranTypeId
+        tran_type_id = "1"  # Default Cash Pickup
+        if delivery_method == "bankDeposit":
+            tran_type_id = "3"
         
-        # Build endpoint URL
-        endpoint = f"{self.BASE_URL}/{self.API_VERSION}/money-transfer/quote"
+        # Map payment method to SenderPaymentMethodId
+        payment_method_id = "3"  # Default Debit Card
+        if payment_method == "creditCard":
+            payment_method_id = "4"
+            
+        # For API, convert country codes if needed
+        mapped_send_country = "USA" if send_country.upper() == "US" else send_country
         
-        # Build request parameters
+        # Build URL / parameters using the real Intermex API endpoint
+        endpoint = f"{self.BASE_URL}/pricing/api/v2/feesrates"
         params = {
-            "sendingCountry": send_country,
-            "receivingCountry": receive_country,
-            "sendingCurrency": send_currency,
-            "receivingCurrency": receive_currency,
-            "paymentMethod": payment_method,
-            "deliveryMethod": delivery_method
+            "DestCountryAbbr": receive_country,
+            "DestCurrency": receive_currency.upper(),
+            "OriCountryAbbr": mapped_send_country,
+            "OriStateAbbr": "NY",  # Default to New York
+            "StyleId": "3",  # Default style
+            "TranTypeId": tran_type_id,
+            "DeliveryType": "W",  # Default delivery type
+            "OriCurrency": send_currency.upper(),
+            "ChannelId": "1",
+            "SenderPaymentMethodId": payment_method_id
         }
         
-        # Add amount parameters based on direction
+        # Set the appropriate amount parameter
         if is_amount_receiving:
-            params["amountReceiving"] = str(amount)
+            params["OriAmount"] = "0"
+            params["DestAmount"] = str(receive_amount)
         else:
-            params["amountSending"] = str(amount)
-        
+            params["OriAmount"] = str(send_amount)
+            params["DestAmount"] = "0"
+
         try:
-            # Make the API request
-            headers = self._get_request_headers()
-            response = self.session.get(endpoint, params=params, headers=headers)
+            # Add required headers for the Intermex API
+            headers = {
+                "Pragma": "no-cache",
+                "Accept": "application/json, text/plain, */*",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Cache-Control": "no-cache",
+                "Origin": "https://www.intermexonline.com",
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15",
+                "Referer": "https://www.intermexonline.com/",
+                "Ocp-Apim-Subscription-Key": self.config.get("api_key", "2162a586e2164623a1cd9b6b2d300b4c"),
+                "LanguageId": "1"
+            }
             
-            # Check if the request was successful
+            response = self.session.get(endpoint, params=params, headers=headers)
             if response.status_code != 200:
-                error_msg = f"API request failed with status {response.status_code}: {response.text}"
+                error_msg = (
+                    f"API request failed with status {response.status_code}: {response.text}"
+                )
                 logger.error(error_msg)
                 return self.standardize_response({
                     "success": False,
                     "error_message": error_msg
                 })
 
-            # Parse the response
             quote_data = response.json()
-            
-            # Check if the API returned an error
             if "error" in quote_data:
                 error_msg = f"API returned an error: {quote_data['error']}"
                 logger.error(error_msg)
@@ -360,31 +419,43 @@ class IntermexProvider(RemittanceProvider):
                     "success": False,
                     "error_message": error_msg
                 })
-            
-            # Extract the quote information
-            result = {
+
+            # Build aggregator-friendly result using the actual response structure
+            local_result = {
                 "success": True,
-                "send_amount": float(quote_data.get("sendingAmount", 0)),
+                "send_amount": float(quote_data.get("origAmount", 0.0)),
                 "send_currency": send_currency,
-                "receive_amount": float(quote_data.get("receivingAmount", 0)),
+                "receive_amount": float(quote_data.get("destAmount", 0.0)),
                 "receive_currency": receive_currency,
-                "exchange_rate": float(quote_data.get("exchangeRate", 0)),
-                "fee": float(quote_data.get("fee", 0)),
-                "total_cost": float(quote_data.get("totalCost", 0)),
+                "exchange_rate": float(quote_data.get("rate", 0.0)),
+                "fee": float(quote_data.get("feeAmount", 0.0)),
+                "total_cost": float(quote_data.get("totalAmount", 0.0)),
                 "payment_method": payment_method,
                 "delivery_method": delivery_method,
-                "timestamp": datetime.now().isoformat(),
-                "delivery_time_minutes": quote_data.get("estimatedDeliveryTimeMinutes")
+                "timestamp": datetime.now().isoformat()
             }
             
-            # Include raw response if requested
-            if kwargs.get("include_raw", False):
-                result["raw_response"] = quote_data
-                
-            return self.standardize_response(result, provider_specific_data=kwargs.get("include_raw", False))
+            # Extract available payment methods if present
+            if "paymentMethods" in quote_data and quote_data["paymentMethods"]:
+                payment_methods = {}
+                for method in quote_data["paymentMethods"]:
+                    method_id = str(method.get("senderPaymentMethodId"))
+                    method_name = method.get("senderPaymentMethodName")
+                    fee = method.get("feeAmount", 0.0)
+                    payment_methods[method_id] = {
+                        "name": method_name,
+                        "fee": fee
+                    }
+                local_result["available_payment_methods"] = payment_methods
             
-        except Exception as e:
-            error_msg = f"Failed to get quote: {str(e)}"
+            # Optionally attach raw response
+            if kwargs.get("include_raw", False):
+                local_result["raw_response"] = quote_data
+
+            return self.standardize_response(local_result, provider_specific_data=kwargs.get("include_raw", False))
+
+        except Exception as exc:
+            error_msg = f"Failed to get quote: {str(exc)}"
             logger.error(error_msg)
             return self.standardize_response({
                 "success": False,
@@ -400,44 +471,82 @@ class IntermexProvider(RemittanceProvider):
         amount: Decimal = Decimal("1000")
     ) -> Dict[str, Any]:
         """
-        Get current exchange rate for a currency pair.
-        
-        Args:
-            send_currency: Currency to send
-            receive_currency: Currency to receive
-            send_country: Sending country code
-            receive_country: Receiving country code
-            amount: Amount to get rate for (defaults to 1000)
-            
-        Returns:
-            Dictionary containing standardized exchange rate information
+        Get aggregator-friendly dictionary with minimal fields for exchange rate tests.
         """
         try:
-            # Get a quote with the specified amount
-            quote = self.get_quote(
-                send_amount=float(amount),
-                send_currency=send_currency,
-                receive_currency=receive_currency,
-                send_country=send_country,
-                receive_country=receive_country
-            )
+            # Map the country code for the API
+            mapped_send_country = "USA" if send_country.upper() == "US" else send_country
             
-            # Convert to the standardized exchange rate format
-            return self.standardize_response({
-                "success": quote.get("success", False),
+            # Build endpoint URL and parameters for direct API call
+            endpoint = f"{self.BASE_URL}/pricing/api/v2/feesrates"
+            params = {
+                "DestCountryAbbr": receive_country,
+                "DestCurrency": receive_currency.upper(),
+                "OriCountryAbbr": mapped_send_country,
+                "OriStateAbbr": "NY",  # Default to New York
+                "StyleId": "3",
+                "TranTypeId": "1",     # Default to Cash Pickup
+                "DeliveryType": "W",
+                "OriCurrency": send_currency.upper(),
+                "ChannelId": "1",
+                "OriAmount": str(amount),
+                "DestAmount": "0",
+                "SenderPaymentMethodId": "3"  # Default to Debit Card
+            }
+            
+            # Add required headers for the Intermex API
+            headers = {
+                "Pragma": "no-cache",
+                "Accept": "application/json, text/plain, */*",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Cache-Control": "no-cache",
+                "Origin": "https://www.intermexonline.com",
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15",
+                "Referer": "https://www.intermexonline.com/",
+                "Ocp-Apim-Subscription-Key": self.config.get("api_key", "2162a586e2164623a1cd9b6b2d300b4c"),
+                "LanguageId": "1"
+            }
+            
+            response = self.session.get(endpoint, params=params, headers=headers)
+            if response.status_code != 200:
+                error_msg = f"API request failed with status {response.status_code}: {response.text}"
+                logger.error(error_msg)
+                return self.standardize_response({
+                    "success": False,
+                    "error_message": error_msg,
+                    "source_currency": send_currency,
+                    "target_currency": receive_currency
+                })
+            
+            data = response.json()
+            
+            # Format into aggregator-friendly response
+            rate_info = {
+                "success": True,
+                "error_message": None,
                 "source_currency": send_currency,
+                "send_currency": send_currency,
                 "target_currency": receive_currency,
-                "rate": quote.get("exchange_rate"),
-                "fee": quote.get("fee"),
-                "timestamp": quote.get("timestamp"),
-                "error_message": quote.get("error_message")
-            })
+                "receive_currency": receive_currency,
+                "rate": float(data.get("rate", 0.0)),
+                "fee": float(data.get("feeAmount", 0.0)),
+                "send_amount": float(data.get("origAmount", 0.0)),
+                "receive_amount": float(data.get("destAmount", 0.0)),
+                "timestamp": datetime.now().isoformat()
+            }
             
-        except Exception as e:
-            logger.error(f"Failed to get exchange rate: {e}")
+            return self.standardize_response(rate_info)
+            
+        except Exception as exc:
+            logger.error(f"Failed to get exchange rate: {exc}")
             return self.standardize_response({
                 "success": False,
-                "error_message": str(e),
+                "error_message": str(exc),
                 "source_currency": send_currency,
                 "target_currency": receive_currency
-            }) 
+            })
+
+    def close(self):
+        """Close the underlying HTTP session if needed."""
+        if self.session:
+            self.session.close() 
