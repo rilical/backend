@@ -29,9 +29,7 @@ logger = logging.getLogger(__name__)
 
 class MukuruProvider(RemittanceProvider):
     """
-    Aggregator-ready Mukuru integration. 
-    Fetches exchange rates, fees, and supported corridors from Mukuru endpoints,
-    returning standardized aggregator responses.
+    Mukuru integration for retrieving fees, exchange rates, and quotes.
     """
 
     # Public Mukuru endpoints

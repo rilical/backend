@@ -1,8 +1,5 @@
 """
-Dahabshiil provider integration module, aggregator-ready.
-
-This module implements the Dahabshiil provider for retrieving remittance quotes,
-returning standardized fields expected by the aggregator.
+Dahabshiil provider integration module.
 """
 
 import logging
@@ -19,21 +16,9 @@ logger = logging.getLogger(__name__)
 
 class DahabshiilProvider(RemittanceProvider):
     """
-    Provider implementation for Dahabshiil, an international remittance service
-    with a strong presence in East Africa and the Middle East.
-
-    Example usage:
-        provider = DahabshiilProvider()
-        quote = provider.get_quote(
-            amount=Decimal("700.00"),
-            source_currency="USD",
-            dest_currency="KES",
-            source_country="US",
-            dest_country="KE"
-        )
+    Provider implementation for Dahabshiil, an international remittance service.
     """
 
-    # Public Dahabshiil endpoints
     BASE_URL = "https://apigw-us.dahabshiil.com/remit/transaction"
     GET_CHARGES_ENDPOINT = "/get-charges-anonymous"
 
@@ -42,7 +27,6 @@ class DahabshiilProvider(RemittanceProvider):
         super().__init__(name=name, base_url=self.BASE_URL)
         self.session = requests.Session()
 
-        # Set browser-like headers to reduce potential blocking
         self.session.headers.update({
             "User-Agent": (
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "

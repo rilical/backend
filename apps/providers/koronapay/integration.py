@@ -38,9 +38,6 @@ logger = logging.getLogger(__name__)
 class KoronaPayProvider(RemittanceProvider):
     """
     KoronaPay integration for retrieving fees, exchange rates, and quotes.
-
-    Note: This aggregator-ready version includes a `standardize_response(...)`
-    method and returns aggregator-friendly fields for `get_quote` and `get_exchange_rate`.
     """
 
     BASE_URL = "https://koronapay.com/api"
@@ -191,20 +188,7 @@ class KoronaPayProvider(RemittanceProvider):
         receiving_method: str = "cash",
         **kwargs
     ) -> Dict[str, Any]:
-        """
-        Get a standardized aggregator quote for a money transfer.
-        
-        Args:
-            send_amount: Amount to send (in source currency)
-            receive_amount: Amount to receive (in target currency)
-            send_currency: Currency to send (e.g., "EUR")
-            receive_currency: Currency to receive (e.g., "USD")
-            send_country: Sending country code (e.g., "ESP")
-            receive_country: Receiving country code (e.g., "TUR")
-            payment_method: e.g. "debit_card"
-            receiving_method: e.g. "cash"
-            **kwargs: Additional parameters (e.g. include_raw=True)
-        """
+        """Get a standardized quote for a money transfer."""
         # Must have either send_amount or receive_amount
         if send_amount is None and receive_amount is None:
             return self.standardize_response({
@@ -281,9 +265,7 @@ class KoronaPayProvider(RemittanceProvider):
         receive_country: str = "TUR",
         amount: Decimal = Decimal("1000")
     ) -> Dict[str, Any]:
-        """
-        Get aggregator-friendly dictionary with minimal fields for exchange rate tests.
-        """
+        """Get exchange rate for a currency pair."""
         try:
             # Reuse the same tariff logic, assuming send_amount approach
             tariff = self._get_tariff_info(
@@ -345,12 +327,7 @@ class KoronaPayProvider(RemittanceProvider):
         payment_method: str,
         receiving_method: str
     ) -> Dict[str, Any]:
-        """
-        Make the GET request to /transfers/tariffs, parse result, and 
-        return a local dict with 'sending_amount', 'receiving_amount', 'exchange_rate', etc.
-        
-        Raises KoronaPayError (or subclass) on failure.
-        """
+        """Get tariff information from KoronaPay API."""
         try:
             # Build query
             params = {

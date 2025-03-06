@@ -1,7 +1,5 @@
 """
 Al Ansari Exchange provider integration module.
-Directly requests a security token without solving reCAPTCHA challenges.
-Maps aggregator's ISO codes to Al Ansari's internal IDs.
 """
 
 import logging
@@ -23,11 +21,9 @@ from .exceptions import (
 logger = logging.getLogger(__name__)
 
 class AlAnsariProvider(RemittanceProvider):
-    # API endpoints
     BASE_URL = "https://alansariexchange.com/wp-admin/admin-ajax.php"
     WEBSITE_URL = "https://alansariexchange.com/"
 
-    # Maps aggregator's ISO-4217 currency code -> Al Ansari internal currency ID
     CURRENCY_ID_MAPPING = {
         'AED': '91',
         'INR': '27',
@@ -63,7 +59,6 @@ class AlAnsariProvider(RemittanceProvider):
         'YER': '30'
     }
 
-    # Maps aggregator's uppercase country name -> Al Ansari's internal country ID
     COUNTRY_ID_MAPPING = {
         'AFGHANISTAN': '69',
         'ALBANIA': '104',

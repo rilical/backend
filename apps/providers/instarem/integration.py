@@ -24,23 +24,12 @@ class InstaRemProvider(RemittanceProvider):
     """
     Integration with InstaRem's public transaction computed-value endpoint.
     Provides aggregator-ready responses.
-    
-    Example usage:
-        provider = InstaRemProvider()
-        quote = provider.get_quote(
-            amount=Decimal("1000.00"),
-            source_currency="USD",
-            dest_currency="INR",
-            source_country="US",
-            dest_country="IN"
-        )
     """
 
     BASE_URL = "https://www.instarem.com"
     PAYMENT_METHOD_ENDPOINT = "/api/v1/public/payment-method/fee"
     QUOTE_ENDPOINT = "/api/v1/public/transaction/computed-value"
     
-    # Example: Delivery methods for aggregator usage (customize as needed)
     DELIVERY_METHODS = {
         "BankDeposit": {
             "id": 58,

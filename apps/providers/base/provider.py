@@ -11,8 +11,7 @@ from typing import Dict, Any, Optional
 
 class RemittanceProvider(abc.ABC):
     """
-    Abstract base class enforcing a standardized quote interface.
-    Subclasses must implement `get_quote` and use `standardize_response`.
+    Abstract base class for standardized remittance provider interface.
     """
 
     def __init__(self, name: str, base_url: str):
@@ -31,10 +30,7 @@ class RemittanceProvider(abc.ABC):
         delivery_method: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
-        """
-        Subclasses must implement. Should call `self.standardize_response(...)` 
-        and return that dict.
-        """
+        """Get standardized quote for money transfer between currencies."""
         raise NotImplementedError
 
     def standardize_response(

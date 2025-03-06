@@ -31,42 +31,8 @@ class IntermexProvider(RemittanceProvider):
     """
     Intermex integration for retrieving fees, exchange rates, and quotes.
     
-    The API requires specific headers and supports various payment methods:
     - Payment methods: debitCard, creditCard, bankAccount, cash, ACH, wireTransfer
     - Delivery methods: bankDeposit, cashPickup, mobileWallet, homeDelivery
-    
-    Currency IDs:
-    - USD: US Dollar (source)
-    - MXN: Mexican Peso
-    - GTQ: Guatemalan Quetzal
-    - HNL: Honduran Lempira
-    - NIO: Nicaraguan Cordoba
-    - CRC: Costa Rican Colon
-    - PAB: Panamanian Balboa
-    - COP: Colombian Peso
-    - PEN: Peruvian Sol
-    - BOB: Bolivian Boliviano
-    - ARS: Argentine Peso
-    - BRL: Brazilian Real
-    - UYU: Uruguayan Peso
-    - PYG: Paraguayan Guarani
-    - VES: Venezuelan Bolivar
-    - DOP: Dominican Peso
-    - HTG: Haitian Gourde
-    - JMD: Jamaican Dollar
-    - CUP: Cuban Peso
-    - EUR: Euro (for European countries)
-    - GBP: British Pound
-    - RON: Romanian Leu
-    - PLN: Polish Zloty
-    - HUF: Hungarian Forint
-    - CZK: Czech Koruna
-    - BGN: Bulgarian Lev
-    - DKK: Danish Krone
-    - SEK: Swedish Krona
-    - NOK: Norwegian Krone
-    - ISK: Icelandic Krona
-    - CHF: Swiss Franc
     """
     
     BASE_URL = "https://api.imxi.com"  # Corrected endpoint for live API access
