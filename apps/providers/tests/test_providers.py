@@ -2,8 +2,12 @@
 import json
 from typing import Dict, List
 
-from apps.providers.tests.providers.western_union_test import test_western_union
-from apps.providers.tests.providers.money_gram_test import test_money_gram
+# Import test functions for each provider
+# These would need to be created in the providers directory
+# from apps.providers.tests.providers.western_union_test import test_western_union
+# from apps.providers.tests.providers.ria_test import test_ria
+# from apps.providers.tests.providers.wise_test import test_wise
+# from apps.providers.tests.providers.pangea_test import test_pangea
 
 
 def test_all() -> List[Dict]:
@@ -16,22 +20,28 @@ def test_all() -> List[Dict]:
     print("\nStarting provider tests...")
     results = []
     
-    # Test Western Union provider
-    print("\nRunning Western Union tests...")
-    wu_results = test_western_union()
-    results.append(wu_results)
-
-    # Test Money Gram provider (Soon)
-    # print("\n Running Moneygram tests...")
-    # mg_results = test_money_gram
-    # results.append(mg_results)
-
+    # Test Western Union provider (commented out until test function is implemented)
+    # print("\nRunning Western Union tests...")
+    # wu_results = test_western_union()
+    # results.append(wu_results)
     
+    # Test RIA provider (commented out until test function is implemented)
+    # print("\nRunning RIA tests...")
+    # ria_results = test_ria()
+    # results.append(ria_results)
     
-    # Add more provider tests here as they are implemented
-    # results.append(test_moneygram())
-    # results.append(test_ria())
-    # etc.
+    # Test Wise provider (commented out until test function is implemented)
+    # print("\nRunning Wise tests...")
+    # wise_results = test_wise()
+    # results.append(wise_results)
+    
+    # Test Pangea provider (commented out until test function is implemented)
+    # print("\nRunning Pangea tests...")
+    # pangea_results = test_pangea()
+    # results.append(pangea_results)
+    
+    # For now, return empty results until test functions are implemented
+    print("No provider test functions implemented yet. Please create test functions for each provider.")
     
     return results
 

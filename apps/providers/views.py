@@ -24,6 +24,13 @@ from .westernunion.exceptions import (
     WUValidationError,
     WUConnectionError
 )
+from .worldremit.integration import WorldRemitProvider
+from .worldremit.exceptions import (
+    WorldRemitError,
+    WorldRemitAuthenticationError,
+    WorldRemitValidationError,
+    WorldRemitConnectionError
+)
 
 class ExchangeRateFilter(filters.FilterSet):
     """Filter set for exchange rates."""

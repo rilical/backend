@@ -7,6 +7,8 @@ from .base.provider import RemittanceProvider
 from .moneygram.integration import MoneyGramProvider
 from .westernunion.integration import WesternUnionProvider
 from .ria.integration import RiaProvider
+from .worldremit.integration import WorldRemitProvider
+from .remitly.integration import RemitlyProvider
 
 class ProviderFactory:
     """Factory for creating and managing remittance provider instances."""
@@ -15,6 +17,8 @@ class ProviderFactory:
         'western_union': WesternUnionProvider,
         'moneygram': MoneyGramProvider,
         'ria': RiaProvider,
+        'worldremit': WorldRemitProvider,
+        'remitly': RemitlyProvider,
         # Add more providers here as they are implemented
         # 'moneygram': MoneyGramProvider,
         # 'ria': RiaProvider,
