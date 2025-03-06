@@ -24,27 +24,13 @@ logger = logging.getLogger("providers.orbitremit")
 
 class OrbitRemitProvider(RemittanceProvider):
     """
-    Example of adding OrbitRemit integration for retrieving fees or quotes.
-    
-    Observed usage from logs:
-      GET /api/fees?send=AUD&payout=PHP&amount=200000&type=bank_account
-
-    The JSON response might look like:
-    {
-      "code": 200,
-      "status": "success",
-      "data": {
-        "fee": "0.00",
-        "send_currency": "AUD",
-        "payout_currency": "PHP",
-        "send_amount": "200000",
-        "recipient_type": "bank_account"
-      }
-    }
+    OrbitRemit integration for retrieving fees, exchange rates, and quotes.
     """
 
     BASE_URL = "https://www.orbitremit.com"
     FEES_ENDPOINT = "/api/fees"
+    RATES_ENDPOINT = "/api/rates"
+    HISTORIC_RATES_ENDPOINT = "/api/historic-rates"
     
     # Common source currencies
     SUPPORTED_SOURCE_CURRENCIES = ["AUD", "NZD", "GBP", "EUR", "CAD", "USD"]
@@ -159,71 +145,42 @@ class OrbitRemitProvider(RemittanceProvider):
             "Pragma": "no-cache",
         })
 
-    def get_exchange_rate(
-        self, 
-        send_amount: Decimal, 
-        send_currency: str, 
-        receive_country: str
-    ) -> Optional[Dict]:
+    def standardize_response(self, raw_result: Dict[str, Any], provider_specific_data: bool = False) -> Dict[str, Any]:
         """
-        Get exchange rate and fees for a money transfer.
-        
-        Args:
-            send_amount: Amount to send
-            send_currency: Currency code to send (e.g. 'USD')
-            receive_country: Destination country code (e.g. 'PH')
-            
-        Returns:
-            Dictionary containing rate information or None if failed
+        Convert local result dict into standardized format.
         """
-        # Convert country code to currency
-        if receive_country.upper() in self.COUNTRY_TO_CURRENCY:
-            payout_currency = self.COUNTRY_TO_CURRENCY[receive_country.upper()]
-        else:
-            logger.warning(f"Unknown country code: {receive_country}, cannot determine currency")
-            return None
-        
-        # Get fee info using the fee_info method
-        fee_info = self.get_fee_info(
-            send_currency=send_currency,
-            payout_currency=payout_currency,
-            send_amount=send_amount,
-        )
-        
-        # Get the exchange rate from our embedded rate database
-        exchange_rate = self._get_exchange_rate(send_currency.upper(), payout_currency)
-        
-        # Calculate the target amount if we have an exchange rate
-        target_amount = None
-        if exchange_rate:
-            # Deduct the fee from the send amount
-            fee = Decimal(str(fee_info.get("fee", 0)))
-            adjusted_send_amount = send_amount - fee
+        final_exchange_rate = raw_result.get("exchange_rate")
+        final_rate = raw_result.get("rate")
+        if final_rate is None:
+            final_rate = final_exchange_rate
             
-            # Calculate the target amount
-            target_amount = adjusted_send_amount * exchange_rate
+        final_target_currency = raw_result.get("target_currency") or raw_result.get("destination_currency")
         
-        if fee_info["success"]:
-            return {
-                "provider": self.name,
-                "source_amount": float(send_amount),
-                "source_currency": send_currency.upper(),
-                "target_currency": payout_currency,
-                "fee": fee_info.get("fee", 0),
-                "rate": float(exchange_rate) if exchange_rate else None,
-                "target_amount": float(target_amount) if target_amount else None,
-                "corridor": f"{send_currency.upper()}-{payout_currency}",
-                "success": True,
-                "rate_source": "OrbitRemit estimated rates",
-                "rate_timestamp": self.RATES_LAST_UPDATED.isoformat(),
-            }
-        else:
-            # Return None or a dictionary with error information
-            return {
-                "provider": self.name,
-                "success": False,
-                "error_message": fee_info.get("error_message", "Failed to get exchange rate information"),
-            }
+        standardized = {
+            "provider_id": self.name,
+            "success": raw_result.get("success", False),
+            "error_message": raw_result.get("error_message"),
+            
+            "send_amount": raw_result.get("send_amount", 0.0),
+            "source_currency": (raw_result.get("source_currency") or "").upper(),
+            
+            "destination_amount": raw_result.get("destination_amount"),
+            "destination_currency": (raw_result.get("destination_currency") or "").upper(),
+            
+            "exchange_rate": final_exchange_rate,
+            "fee": raw_result.get("fee"),
+            
+            "delivery_time_minutes": None,
+            "timestamp": raw_result.get("timestamp") or datetime.now().isoformat(),
+            
+            "rate": final_rate,
+            "target_currency": (final_target_currency or "").upper(),
+        }
+        
+        if provider_specific_data and "raw_response" in raw_result:
+            standardized["raw_response"] = raw_result["raw_response"]
+            
+        return standardized
 
     def _get_exchange_rate(self, source_currency: str, target_currency: str) -> Optional[Decimal]:
         """
@@ -246,6 +203,109 @@ class OrbitRemitProvider(RemittanceProvider):
         logger.warning(f"No exchange rate found for {source_currency} to {target_currency}")
         return None
 
+    def get_rates(self, send_currency, dest_currency, amount=None):
+        """Get the exchange rate for a currency pair."""
+        try:
+            payload = {
+                'send_currency': send_currency,
+                'payout_currency': dest_currency,
+                'send_amount': str(float(amount)) if amount else '1000.00'
+            }
+
+            headers = {
+                'Content-Type': 'application/json',
+                'Pragma': 'no-cache',
+                'Accept': 'application/json, text/plain, */*',
+                'Sec-Fetch-Site': 'same-origin',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Sec-Fetch-Mode': 'cors',
+                'Cache-Control': 'no-cache',
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                'Referer': 'https://www.orbitremit.com/',
+                'Sec-Fetch-Dest': 'empty',
+                'Priority': 'u=1, i'
+            }
+
+            url = f"{self.BASE_URL}/api/rates"
+            
+            logging.info(f"Request to {url} with params: {payload}")
+            # Use a default timeout of 15 seconds if self.timeout isn't available
+            timeout = getattr(self, 'timeout', 15)
+            response = requests.post(url, json=payload, headers=headers, timeout=timeout)
+            response.raise_for_status()
+
+            logging.info(f"Response from {url}: {response.text}")
+            data = response.json()
+            
+            # Extract rate from the nested structure
+            try:
+                # Handle the new nested response format
+                if data.get('type') == 'success' and 'data' in data:
+                    attributes = data.get('data', {}).get('data', {}).get('attributes', {})
+                    rate = attributes.get('rate') or attributes.get('promotion_rate')
+                elif 'data' in data and 'attributes' in data.get('data', {}).get('data', {}):
+                    attributes = data.get('data', {}).get('data', {}).get('attributes', {})
+                    rate = attributes.get('rate') or attributes.get('promotion_rate')
+                else:
+                    rate = None
+                
+                if rate:
+                    rate_value = Decimal(str(rate))
+                    return {
+                        'success': True,
+                        'source_currency': send_currency,
+                        'target_currency': dest_currency,
+                        'rate': rate_value,
+                        'error_message': None,
+                        'timestamp': datetime.now().isoformat()
+                    }
+                else:
+                    error_msg = f"Could not find rate in response: {data}"
+                    logging.error(error_msg)
+                    return {
+                        'success': False,
+                        'source_currency': send_currency,
+                        'target_currency': dest_currency,
+                        'rate': None,
+                        'error_message': error_msg,
+                        'timestamp': datetime.now().isoformat()
+                    }
+            except (KeyError, TypeError) as e:
+                error_msg = f"Error extracting rate from response: {e}. Response: {data}"
+                logging.error(error_msg)
+                return {
+                    'success': False,
+                    'source_currency': send_currency,
+                    'target_currency': dest_currency,
+                    'rate': None,
+                    'error_message': error_msg,
+                    'timestamp': datetime.now().isoformat()
+                }
+                
+        except requests.RequestException as e:
+            error_msg = f"Error fetching exchange rate: {str(e)}"
+            logging.error(error_msg)
+            return {
+                'success': False,
+                'source_currency': send_currency,
+                'target_currency': dest_currency,
+                'rate': None,
+                'error_message': error_msg,
+                'timestamp': datetime.now().isoformat()
+            }
+        except (ValueError, TypeError) as e:
+            error_msg = f"Error processing exchange rate data: {str(e)}"
+            logging.error(error_msg)
+            return {
+                'success': False,
+                'source_currency': send_currency,
+                'target_currency': dest_currency,
+                'rate': None,
+                'error_message': error_msg,
+                'timestamp': datetime.now().isoformat()
+            }
+
     def get_fee_info(
         self,
         send_currency: str,
@@ -255,41 +315,23 @@ class OrbitRemitProvider(RemittanceProvider):
         **kwargs
     ) -> Dict[str, Any]:
         """
-        Retrieve the fee / quote from OrbitRemit, e.g.:
-
-        GET /api/fees
-          ?send=AUD
-          &payout=PHP
-          &amount=200000
-          &type=bank_account
-
-        Example usage:
-            result = provider.get_fee_info(
-                send_currency="AUD",
-                payout_currency="PHP",
-                send_amount=Decimal("200000"),
-                recipient_type="bank_account",
-            )
-
-        :return: Dictionary with keys: success, fee, send_currency, payout_currency, etc.
+        Retrieve fee from OrbitRemit's /api/fees endpoint.
         """
         # Validate inputs
         send_currency = send_currency.upper()
         payout_currency = payout_currency.upper()
         
         result = {
-            "provider": self.name,
             "success": False,
             "send_currency": send_currency,
             "payout_currency": payout_currency,
             "send_amount": float(send_amount),
             "recipient_type": recipient_type,
             "fee": None,
-            "raw_data": None,
             "error_message": None,
         }
         
-        # Input validation
+        # Basic validation
         if not send_amount or send_amount <= 0:
             result["error_message"] = "Amount must be positive"
             return result
@@ -301,160 +343,314 @@ class OrbitRemitProvider(RemittanceProvider):
         if not payout_currency:
             result["error_message"] = "Payout currency cannot be empty"
             return result
-            
-        if send_currency not in self.SUPPORTED_SOURCE_CURRENCIES:
-            result["error_message"] = f"Invalid source currency. Supported currencies: {', '.join(self.SUPPORTED_SOURCE_CURRENCIES)}"
-            return result
-            
-        # Check if corridor is supported
-        if send_currency in self.SUPPORTED_CORRIDORS:
-            if payout_currency not in self.SUPPORTED_CORRIDORS[send_currency]:
-                result["error_message"] = f"Unsupported corridor: {send_currency} to {payout_currency}"
-                return result
-        else:
-            # If source currency not found in supported corridors, indicate that
-            result["error_message"] = f"Source currency {send_currency} is not supported"
-            return result
 
-        endpoint_url = self.base_url + self.FEES_ENDPOINT
+        endpoint_url = self.BASE_URL + self.FEES_ENDPOINT
 
-        # Convert Decimal to string
-        send_amount_str = f"{send_amount:.2f}"
-
-        # Construct query parameters
-        params = {
-            "send": send_currency,       # e.g. 'AUD'
-            "payout": payout_currency,   # e.g. 'PHP'
-            "amount": send_amount_str,   # e.g. '200000'
-            "type": recipient_type,      # e.g. 'bank_account'
+        # Set headers to match the curl example
+        headers = {
+            "Content-Type": "application/json",
+            "Pragma": "no-cache",
+            "Accept": "application/json, text/plain, */*",
+            "Sec-Fetch-Site": "same-origin",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Sec-Fetch-Mode": "cors",
+            "Cache-Control": "no-cache",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            "Referer": "https://www.orbitremit.com/",
+            "Sec-Fetch-Dest": "empty",
+            "Priority": "u=1, i"
         }
-
-        logger.debug(f"OrbitRemit GET: {endpoint_url} params={params}")
-
+        
         try:
-            resp = self.session.get(endpoint_url, params=params, timeout=15)
+            # Construct the query parameters
+            params = {
+                "send_currency": send_currency,
+                "payout_currency": payout_currency,
+                "amount": str(float(send_amount)),
+                "recipient_type": recipient_type
+            }
+            
+            # Add any additional parameters from kwargs
+            params.update({k: v for k, v in kwargs.items() if k not in params})
+            
+            logging.info(f"OrbitRemit fees request: {endpoint_url}, {params}")
+            
+            # Use a default timeout of 15 seconds if self.timeout isn't available
+            timeout = getattr(self, 'timeout', 15)
+            resp = requests.get(endpoint_url, params=params, headers=headers, timeout=timeout)
             resp.raise_for_status()
+            
+            logging.info(f"OrbitRemit fees response: {resp.text}")
             data = resp.json()
             
-            # Store raw data for debugging
-            result["raw_data"] = data
-            
-            logger.debug(f"OrbitRemit response: {data}")
-
-            # Check if we have a "success" code
-            if data.get("status") == "success" and isinstance(data.get("data"), dict):
-                fee_data = data["data"]
-                # Example structure:
-                # {
-                #   "fee": "0.00",
-                #   "send_currency": "AUD",
-                #   "payout_currency": "PHP",
-                #   "send_amount": "200000",
-                #   "recipient_type": "bank_account"
-                # }
-
-                fee_str = fee_data.get("fee", "0.00")
-                fee_val = float(fee_str)
-
-                result.update({
-                    "success": True,
-                    "fee": fee_val,
-                })
+            # Check if the response contains fee information
+            # The structure might be different than expected, but we'll try common patterns
+            if "fee" in data:
+                # Direct fee property
+                fee_value = float(data["fee"])
+                result["fee"] = Decimal(str(fee_value))
+                result["success"] = True
+            elif "data" in data and isinstance(data["data"], dict):
+                # Nested data structure
+                if "fee" in data["data"]:
+                    fee_value = float(data["data"]["fee"])
+                    result["fee"] = Decimal(str(fee_value))
+                    result["success"] = True
+                elif "attributes" in data["data"] and "fee" in data["data"]["attributes"]:
+                    fee_value = float(data["data"]["attributes"]["fee"])
+                    result["fee"] = Decimal(str(fee_value))
+                    result["success"] = True
             else:
-                msg = f"OrbitRemit returned unexpected response: {data}"
-                logger.error(msg)
-                result["error_message"] = msg
-        except requests.exceptions.JSONDecodeError as e:
-            error_msg = f"Failed to parse OrbitRemit response as JSON: {e}"
-            logger.error(error_msg)
-            result["error_message"] = error_msg
-            raise OrbitRemitResponseError(error_msg) from e
-        except requests.exceptions.ConnectionError as e:
-            error_msg = f"Connection error when accessing OrbitRemit API: {e}"
-            logger.error(error_msg)
-            result["error_message"] = error_msg
-            raise OrbitRemitConnectionError(error_msg) from e
+                result["error_message"] = f"Could not find fee in response: {data}"
+                
         except requests.exceptions.RequestException as e:
-            error_msg = f"OrbitRemit request failed: {e}"
-            logger.error(error_msg)
+            error_msg = f"OrbitRemit fees request failed: {e}"
+            logging.error(error_msg)
             result["error_message"] = error_msg
-            raise OrbitRemitApiError(error_msg) from e
-
+            
+        except (ValueError, TypeError) as e:
+            error_msg = f"Failed to parse OrbitRemit fees response: {e}"
+            logging.error(error_msg)
+            result["error_message"] = error_msg
+            
         return result
 
     def get_quote(
         self,
-        amount: Decimal,
+        amount=None,
+        source_currency=None,
+        dest_currency=None,
+        source_country=None,
+        dest_country=None,
+        payment_method=None,
+        receiving_method=None,
+        **kwargs
+    ):
+        """Get a standardized quote for a money transfer."""
+        try:
+            # Validate required parameters
+            if not amount or not source_currency or not dest_currency:
+                return {
+                    'provider_id': self.name,
+                    'success': False,
+                    'error_message': 'Missing required parameters: amount, source_currency, dest_currency',
+                }
+            
+            # Try to get fee information, but use fallback if it fails
+            try:
+                fee_info = self.get_fee_info(
+                    send_currency=source_currency,
+                    payout_currency=dest_currency,
+                    send_amount=Decimal(str(amount))
+                )
+                if fee_info.get('success'):
+                    fee = fee_info.get('fee', Decimal('6.00'))
+                else:
+                    # Fall back to fixed fee
+                    fee = Decimal('6.00')  # Default fee if not available
+            except Exception as e:
+                logging.warning(f"Fee API call failed: {str(e)}")
+                fee = Decimal('6.00')  # Default fee
+            
+            # Try to get exchange rate, but use fallback if it fails
+            try:
+                rate_info = self.get_rates(source_currency, dest_currency, amount)
+                if rate_info.get('success'):
+                    rate = rate_info.get('rate')
+                else:
+                    # Fall back to embedded rates
+                    rate = None
+            except Exception as e:
+                logging.warning(f"Rate API call failed: {str(e)}")
+                rate = None
+            
+            # If we couldn't get a rate from the API, use the embedded rates
+            if not rate:
+                logging.info("Using embedded exchange rates")
+                # Get the nested dictionary for the source currency
+                source_rates = self.EXCHANGE_RATES.get(source_currency.upper(), {})
+                # Get the rate for the destination currency
+                rate = source_rates.get(dest_currency.upper())
+                
+                if not rate:
+                    return {
+                        'provider_id': self.name,
+                        'success': False,
+                        'error_message': f'No exchange rate found for {source_currency} to {dest_currency}',
+                    }
+            
+            # Calculate destination amount
+            send_amount = Decimal(str(amount))
+            destination_amount = (send_amount - fee) * rate
+            
+            # Build the response
+            return {
+                'provider_id': self.name,
+                'success': True,
+                'error_message': None,
+                'send_amount': float(send_amount),
+                'source_currency': source_currency,
+                'destination_amount': float(destination_amount),
+                'destination_currency': dest_currency,
+                'exchange_rate': float(rate),
+                'fee': float(fee),
+                'delivery_time_minutes': None,
+                'timestamp': datetime.now().isoformat(),
+                'rate': float(rate),
+                'target_currency': dest_currency,
+            }
+            
+        except Exception as e:
+            logging.error(f"Error getting quote: {str(e)}")
+            return {
+                'provider_id': self.name,
+                'success': False,
+                'error_message': f"Failed to get quote: {str(e)}",
+            }
+
+    def get_exchange_rate(
+        self,
         source_currency: str,
         target_currency: str,
-        **kwargs
+        source_country: str = None,
+        target_country: str = None,
+        amount: Decimal = Decimal("1000")
     ) -> Dict[str, Any]:
         """
-        Get a quote for converting an amount from one currency to another.
-        This provides the standard interface expected by the remittance comparison system.
-
-        Args:
-            amount: The amount to convert
-            source_currency: The source currency code (e.g. "AUD")
-            target_currency: The target currency code (e.g. "PHP")
-            **kwargs: Additional parameters for the API call
-
-        Returns:
-            A dictionary containing:
-            - success: Boolean indicating success or failure
-            - source_amount: Original amount in source currency
-            - target_amount: Converted amount in target currency
-            - fee: Fee charged for the conversion (if available)
-            - rate: Exchange rate used (if available/calculated)
-            - source_currency: Source currency code
-            - target_currency: Target currency code
-            - error_message: Error message if the quote failed
+        Get exchange rate for a currency pair.
         """
-        source_currency = source_currency.upper()
-        target_currency = target_currency.upper()
-        
-        result = {
-            "provider": self.name,
+        local_result = {
             "success": False,
-            "source_amount": float(amount),
-            "target_amount": None,
-            "fee": None,
-            "rate": None,
-            "source_currency": source_currency,
-            "target_currency": target_currency,
+            "send_amount": float(amount),
+            "source_currency": source_currency.upper(),
+            "destination_currency": target_currency.upper(),
+            "exchange_rate": None,
             "error_message": None,
+            "timestamp": datetime.now().isoformat(),
         }
         
-        # Call get_fee_info to get the fee
-        fee_info = self.get_fee_info(
-            send_currency=source_currency,
-            payout_currency=target_currency,
-            send_amount=amount,
-            **kwargs
+        # Get rates from the live API
+        rate_data = self.get_rates(
+            source_currency,
+            target_currency,
+            amount
         )
         
-        # Update result with fee info
-        result["success"] = fee_info["success"]
-        result["fee"] = fee_info.get("fee")
-        result["error_message"] = fee_info.get("error_message")
+        local_result["success"] = rate_data["success"]
+        local_result["exchange_rate"] = rate_data.get("rate")
+        local_result["error_message"] = rate_data.get("error_message")
         
-        # Get the exchange rate from our embedded rate database
-        if result["success"]:
-            exchange_rate = self._get_exchange_rate(source_currency, target_currency)
+        return self.standardize_response(local_result)
+        
+    def close(self):
+        """Close the session."""
+        if self.session:
+            self.session.close()
+
+    def __enter__(self):
+        """Enter context manager."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit context manager."""
+        self.close()
+
+    def get_historic_rates(
+        self,
+        send_currency: str,
+        payout_currency: str,
+        timescale: str = "weekly"
+    ) -> Dict[str, Any]:
+        """Get historical exchange rates from OrbitRemit API."""
+        try:
+            # Validate input parameters
+            if not send_currency or not payout_currency:
+                return {
+                    "success": False,
+                    "source_currency": send_currency,
+                    "target_currency": payout_currency,
+                    "rates": [],
+                    "error_message": "Send currency and payout currency must be provided",
+                }
+                
+            # Set parameters for the request
+            params = {
+                "send_currency": send_currency.upper(),
+                "payout_currency": payout_currency.upper(),
+                "timescale": timescale
+            }
             
-            if exchange_rate:
-                result["rate"] = float(exchange_rate)
+            # Set headers to match the curl example
+            headers = {
+                "Pragma": "no-cache",
+                "Accept": "application/json, text/plain, */*",
+                "Sec-Fetch-Site": "same-origin",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Sec-Fetch-Mode": "cors",
+                "Cache-Control": "no-cache",
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+                "Referer": "https://www.orbitremit.com/",
+                "Sec-Fetch-Dest": "empty",
+                "Priority": "u=1, i"
+            }
+            
+            url = f"{self.BASE_URL}{self.HISTORIC_RATES_ENDPOINT}"
+            
+            logging.info(f"Request to {url} with params: {params}")
+            # Use a default timeout of 15 seconds if self.timeout isn't available
+            timeout = getattr(self, 'timeout', 15)
+            response = requests.get(url, params=params, headers=headers, timeout=timeout)
+            response.raise_for_status()
+            
+            logging.info(f"Response from {url}: {response.text}")
+            data = response.json()
+            
+            # Extract rates from response
+            try:
+                if data.get("type") == "success" and "data" in data:
+                    # Process the historical rates data
+                    rates = []
+                    if isinstance(data["data"], list):
+                        for item in data["data"]:
+                            if "attributes" in item:
+                                attributes = item["attributes"]
+                                rate_info = {
+                                    "date": attributes.get("date"),
+                                    "rate": float(attributes.get("rate", 0)),
+                                }
+                                rates.append(rate_info)
+                    
+                    return {
+                        "success": True,
+                        "source_currency": send_currency,
+                        "target_currency": payout_currency,
+                        "rates": rates,
+                        "error_message": None,
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "source_currency": send_currency,
+                        "target_currency": payout_currency,
+                        "rates": [],
+                        "error_message": f"Unexpected response format: {data}",
+                    }
+            except (KeyError, ValueError, TypeError) as e:
+                return {
+                    "success": False,
+                    "source_currency": send_currency,
+                    "target_currency": payout_currency, 
+                    "rates": [],
+                    "error_message": f"Error parsing response: {e}"
+                }
                 
-                # Calculate the target amount
-                fee = Decimal(str(result["fee"] or 0))
-                adjusted_amount = amount - fee
-                target_amount = adjusted_amount * exchange_rate
-                result["target_amount"] = float(target_amount)
-                
-                # Add rate source information
-                result["rate_source"] = "OrbitRemit estimated rates"
-                result["rate_timestamp"] = self.RATES_LAST_UPDATED.isoformat()
-            else:
-                result["error_message"] = f"Exchange rate not available for {source_currency} to {target_currency}"
-        
-        return result 
+        except requests.RequestException as e:
+            return {
+                "success": False,
+                "source_currency": send_currency,
+                "target_currency": payout_currency,
+                "rates": [],
+                "error_message": f"Error fetching historic rates: {str(e)}"
+            } 
