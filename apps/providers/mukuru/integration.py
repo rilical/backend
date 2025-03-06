@@ -13,7 +13,6 @@ from decimal import Decimal
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
-# Import the base provider class
 from apps.providers.base.provider import RemittanceProvider
 from apps.providers.mukuru.exceptions import (
     MukuruError,
@@ -22,6 +21,14 @@ from apps.providers.mukuru.exceptions import (
     MukuruResponseError,
     MukuruCorridorUnsupportedError,
     MukuruRateLimitError,
+)
+from apps.providers.mukuru.mapping import (
+    COUNTRY_TO_CURRENCY,
+    CURRENCY_ID_MAPPING,
+    SUPPORTED_CORRIDORS,
+    PAYMENT_METHODS,
+    DELIVERY_METHODS,
+    update_country_currency_mapping,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,42 +39,18 @@ class MukuruProvider(RemittanceProvider):
     Mukuru integration for retrieving fees, exchange rates, and quotes.
     """
 
-    # Public Mukuru endpoints
     BASE_URL = "https://mobile.mukuru.com"
     PRICECHECKER_CALCULATE_PATH = "/pricechecker/calculate"
     PRICECHECKER_COUNTRIES_PATH = "/pricechecker/get_recipient_countries"
     
-    # Mapping of ISO country codes to currencies
-    COUNTRY_TO_CURRENCY = {
-        'ZA': 'ZAR',  # South Africa - South African Rand
-        'ZW': 'USD',  # Zimbabwe - US Dollar
-        'GH': 'GHS',  # Ghana - Ghana Cedi
-        'NG': 'NGN',  # Nigeria - Nigerian Naira
-        'ML': 'XOF',  # Mali - West African CFA franc
-        'MZ': 'MZN',  # Mozambique - Mozambican Metical
-        'KE': 'KES',  # Kenya - Kenyan Shilling
-        'MW': 'MWK',  # Malawi - Malawian Kwacha
-    }
-    
-    # Default corridors based on Mukuru's typical operations
-    SUPPORTED_CORRIDORS = [
-        ('ZA', 'ZW'),  # South Africa -> Zimbabwe
-        ('ZA', 'GH'),  # South Africa -> Ghana
-        ('ZA', 'NG'),  # South Africa -> Nigeria
-        ('ZA', 'MZ'),  # South Africa -> Mozambique
-        ('ZA', 'MW'),  # South Africa -> Malawi
-    ]
-    
-    # Example: currency ID mapping for specific corridors (if used internally)
-    CURRENCY_ID_MAPPING = {
-        ('ZA', 'ZW'): 18,  # For ZAR -> USD (Zimbabwe)
-        ('ZA', 'GH'): 20,  # Example ID for Ghana
-        ('ZA', 'NG'): 21,  # Example ID for Nigeria
-        # ...
-    }
+    # Import mappings from mapping.py
+    COUNTRY_TO_CURRENCY = COUNTRY_TO_CURRENCY
+    SUPPORTED_CORRIDORS = SUPPORTED_CORRIDORS
+    CURRENCY_ID_MAPPING = CURRENCY_ID_MAPPING
+    PAYMENT_METHODS = PAYMENT_METHODS
+    DELIVERY_METHODS = DELIVERY_METHODS
 
     def __init__(self, name="mukuru", **kwargs):
-        """Initialize the Mukuru provider in aggregator-friendly mode."""
         super().__init__(name=name, base_url=self.BASE_URL, **kwargs)
 
         self.session = requests.Session()
@@ -83,34 +66,16 @@ class MukuruProvider(RemittanceProvider):
             "Cache-Control": "no-cache",
         })
 
-        # Cache for supported countries
         self._supported_countries = None
 
-    # ------------------------------------------------------------------------
-    # Aggregator-specific helper: standardize the response
-    # ------------------------------------------------------------------------
     def standardize_response(self, local_data: Dict[str, Any], provider_specific_data: bool = False) -> Dict[str, Any]:
-        """
-        Convert local fields into aggregator-friendly keys:
-          - 'provider_id', 'success', 'error_message'
-          - 'send_amount', 'source_currency'
-          - 'destination_amount', 'destination_currency'
-          - 'exchange_rate', 'fee'
-          - 'delivery_time_minutes', 'timestamp'
-        
-        Also includes aggregator keys 'rate' (mirroring exchange_rate) 
-        and 'target_currency' (mirroring destination_currency).
-        """
-        # aggregator might want "rate" specifically
         final_exchange_rate = local_data.get("exchange_rate")
         final_rate = local_data.get("rate")
         if final_rate is None:
             final_rate = final_exchange_rate
         
-        # aggregator might want "target_currency" specifically
         final_target_currency = local_data.get("target_currency") or local_data.get("receive_currency", "")
 
-        # Build aggregator output
         response = {
             "provider_id": self.name,
             "success": local_data.get("success", False),
@@ -127,35 +92,18 @@ class MukuruProvider(RemittanceProvider):
             "payment_method": local_data.get("payment_method"),
             "delivery_method": local_data.get("delivery_method"),
             
-            # aggregator might ask for "delivery_time_minutes" if known
             "delivery_time_minutes": local_data.get("delivery_time_minutes"),
-            
-            # aggregator might want a "timestamp" for the quote
             "timestamp": local_data.get("timestamp"),
-            
-            # aggregator might specifically look for "rate" (mirroring exchange_rate)
             "rate": final_rate,
-            
-            # aggregator might specifically want "target_currency"
             "target_currency": final_target_currency.upper(),
         }
 
-        # optionally attach raw response
         if provider_specific_data and "raw_response" in local_data:
             response["raw_response"] = local_data["raw_response"]
 
         return response
 
-    # ------------------------------------------------------------------------
-    # Public aggregator-like methods
-    # ------------------------------------------------------------------------
     def get_supported_countries(self) -> Dict[str, str]:
-        """
-        Retrieve recipient countries from Mukuru's endpoint.
-        
-        Returns:
-            A dict mapping country codes to currency codes.
-        """
         if self._supported_countries is not None:
             return self._supported_countries
         
@@ -175,13 +123,13 @@ class MukuruProvider(RemittanceProvider):
                 self._supported_countries = {}
                 return {}
             
-            result = {}
-            for ccode, info in data.get("data", {}).items():
-                currency_iso = info.get("currency_market_iso")
-                result[ccode] = currency_iso
+            # Extract the country data from the API response
+            country_data = data.get("data", {})
             
-            self._supported_countries = result
-            return result
+            # Update our mapping with the latest data from the API
+            self._supported_countries = update_country_currency_mapping(country_data)
+            
+            return self._supported_countries
             
         except requests.exceptions.RequestException as e:
             logger.error(f"Connection error fetching Mukuru countries: {str(e)}")
@@ -190,15 +138,39 @@ class MukuruProvider(RemittanceProvider):
             logger.error(f"Failed to parse JSON: {str(e)}")
             raise MukuruResponseError(f"Failed to parse JSON response: {str(e)}")
 
-    def get_currency_id(self, from_country: str, to_country: str) -> int:
+    def get_currency_id(self, from_country: str, to_country: str, delivery_method: str = None) -> int:
         """
-        Optional: Get a corridor-specific currency ID for internal usage.
-        Fallback to a default if not found.
+        Get the appropriate currency ID for the given corridor and delivery method.
+        
+        Args:
+            from_country: Source country code
+            to_country: Destination country code
+            delivery_method: Optional delivery method (cash, wallet, bank)
+            
+        Returns:
+            The currency ID to use in the API request
         """
+        # Normalize the delivery method to lowercase if provided
+        method = delivery_method.lower() if delivery_method else None
+        
+        # First try with the specific delivery method
+        if method:
+            corridor_id = self.CURRENCY_ID_MAPPING.get((from_country, to_country, method))
+            if corridor_id is not None:
+                return corridor_id
+        
+        # Then try the general corridor
         corridor_id = self.CURRENCY_ID_MAPPING.get((from_country, to_country))
+        
+        # If still not found, use default USD Cash for Zimbabwe (18) or default (1)
         if corridor_id is None:
-            logger.warning(f"No currency ID for {from_country}->{to_country}, fallback 18")
-            corridor_id = 18  # e.g., default to ZW corridor
+            if to_country == 'ZW':
+                logger.warning(f"No currency ID for {from_country}->{to_country}, using default USD Cash (18)")
+                corridor_id = 18
+            else:
+                logger.warning(f"No currency ID for {from_country}->{to_country}, using default (1)")
+                corridor_id = 1
+                
         return corridor_id
 
     def _get_exchange_rate_data(
@@ -207,13 +179,9 @@ class MukuruProvider(RemittanceProvider):
         send_currency: str,
         receive_country: str,
         from_country_code: str = "ZA",
+        delivery_method: str = None,
         **kwargs
     ) -> Dict[str, Any]:
-        """
-        Internal method that calls Mukuru's /pricechecker/calculate
-        and returns local dictionary of aggregator-like keys (not yet fully standardized).
-        """
-        # create a minimal local result
         local_result = {
             "success": False,
             "send_amount": float(send_amount),
@@ -226,17 +194,16 @@ class MukuruProvider(RemittanceProvider):
             "timestamp": datetime.now().isoformat()
         }
 
-        # get corridor currency ID if needed
-        corridor_id = self.get_currency_id(from_country_code, receive_country)
+        corridor_id = self.get_currency_id(from_country_code, receive_country, delivery_method)
         
         url = self.BASE_URL + self.PRICECHECKER_CALCULATE_PATH
         params = {
-            "from_currency_iso": send_currency,   # e.g. 'ZAR'
-            "payin_amount": str(send_amount),     # e.g. '900'
-            "from_country": from_country_code,    # e.g. 'ZA'
+            "from_currency_iso": send_currency,
+            "payin_amount": str(send_amount),
+            "from_country": from_country_code,
             "to_currency_iso": "",
             "payout_amount": "",
-            "to_country": receive_country,        # e.g. 'ZW'
+            "to_country": receive_country,
             "currency_id": corridor_id,
             "active_input": "payin_amount",
             "brand_id": 1,
@@ -256,43 +223,36 @@ class MukuruProvider(RemittanceProvider):
                 local_result["error_message"] = error_msg
                 return local_result
 
-            # Parse data
             quote_data = data.get("data", {})
             breakdown = quote_data.get("breakdown", {})
 
-            rate_str = breakdown.get("Rate", "")  # e.g. "$1:R18.7248"
+            rate_str = breakdown.get("Rate", "")
             exchange_rate = None
-            # parse e.g. "R18.7248"
             r_match = re.search(r"R(\d+(\.\d+)?)", rate_str)
             if r_match:
-                zar_per_unit = float(r_match.group(1))  # e.g. 18.7248
+                zar_per_unit = float(r_match.group(1))
                 if zar_per_unit != 0:
-                    # if corridor is ZAR->USD, we interpret "R18.72 = $1" => exchange_rate=1/18.72=0.053
                     exchange_rate = 1.0 / zar_per_unit
 
-            # parse fee
             payin_info = breakdown.get("payin", {})
-            fee_str = payin_info.get("Charge", "")  # e.g. "ZAR94.00"
+            fee_str = payin_info.get("Charge", "")
             fee_val = 0.0
             f_match = re.search(r"(\d+(\.\d+)?)", fee_str)
             if f_match:
                 fee_val = float(f_match.group(1))
 
-            # parse receive amount from "They receive"
             payout_info = breakdown.get("payout", {})
-            receive_str = payout_info.get("They receive", "")  # e.g. "USD50.00"
+            receive_str = payout_info.get("They receive", "")
             rx_match = re.search(r"(\d+(\.\d+)?)", receive_str)
             rx_val = 0.0
             if rx_match:
                 rx_val = float(rx_match.group(1))
 
-            # parse currency code from "They receive"
             currency_match = re.search(r"([A-Z]{3})", receive_str)
             rcur = None
             if currency_match:
                 rcur = currency_match.group(1)
 
-            # update local result
             local_result.update({
                 "success": True,
                 "exchange_rate": exchange_rate,
@@ -320,32 +280,38 @@ class MukuruProvider(RemittanceProvider):
         **kwargs
     ) -> Dict[str, Any]:
         """
-        Aggregator: get a quote for sending `amount` in `source_currency` 
-        to `target_country` via Mukuru. Returns aggregator-standard keys.
+        Get a standardized quote for a money transfer.
         """
-        # Attempt to deduce from_country_code from source_currency if not in kwargs
         from_country_code = kwargs.get("from_country_code")
         if not from_country_code:
-            # try matching country in COUNTRY_TO_CURRENCY
-            for cc, cur in self.COUNTRY_TO_CURRENCY.items():
+            # Try to get the updated country mapping from API
+            country_mapping = self.get_supported_countries()
+            
+            # If API failed, fall back to hardcoded mapping
+            if not country_mapping:
+                country_mapping = COUNTRY_TO_CURRENCY
+                
+            # Look up country code based on currency
+            for cc, cur in country_mapping.items():
                 if cur.upper() == source_currency.upper():
                     from_country_code = cc
                     break
+                    
+            # Default to South Africa if no match found
             if not from_country_code:
-                from_country_code = "ZA"  # fallback to South Africa
+                from_country_code = "ZA"
 
-        # call internal method
         local_result = self._get_exchange_rate_data(
             send_amount=amount,
             send_currency=source_currency,
             receive_country=target_country,
             from_country_code=from_country_code,
+            delivery_method=kwargs.get("delivery_method"),
             **kwargs
         )
 
-        # optionally store raw response
         if kwargs.get("include_raw", False):
-            local_result["raw_response"] = dict(local_result)  # shallow copy or store something else
+            local_result["raw_response"] = dict(local_result)
 
         return self.standardize_response(local_result, provider_specific_data=kwargs.get("include_raw", False))
 
@@ -356,22 +322,15 @@ class MukuruProvider(RemittanceProvider):
         receive_country: str,
         **kwargs
     ) -> Dict[str, Any]:
-        """
-        Aggregator: get exchange rate for a corridor (similar to get_quote).
-        Some aggregator tests specifically look for "rate" instead of "exchange_rate".
-        """
         local_result = self._get_exchange_rate_data(
             send_amount=send_amount,
             send_currency=send_currency,
             receive_country=receive_country,
+            delivery_method=kwargs.get("delivery_method"),
             **kwargs
         )
-        # aggregator might not need fee or amounts for a pure "exchange rate" call,
-        # but we'll keep them
-        # store raw if needed
+
         if kwargs.get("include_raw", False):
             local_result["raw_response"] = dict(local_result)
 
-        # aggregator might specifically want "rate" in the result
-        # we can either rename exchange_rate => rate or just rely on standardize_response
-        return self.standardize_response(local_result, provider_specific_data=kwargs.get("include_raw", False)) 
+        return self.standardize_response(local_result, provider_specific_data=kwargs.get("include_raw", False))
