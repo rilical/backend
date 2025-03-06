@@ -2,8 +2,8 @@
 Western Union Money Transfer API Tests
 
 HOW TO RUN:
-python3 -m unittest apps.providers.westernunion.tests
-python3 -m unittest apps.providers.westernunion.tests.TestWesternUnionProviderRealAPI.test_discover_supported_methods
+python -m unittest apps.providers.westernunion.tests
+python -m unittest apps.providers.westernunion.tests.TestWesternUnionProviderRealAPI.test_discover_supported_methods
 """
 
 import json
@@ -25,10 +25,20 @@ from apps.providers.westernunion.exceptions import (
 )
 
 class TestWesternUnionProviderRealAPI(unittest.TestCase):
-    """Real-API tests for Western Union Provider."""
+    """Real-API tests for Western Union Money Transfer Provider.
+    
+    This class contains tests that make real API calls to the Western Union Money Transfer API.
+    These tests verify the functionality of the integration with actual API responses.
+    
+    Note: Running these tests will make real API calls and may consume API quota or incur costs.
+    """
 
     @classmethod
     def setUpClass(cls):
+        """Set up test environment before running any tests in this class.
+        
+        Creates necessary directories for test outputs and configures logging.
+        """
         logging.basicConfig(level=logging.INFO)
         cls.logger = logging.getLogger(__name__)
         
@@ -50,6 +60,7 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        """Clean up resources after all tests in this class have run."""
         if hasattr(cls, 'file_handler') and cls.file_handler:
             cls.file_handler.close()
             logging.getLogger().removeHandler(cls.file_handler)
@@ -57,18 +68,20 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
         cls.logger.info("Test run completed.")
 
     def setUp(self):
+        """Set up test environment before each test method."""
         self.provider = WesternUnionProvider(timeout=30)
         self.logger = logging.getLogger(__name__)
         self.logger.info(f"=== Starting test: {self._testMethodName} ===")
 
     def tearDown(self):
+        """Clean up after each test method."""
         test_log_file = os.path.join(self.logs_dir, f"{self._testMethodName}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
         self.logger.info(f"=== Ending test: {self._testMethodName} ===")
         
-        if hasattr(self, 'provider') and hasattr(self.provider, 'logger'):
+        if hasattr(self, 'provider') and hasattr(self.provider, '_session'):
             try:
                 session_logs = []
-                if hasattr(self.provider, '_session') and hasattr(self.provider._session, 'history'):
+                if hasattr(self.provider._session, 'history'):
                     for req in self.provider._session.history:
                         session_logs.append(f"Request: {req.method} {req.url}")
                         session_logs.append(f"Response: {req.status_code}")
@@ -80,12 +93,28 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
             except Exception as e:
                 self.logger.warning(f"Could not export session logs: {str(e)}")
 
-    def save_response_data(self, data, prefix):
-        """Saves the JSON response to a timestamped file for reference."""
+    def save_response_data(self, data, prefix, error_reason=None):
+        """Save JSON response data to a timestamped file for later analysis.
+        
+        Args:
+            data: The data to save
+            prefix: Prefix for the filename
+            error_reason: Optional error information to include
+            
+        Returns:
+            str: The filename where the data was saved
+        """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        response_data = {
+            "timestamp": datetime.now().isoformat(),
+            "data": data
+        }
+        if error_reason:
+            response_data["error_reason"] = error_reason
+            
         filename = f"{self.results_dir}/{prefix}_{timestamp}.json"
         with open(filename, 'w') as f:
-            json.dump(data, f, indent=2)
+            json.dump(response_data, f, indent=2)
         self.logger.info(f"Saved response data to: {filename}")
         return filename
 
@@ -105,7 +134,12 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
         self.assertGreaterEqual(rate_data["receive_amount"], 0.0, "receive_amount < 0")
 
     def test_discover_supported_methods(self):
-        """Discover supported delivery methods and payment combinations."""
+        """Discover supported delivery methods and payment combinations.
+        
+        This test attempts to discover all supported payment and delivery methods
+        for various send/receive country corridors by making API calls and
+        analyzing the responses.
+        """
         test_method_log = os.path.join(self.logs_dir, f"test_discover_supported_methods_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
         
         file_handler = logging.FileHandler(test_method_log)
@@ -397,7 +431,12 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
             test_logger.info(f"Test logs saved to: {test_method_log}")
 
     def test_20_valid_combinations(self):
-        """Test 20 different valid combinations of send countries, currencies, and receive countries."""
+        """Test exchange rates for 20 different valid combinations of send/receive countries.
+        
+        This test checks various money transfer corridors to verify that the 
+        WesternUnionProvider can handle a variety of source/destination combinations 
+        and provide accurate rates and fees.
+        """
         test_method_log = os.path.join(self.logs_dir, f"test_20_valid_combinations_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
         
         file_handler = logging.FileHandler(test_method_log)
@@ -481,7 +520,11 @@ class TestWesternUnionProviderRealAPI(unittest.TestCase):
             test_logger.info(f"Test logs saved to: {test_method_log}")
 
     def test_5_invalid_inputs(self):
-        """Test 5 invalid input combinations that should fail gracefully."""
+        """Test error handling for 5 invalid input combinations.
+        
+        This test checks that the WesternUnionProvider gracefully handles invalid input
+        combinations that should fail without crashing the application.
+        """
         test_method_log = os.path.join(self.logs_dir, f"test_5_invalid_inputs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
         
         file_handler = logging.FileHandler(test_method_log)

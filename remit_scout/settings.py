@@ -103,8 +103,8 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Celery settings
-CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+CELERY_BROKER_URL = os.getenv('REDIS_URL', "redis://127.0.0.1:6379/0")
+CELERY_RESULT_BACKEND = os.getenv('REDIS_URL', "redis://127.0.0.1:6379/0")
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
@@ -132,9 +132,43 @@ CACHES = {
             "RETRY_ON_TIMEOUT": True,
             "MAX_CONNECTIONS": 1000,
             "IGNORE_EXCEPTIONS": True,
+            "PARSER_CLASS": "redis.connection.HiredisParser",  # For better performance
+            "CONNECTION_POOL_CLASS": "redis.BlockingConnectionPool",
+            "CONNECTION_POOL_CLASS_KWARGS": {
+                "max_connections": 50,
+                "timeout": 20,
+            }
         }
     }
 }
 
-# Cache time to live is 10 minutes
-CACHE_TTL = 60 * 10
+# Cache time to live is 1 day (24 hours = 86400 seconds)
+CACHE_TTL = 60 * 60 * 24  # 1 day in seconds
+
+# Logging configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'apps.providers.aggregator': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'WARNING',
+    },
+}

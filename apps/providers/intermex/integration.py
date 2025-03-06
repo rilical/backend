@@ -1,384 +1,443 @@
 """
-Intermex Money Transfer Integration
+Intermex Provider Integration
 
-This module implements the integration with Intermex Money Transfer API.
-Intermex offers money transfer services to various countries with multiple payment options.
-
-PAYMENT METHODS:
----------------------------------
-- Debit Card (SenderPaymentMethodId=3): Primary method for payments
-- Credit Card (SenderPaymentMethodId=4): Alternative payment method
-
-DELIVERY METHODS:
----------------------------------
-- Bank Deposit (DeliveryType=W): Direct to bank account
-- Cash Pickup (other DeliveryType values): Available in some corridors
-
-Important API notes:
-1. The API requires a subscription key in the header (Ocp-Apim-Subscription-Key)
-2. Exchange rates vary by delivery method and payment method
-3. The API supports both calculating by send amount and by receive amount
+This module provides integration with the Intermex remittance service.
+It supports sending money from the US to various countries with multiple payment methods.
 """
 
-import json
 import logging
-import os
-import random
-import time
-import uuid
-from datetime import datetime, UTC
-from decimal import Decimal
-from typing import Dict, Optional, Any, List, Union
-from urllib.parse import urljoin
-
 import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+from decimal import Decimal
+from typing import Dict, List, Optional, Any
+from datetime import datetime
 
 from apps.providers.base.provider import RemittanceProvider
 from .exceptions import (
     IntermexError,
-    IntermexAuthenticationError,
-    IntermexConnectionError,
-    IntermexValidationError,
-    IntermexRateLimitError
+    IntermexAuthError,
+    IntermexAPIError,
+    IntermexValidationError
+)
+from .mapping import (
+    map_country_code,
+    map_payment_method,
+    map_delivery_method,
+    validate_corridor
 )
 
 logger = logging.getLogger(__name__)
 
-
-def log_request_details(logger, method: str, url: str, headers: Dict,
-                      params: Dict = None, data: Dict = None):
-    logger.debug("\n" + "="*80 + f"\nOUTGOING REQUEST DETAILS:\n{'='*80}")
-    logger.debug(f"Method: {method}")
-    logger.debug(f"URL: {url}")
-
-    masked_headers = headers.copy()
-    sensitive = ['Authorization', 'Cookie', 'Ocp-Apim-Subscription-Key']
-    for key in sensitive:
-        if key in masked_headers:
-            masked_headers[key] = '***MASKED***'
-
-    logger.debug("\nHeaders:")
-    logger.debug(json.dumps(dict(masked_headers), indent=2))
-
-    if params:
-        logger.debug("\nQuery Params:")
-        logger.debug(json.dumps(params, indent=2))
-    if data:
-        logger.debug("\nRequest Body:")
-        logger.debug(json.dumps(data, indent=2))
-
-
-def log_response_details(logger, response):
-    logger.debug("\n" + "="*80 + f"\nRESPONSE DETAILS:\n{'='*80}")
-    logger.debug(f"Status Code: {response.status_code}")
-    logger.debug(f"Reason: {response.reason}")
-    logger.debug("\nResponse Headers:")
-    logger.debug(json.dumps(dict(response.headers), indent=2))
-
-    try:
-        body = response.json()
-        logger.debug("\nJSON Response Body:")
-        logger.debug(json.dumps(body, indent=2))
-    except ValueError:
-        body = response.text
-        content_type = response.headers.get('content-type', '').lower()
-        if 'html' in content_type:
-            logger.debug("\nHTML Response (truncated):")
-            logger.debug(body[:500] + '...' if len(body) > 500 else body)
-        else:
-            logger.debug("\nPlain Text Response:")
-            logger.debug(body[:1000] + '...' if len(body) > 1000 else body)
-
-    logger.debug("="*80)
-
-
 class IntermexProvider(RemittanceProvider):
-    BASE_URL = "https://api.imxi.com"
-    PRICING_ENDPOINT = "/pricing/api/v2/feesrates"
+    """
+    Intermex integration for retrieving fees, exchange rates, and quotes.
     
-    DEFAULT_STYLE_ID = 3
-    DEFAULT_TRAN_TYPE_ID = 3
-    DEFAULT_CHANNEL_ID = 1
-    DEFAULT_PARTNER_ID = 1
-    DEFAULT_LANGUAGE_ID = 1
+    The API requires specific headers and supports various payment methods:
+    - Payment methods: debitCard, creditCard, bankAccount, cash, ACH, wireTransfer
+    - Delivery methods: bankDeposit, cashPickup, mobileWallet, homeDelivery
     
+    Currency IDs:
+    - USD: US Dollar (source)
+    - MXN: Mexican Peso
+    - GTQ: Guatemalan Quetzal
+    - HNL: Honduran Lempira
+    - NIO: Nicaraguan Cordoba
+    - CRC: Costa Rican Colon
+    - PAB: Panamanian Balboa
+    - COP: Colombian Peso
+    - PEN: Peruvian Sol
+    - BOB: Bolivian Boliviano
+    - ARS: Argentine Peso
+    - BRL: Brazilian Real
+    - UYU: Uruguayan Peso
+    - PYG: Paraguayan Guarani
+    - VES: Venezuelan Bolivar
+    - DOP: Dominican Peso
+    - HTG: Haitian Gourde
+    - JMD: Jamaican Dollar
+    - CUP: Cuban Peso
+    - EUR: Euro (for European countries)
+    - GBP: British Pound
+    - RON: Romanian Leu
+    - PLN: Polish Zloty
+    - HUF: Hungarian Forint
+    - CZK: Czech Koruna
+    - BGN: Bulgarian Lev
+    - DKK: Danish Krone
+    - SEK: Swedish Krona
+    - NOK: Norwegian Krone
+    - ISK: Icelandic Krona
+    - CHF: Swiss Franc
+    """
+    
+    BASE_URL = "https://api.intermexonline.com/api"  # Updated endpoint
+    API_VERSION = "v1"
+    
+    # Supported countries
+    SUPPORTED_COUNTRIES = {
+        "US": "United States",
+        "MX": "Mexico",
+        "GT": "Guatemala",
+        "HN": "Honduras",
+        "SV": "El Salvador",
+        "NI": "Nicaragua",
+        "CR": "Costa Rica",
+        "PA": "Panama",
+        "CO": "Colombia",
+        "PE": "Peru",
+        "EC": "Ecuador",
+        "BO": "Bolivia",
+        "BR": "Brazil",
+        "AR": "Argentina",
+        "UY": "Uruguay",
+        "PY": "Paraguay",
+        "CL": "Chile",
+        "DO": "Dominican Republic",
+        "HT": "Haiti",
+        "JM": "Jamaica"
+    }
+    
+    # Supported currencies
+    SUPPORTED_CURRENCIES = {
+        "USD": "US Dollar",
+        "MXN": "Mexican Peso",
+        "GTQ": "Guatemalan Quetzal",
+        "HNL": "Honduran Lempira",
+        "SVC": "Salvadoran Colon",
+        "NIO": "Nicaraguan Cordoba",
+        "CRC": "Costa Rican Colon",
+        "PAB": "Panamanian Balboa",
+        "COP": "Colombian Peso",
+        "PEN": "Peruvian Sol",
+        "BOB": "Bolivian Boliviano",
+        "BRL": "Brazilian Real",
+        "ARS": "Argentine Peso",
+        "UYU": "Uruguayan Peso",
+        "PYG": "Paraguayan Guarani",
+        "CLP": "Chilean Peso",
+        "DOP": "Dominican Peso",
+        "HTG": "Haitian Gourde",
+        "JMD": "Jamaican Dollar"
+    }
+    
+    # Payment methods
     PAYMENT_METHODS = {
-        "DebitCard": 3,
-        "CreditCard": 4
+        "debitCard": "Debit Card",
+        "creditCard": "Credit Card",
+        "bankAccount": "Bank Account",
+        "cash": "Cash",
+        "ACH": "ACH Transfer",
+        "wireTransfer": "Wire Transfer"
     }
     
-    DELIVERY_METHODS = {
-        "BankDeposit": "W"
+    # Receiving methods
+    RECEIVING_METHODS = {
+        "bankDeposit": "Bank Deposit",
+        "cashPickup": "Cash Pickup",
+        "mobileWallet": "Mobile Wallet",
+        "homeDelivery": "Home Delivery"
     }
     
-    def __init__(self, api_key: Optional[str] = None, timeout: int = 30, user_agent: Optional[str] = None):
-        super().__init__(name="Intermex", base_url=self.BASE_URL)
-        self.logger = logger
-        self.timeout = timeout
-        
-        self.user_agent = user_agent or os.environ.get(
-            "INTERMEX_DEFAULT_UA",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15"
-        )
-        
-        self.api_key = api_key or os.environ.get("INTERMEX_API_KEY", "2162a586e2164623a1cd9b6b2d300b4c")
-        self._session = requests.Session()
-        self.request_id = str(uuid.uuid4())
-        self._initialize_session()
-        
-        self.logger.debug(f"Initialized IntermexProvider with UA: {self.user_agent}")
-        
-    def _initialize_session(self) -> None:
-        self.logger.debug("Initializing Intermex session...")
-        
-        self._session.headers.update({
-            "Accept": "application/json, text/plain, */*",
-            "User-Agent": self.user_agent,
-            "Accept-Language": "en-US,en;q=0.9",
-            "Accept-Encoding": "gzip, deflate, br",
-            "Cache-Control": "no-cache",
-            "Pragma": "no-cache",
-            "Sec-Fetch-Mode": "cors",
-            "Sec-Fetch-Site": "cross-site",
-            "Sec-Fetch-Dest": "empty",
-            "Priority": "u=3, i",
-            "PartnerId": str(self.DEFAULT_PARTNER_ID),
-            "ChannelId": str(self.DEFAULT_CHANNEL_ID),
-            "LanguageId": str(self.DEFAULT_LANGUAGE_ID),
-            "Origin": "https://www.intermexonline.com",
-            "Referer": "https://www.intermexonline.com/"
+    def __init__(self, config: Optional[Dict] = None):
+        """Initialize the Intermex provider."""
+        super().__init__(name="intermex", base_url=self.BASE_URL)
+        self.config = config or {}
+        self.session = requests.Session()
+        self._setup_session()
+    
+    def _setup_session(self):
+        """Set up the session with required headers."""
+        self.session.headers.update({
+            "Accept": f"application/vnd.intermex.{self.API_VERSION}+json",
+            "Accept-Language": "en",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15"
         })
-        
-        if self.api_key:
-            self._session.headers.update({
-                "Ocp-Apim-Subscription-Key": self.api_key
-            })
-            
-        retry_strategy = Retry(
-            total=3,
-            backoff_factor=0.5,
-            status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["GET", "POST"]
-        )
-        adapter = HTTPAdapter(max_retries=retry_strategy)
-        self._session.mount("https://", adapter)
-        
-    def get_exchange_rate(self,
-                         send_amount: Decimal,
-                         send_currency: str,
-                         receive_country: str,
-                         receive_currency: Optional[str] = None,
-                         send_country: str = "USA",
-                         send_state: str = "PA",
-                         payment_method: str = "CreditCard",
-                         delivery_method: str = "BankDeposit") -> Optional[Dict]:
-        country_to_currency = {
-            "USA": "USD",
-            "TUR": "TRY",
-            "MEX": "MXN",
-            "COL": "COP", 
-            "PHL": "PHP",
-            "GTM": "GTQ",
-            "SLV": "USD",
-            "HND": "HNL",
-            "ECU": "USD",
-            "DOM": "DOP",
-            "NIC": "NIO",
-            "PER": "PEN",
-            "AD": "EUR",
-            "AR": "ARS",
-            "AT": "EUR",
-            "BE": "EUR",
-            "BO": "BOB",
-            "BR": "BRL",
-            "BG": "BGN",
-            "CM": "XAF",
-            "CH": "CLP",
-            "CR": "CRC",
-            "CI": "XOF",
-            "HRV": "EUR",
-            "CY": "EUR",
-            "CZ": "CZK",
-            "DK": "DKK",
-            "EGY": "EGP",
-            "EE": "EUR",
-            "ET": "ETB",
-            "FIN": "EUR",
-            "FRA": "EUR",
-            "DEU": "EUR",
-            "GH": "GHS",
-            "GRC": "EUR",
-            "HT": "HTG",
-            "HU": "HUF",
-            "ISL": "ISK",
-            "IND": "INR",
-            "IT": "EUR",
-            "JA": "JMD",
-            "KE": "KES",
-            "LV": "EUR",
-            "LIE": "CHF",
-            "LTU": "EUR",
-            "LUX": "EUR",
-            "MLT": "EUR",
-            "MCO": "EUR",
-            "NLD": "EUR",
-            "NG": "NGN",
-            "NOR": "NOK",
-            "PK": "PKR",
-            "PA": "PAB",
-            "PE": "PEN",
-            "PH": "PHP",
-            "PL": "PLN",
-            "PRT": "EUR",
-            "IRL": "EUR",
-            "RP": "DOP",
-            "RO": "RON",
-            "ROU": "RON",
-            "SMR": "EUR",
-            "SN": "XOF",
-            "SVK": "EUR",
-            "SVN": "EUR",
-            "ESP": "EUR",
-            "SE": "SEK",
-            "CHE": "CHF",
-            "TH": "THB",
-            "VN": "VND",
-            "VAT": "EUR",
+    
+    def _get_request_headers(self) -> Dict[str, str]:
+        """Get headers for API request."""
+        return {
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache"
         }
+    
+    def get_supported_countries(self) -> List[str]:
+        """Get list of supported destination countries."""
+        return list(self.SUPPORTED_COUNTRIES.keys())
+    
+    def get_supported_currencies(self) -> List[str]:
+        """Get list of supported currencies."""
+        return list(self.SUPPORTED_CURRENCIES.keys())
+    
+    def get_supported_payment_methods(self) -> List[str]:
+        """Get list of supported payment methods."""
+        return list(self.PAYMENT_METHODS.keys())
+    
+    def get_supported_receiving_methods(self) -> List[str]:
+        """Get list of supported receiving methods."""
+        return list(self.RECEIVING_METHODS.keys())
+    
+    def get_delivery_methods(
+        self,
+        source_country: str,
+        dest_country: str,
+        source_currency: str,
+        dest_currency: str
+    ) -> Dict[str, Any]:
+        """
+        Get available delivery methods for a corridor.
         
-        if not receive_currency:
-            receive_currency = country_to_currency.get(receive_country)
-            if not receive_currency:
-                self.logger.warning(f"No default currency for country {receive_country}")
-                return None
-        
-        payment_method_id = self.PAYMENT_METHODS.get(payment_method, 4)
-        
-        delivery_type = self.DELIVERY_METHODS.get(delivery_method, "W")
-                
+        Args:
+            source_country: Source country code
+            dest_country: Destination country code
+            source_currency: Source currency code
+            dest_currency: Destination currency code
+            
+        Returns:
+            Dictionary containing delivery methods
+        """
         try:
+            # Validate corridor
+            is_valid, error = validate_corridor(
+                source_country,
+                source_currency,
+                dest_country,
+                dest_currency
+            )
+            if not is_valid:
+                return {
+                    "success": False,
+                    "error": error,
+                    "provider": "intermex"
+                }
+            
+            # Map country codes
+            mapped_source = map_country_code(source_country)
+            mapped_dest = map_country_code(dest_country)
+            
+            # Prepare query parameters
             params = {
-                "DestCountryAbbr": receive_country,
-                "DestCurrency": receive_currency,
-                "OriCountryAbbr": send_country,
-                "OriStateAbbr": send_state,
-                "StyleId": self.DEFAULT_STYLE_ID,
-                "TranTypeId": self.DEFAULT_TRAN_TYPE_ID,
-                "DeliveryType": delivery_type,
-                "OriCurrency": send_currency,
-                "ChannelId": self.DEFAULT_CHANNEL_ID,
-                "OriAmount": float(send_amount),
-                "DestAmount": 0,
-                "SenderPaymentMethodId": payment_method_id
+                "sourceCountry": mapped_source,
+                "destinationCountry": mapped_dest,
+                "sourceCurrency": source_currency.upper(),
+                "destinationCurrency": dest_currency.upper()
             }
             
-            url = f"{self.BASE_URL}{self.PRICING_ENDPOINT}"
-            
-            log_request_details(self.logger, "GET", url, self._session.headers, params)
-            
-            response = self._session.get(
-                url,
+            # Make API request
+            response = self.session.get(
+                f"{self.BASE_URL}/delivery-methods",
                 params=params,
-                timeout=self.timeout
+                headers=self._get_request_headers(),
+                timeout=30
             )
             
-            log_response_details(self.logger, response)
-            
             if response.status_code != 200:
-                error_message = f"Failed to get exchange rate: {response.status_code}"
-                if response.status_code == 401:
-                    raise IntermexAuthenticationError(error_message)
-                elif response.status_code == 400:
-                    raise IntermexValidationError(error_message)
-                elif response.status_code == 429:
-                    raise IntermexRateLimitError("Rate limit exceeded")
-                else:
-                    raise IntermexError(error_message)
+                raise IntermexAPIError(
+                    f"API request failed with status {response.status_code}",
+                    status_code=response.status_code,
+                    response=response.json() if response.text else None
+                )
             
-            data = response.json()
+            # Parse response
+            methods = response.json()
+            if not methods or not isinstance(methods, list):
+                raise IntermexAPIError("Invalid delivery methods response format")
             
-            payment_methods = data.get("paymentMethods", [])
-            available_payment_methods = [
-                {"id": pm.get("senderPaymentMethodId"), "name": pm.get("senderPaymentMethodName"), "fee": pm.get("feeAmount")}
-                for pm in payment_methods if pm.get("isAvailable")
-            ]
+            # Map delivery methods to standard format
+            delivery_methods = []
+            for method in methods:
+                mapped_method = map_delivery_method(method.get("name"))
+                if mapped_method:
+                    delivery_methods.append({
+                        "id": mapped_method["tranTypeId"],
+                        "name": mapped_method["tranTypeName"],
+                        "type": mapped_method["deliveryType"],
+                        "estimated_minutes": method.get("estimatedMinutes", 60),
+                        "description": method.get("description", ""),
+                        "is_default": method.get("isDefault", False)
+                    })
             
             return {
-                "provider": self.name,
-                "timestamp": datetime.now(UTC).isoformat(),
-                "send_amount": float(send_amount),
-                "send_currency": send_currency,
-                "receive_country": receive_country,
-                "receive_currency": receive_currency,
-                "exchange_rate": float(data.get("rate", 0)),
-                "transfer_fee": float(data.get("feeAmount", 0)),
-                "payment_method": payment_method,
-                "payment_method_id": payment_method_id,
-                "delivery_method": delivery_method,
-                "delivery_time": "24-48 hours",
-                "receive_amount": float(data.get("destAmount", 0)),
-                "available_payment_methods": available_payment_methods,
-                "total_amount": float(data.get("totalAmount", 0))
+                "success": True,
+                "delivery_methods": delivery_methods,
+                "provider": "intermex",
+                "timestamp": datetime.now().isoformat()
             }
-                
-        except (IntermexError, IntermexConnectionError, IntermexValidationError) as e:
-            self.logger.error(f"Error getting Intermex exchange rate: {e}")
-            return None
-        except Exception as e:
-            self.logger.error(f"Unexpected error in Intermex exchange rate: {e}")
-            return None
             
-    def get_payment_methods(self, source_country: str = "USA", target_country: str = "TUR") -> List[Dict]:
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Intermex API request failed: {e}")
+            return {
+                "success": False,
+                "error": f"API request failed: {str(e)}",
+                "provider": "intermex"
+            }
+        
+        except (KeyError, ValueError, TypeError) as e:
+            logger.error(f"Error parsing Intermex response: {e}")
+            return {
+                "success": False,
+                "error": f"Error parsing response: {str(e)}",
+                "provider": "intermex"
+            }
+    
+    def get_quote(
+        self,
+        send_amount: Optional[float] = None,
+        receive_amount: Optional[float] = None,
+        send_currency: str = "USD",
+        receive_currency: str = "MXN",
+        send_country: str = "US",
+        receive_country: str = "MX",
+        payment_method: str = "debitCard",
+        delivery_method: str = "bankDeposit",
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Get a quote for a money transfer from Intermex.
+        
+        Args:
+            send_amount: Amount to send (in source currency)
+            receive_amount: Amount to receive (in target currency)
+            send_currency: Currency to send (e.g., "USD")
+            receive_currency: Currency to receive (e.g., "MXN")
+            send_country: Sending country code (e.g., "US")
+            receive_country: Receiving country code (e.g., "MX")
+            payment_method: Method of payment (e.g., "debitCard")
+            delivery_method: Method of delivery (e.g., "bankDeposit")
+            **kwargs: Additional parameters
+            
+        Returns:
+            Dictionary containing standardized quote information
+        """
+        if send_amount is None and receive_amount is None:
+            return self.standardize_response({
+                "success": False,
+                "error_message": "Either send_amount or receive_amount must be provided"
+            })
+
+        is_amount_receiving = send_amount is None
+        amount = Decimal(str(receive_amount if is_amount_receiving else send_amount))
+        
+        # Build endpoint URL
+        endpoint = f"{self.BASE_URL}/{self.API_VERSION}/money-transfer/quote"
+        
+        # Build request parameters
+        params = {
+            "sendingCountry": send_country,
+            "receivingCountry": receive_country,
+            "sendingCurrency": send_currency,
+            "receivingCurrency": receive_currency,
+            "paymentMethod": payment_method,
+            "deliveryMethod": delivery_method
+        }
+        
+        # Add amount parameters based on direction
+        if is_amount_receiving:
+            params["amountReceiving"] = str(amount)
+        else:
+            params["amountSending"] = str(amount)
+        
         try:
-            test_amount = Decimal("100.00")
+            # Make the API request
+            headers = self._get_request_headers()
+            response = self.session.get(endpoint, params=params, headers=headers)
             
-            params = {
-                "DestCountryAbbr": target_country,
-                "OriCountryAbbr": source_country,
-                "OriStateAbbr": "PA",
-                "StyleId": self.DEFAULT_STYLE_ID,
-                "TranTypeId": self.DEFAULT_TRAN_TYPE_ID,
-                "DeliveryType": "W",
-                "OriCurrency": "USD",
-                "ChannelId": self.DEFAULT_CHANNEL_ID,
-                "OriAmount": float(test_amount),
-                "DestAmount": 0,
-                "SenderPaymentMethodId": 4
+            # Check if the request was successful
+            if response.status_code != 200:
+                error_msg = f"API request failed with status {response.status_code}: {response.text}"
+                logger.error(error_msg)
+                return self.standardize_response({
+                    "success": False,
+                    "error_message": error_msg
+                })
+
+            # Parse the response
+            quote_data = response.json()
+            
+            # Check if the API returned an error
+            if "error" in quote_data:
+                error_msg = f"API returned an error: {quote_data['error']}"
+                logger.error(error_msg)
+                return self.standardize_response({
+                    "success": False,
+                    "error_message": error_msg
+                })
+            
+            # Extract the quote information
+            result = {
+                "success": True,
+                "send_amount": float(quote_data.get("sendingAmount", 0)),
+                "send_currency": send_currency,
+                "receive_amount": float(quote_data.get("receivingAmount", 0)),
+                "receive_currency": receive_currency,
+                "exchange_rate": float(quote_data.get("exchangeRate", 0)),
+                "fee": float(quote_data.get("fee", 0)),
+                "total_cost": float(quote_data.get("totalCost", 0)),
+                "payment_method": payment_method,
+                "delivery_method": delivery_method,
+                "timestamp": datetime.now().isoformat(),
+                "delivery_time_minutes": quote_data.get("estimatedDeliveryTimeMinutes")
             }
             
-            url = f"{self.BASE_URL}{self.PRICING_ENDPOINT}"
+            # Include raw response if requested
+            if kwargs.get("include_raw", False):
+                result["raw_response"] = quote_data
+                
+            return self.standardize_response(result, provider_specific_data=kwargs.get("include_raw", False))
             
-            response = self._session.get(
-                url,
-                params=params,
-                timeout=self.timeout
+        except Exception as e:
+            error_msg = f"Failed to get quote: {str(e)}"
+            logger.error(error_msg)
+            return self.standardize_response({
+                "success": False,
+                "error_message": error_msg
+            })
+    
+    def get_exchange_rate(
+        self,
+        send_currency: str,
+        receive_currency: str,
+        send_country: str = "US",
+        receive_country: str = "MX",
+        amount: Decimal = Decimal("1000")
+    ) -> Dict[str, Any]:
+        """
+        Get current exchange rate for a currency pair.
+        
+        Args:
+            send_currency: Currency to send
+            receive_currency: Currency to receive
+            send_country: Sending country code
+            receive_country: Receiving country code
+            amount: Amount to get rate for (defaults to 1000)
+            
+        Returns:
+            Dictionary containing standardized exchange rate information
+        """
+        try:
+            # Get a quote with the specified amount
+            quote = self.get_quote(
+                send_amount=float(amount),
+                send_currency=send_currency,
+                receive_currency=receive_currency,
+                send_country=send_country,
+                receive_country=receive_country
             )
             
-            if response.status_code != 200:
-                self.logger.error(f"Failed to get payment methods: {response.status_code}")
-                return []
+            # Convert to the standardized exchange rate format
+            return self.standardize_response({
+                "success": quote.get("success", False),
+                "source_currency": send_currency,
+                "target_currency": receive_currency,
+                "rate": quote.get("exchange_rate"),
+                "fee": quote.get("fee"),
+                "timestamp": quote.get("timestamp"),
+                "error_message": quote.get("error_message")
+            })
             
-            data = response.json()
-            
-            payment_methods = data.get("paymentMethods", [])
-            return [
-                {
-                    "id": pm.get("senderPaymentMethodId"),
-                    "name": pm.get("senderPaymentMethodName"),
-                    "fee": pm.get("feeAmount"),
-                    "available": pm.get("isAvailable", False)
-                }
-                for pm in payment_methods
-            ]
-                
         except Exception as e:
-            self.logger.error(f"Error getting payment methods: {e}")
-            return []
-            
-    def __enter__(self):
-        return self
-        
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self._session.close() 
+            logger.error(f"Failed to get exchange rate: {e}")
+            return self.standardize_response({
+                "success": False,
+                "error_message": str(e),
+                "source_currency": send_currency,
+                "target_currency": receive_currency
+            }) 

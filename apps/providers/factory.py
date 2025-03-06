@@ -4,25 +4,36 @@ Factory for creating remittance provider instances.
 from typing import Dict, Type
 
 from .base.provider import RemittanceProvider
-from .moneygram.integration import MoneyGramProvider
-from .westernunion.integration import WesternUnionProvider
-from .ria.integration import RiaProvider
-from .worldremit.integration import WorldRemitProvider
-from .remitly.integration import RemitlyProvider
+# Import only the providers we have confirmed are implemented
+from .remitbee.integration import RemitbeeProvider
+from .remitguru.integration import RemitGuruProvider
+from .xe.integration import XEProvider
+from .sendwave.integration import WaveProvider as SendwaveProvider
+from .rewire.integration import RewireProvider
+from .mukuru.integration import MukuruProvider
+from .dahabshiil.integration import DahabshiilProvider
+from .alansari.integration import AlAnsariProvider
+from .placid.integration import PlacidProvider
+from .orbitremit.integration import OrbitRemitProvider
+from .wirebarley.integration import WireBarleyProvider
 
 class ProviderFactory:
     """Factory for creating and managing remittance provider instances."""
 
     _providers: Dict[str, Type[RemittanceProvider]] = {
-        'western_union': WesternUnionProvider,
-        'moneygram': MoneyGramProvider,
-        'ria': RiaProvider,
-        'worldremit': WorldRemitProvider,
-        'remitly': RemitlyProvider,
-        # Add more providers here as they are implemented
-        # 'moneygram': MoneyGramProvider,
-        # 'ria': RiaProvider,
-        # etc.
+        # Include only the providers we've implemented and confirmed
+        'remitbee': RemitbeeProvider,
+        'remitguru': RemitGuruProvider,
+        'xe': XEProvider,
+        'sendwave': SendwaveProvider,
+        'rewire': RewireProvider,
+        'mukuru': MukuruProvider,
+        'dahabshiil': DahabshiilProvider,
+        'alansari': AlAnsariProvider,
+        'placid': PlacidProvider,
+        'orbitremit': OrbitRemitProvider,
+        'wirebarley': WireBarleyProvider,
+        # Add more providers as they are implemented and confirmed
     }
 
     @classmethod
@@ -31,25 +42,20 @@ class ProviderFactory:
         Get an instance of a remittance provider.
 
         Args:
-            provider_name: Name of the provider (e.g., 'western_union')
+            provider_name: Name of the provider to instantiate
             **kwargs: Additional arguments to pass to the provider constructor
 
         Returns:
             An instance of the requested provider
 
         Raises:
-            ValueError: If the provider is not supported
+            ValueError: If the requested provider is not supported
         """
-        provider_class = cls._providers.get(provider_name.lower())
-        if not provider_class:
+        if provider_name not in cls._providers:
             raise ValueError(f"Unsupported provider: {provider_name}")
-
+        
+        provider_class = cls._providers[provider_name]
         return provider_class(**kwargs)
-
-    @classmethod
-    def list_providers(cls) -> list[str]:
-        """Get a list of supported provider names."""
-        return list(cls._providers.keys())
 
     @classmethod
     def register_provider(cls, name: str, provider_class: Type[RemittanceProvider]) -> None:
@@ -57,7 +63,17 @@ class ProviderFactory:
         Register a new provider class.
 
         Args:
-            name: Name for the provider
+            name: Name to register the provider under
             provider_class: The provider class to register
         """
-        cls._providers[name.lower()] = provider_class
+        cls._providers[name] = provider_class
+
+    @classmethod
+    def get_available_providers(cls) -> Dict[str, Type[RemittanceProvider]]:
+        """
+        Get a dictionary of all available providers.
+
+        Returns:
+            Dictionary mapping provider names to provider classes
+        """
+        return dict(cls._providers)

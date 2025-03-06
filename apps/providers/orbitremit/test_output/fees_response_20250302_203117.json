@@ -1,0 +1,11 @@
+{
+  "code": 200,
+  "status": "success",
+  "data": {
+    "fee": "0.00",
+    "send_currency": "AUD",
+    "payout_currency": "PHP",
+    "send_amount": "200000.00",
+    "recipient_type": "bank_account"
+  }
+}

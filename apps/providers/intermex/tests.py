@@ -1,388 +1,159 @@
+#!/usr/bin/env python3
 """
-Intermex Money Transfer API Tests
+Intermex Provider Test Script
 
-HOW TO RUN:
-python -m unittest apps.providers.intermex.tests  
-python -m unittest apps.providers.intermex.tests.TestIntermexProviderRealAPI.test_get_exchange_rate_real
+This script tests the Intermex integration by making live API calls.
 """
 
-import json
 import logging
-import os
-import time
-import unittest
-import traceback
-from datetime import datetime
+import sys
+import requests
 from decimal import Decimal
+from typing import Dict, Any
 
-from apps.providers.intermex.integration import IntermexProvider
-from apps.providers.intermex.exceptions import (
-    IntermexError, 
-    IntermexValidationError, 
-    IntermexAuthenticationError, 
-    IntermexConnectionError,
-    IntermexRateLimitError
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
 )
 
-class TestIntermexProviderRealAPI(unittest.TestCase):
-    """Real-API tests for Intermex Money Transfer Provider."""
+logger = logging.getLogger("intermex-test")
 
-    @classmethod
-    def setUpClass(cls):
-        logging.basicConfig(level=logging.INFO)
-        cls.logger = logging.getLogger(__name__)
-        
-        cls.results_dir = "test_results_intermex"
-        cls.logs_dir = os.path.join(cls.results_dir, "logs")
-        
-        os.makedirs(cls.results_dir, exist_ok=True)
-        os.makedirs(cls.logs_dir, exist_ok=True)
-        
-        root_log_file = os.path.join(cls.logs_dir, f"intermex_tests_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
-        file_handler = logging.FileHandler(root_log_file)
-        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-        
-        root_logger = logging.getLogger()
-        root_logger.addHandler(file_handler)
-        
-        cls.file_handler = file_handler
-        cls.logger.info(f"Test run started. Logs will be saved to {root_log_file}")
+def get_headers() -> Dict[str, str]:
+    """Get required headers for API requests."""
+    return {
+        "Pragma": "no-cache",
+        "Accept": "application/json, text/plain, */*",
+        "Sec-Fetch-Site": "cross-site",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cache-Control": "no-cache",
+        "Sec-Fetch-Mode": "cors",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Origin": "https://www.intermexonline.com",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15",
+        "Referer": "https://www.intermexonline.com/",
+        "Sec-Fetch-Dest": "empty",
+        "PartnerId": "1",
+        "ChannelId": "1",
+        "Priority": "u=3, i",
+        "Ocp-Apim-Subscription-Key": "2162a586e2164623a1cd9b6b2d300b4c",
+        "LanguageId": "1"
+    }
 
-    @classmethod
-    def tearDownClass(cls):
-        if hasattr(cls, 'file_handler') and cls.file_handler:
-            cls.file_handler.close()
-            logging.getLogger().removeHandler(cls.file_handler)
+def test_get_delivery_and_payments() -> Dict[str, Any]:
+    """Test the delivery and payments endpoint."""
+    url = "https://api.imxi.com/pricing/api/deliveryandpayments"
+    
+    params = {
+        "DestCountryAbbr": "MX",
+        "DestCurrency": "MXN",
+        "OriCountryAbbr": "USA",
+        "OriCurrency": "USD",
+        "OriStateAbbr": "PA"
+    }
+    
+    try:
+        response = requests.get(url, headers=get_headers(), params=params)
+        response.raise_for_status()
         
-        cls.logger.info("Test run completed.")
-
-    def setUp(self):
-        self.provider = IntermexProvider(timeout=30)
-        self.logger = logging.getLogger(__name__)
-        self.logger.info(f"=== Starting test: {self._testMethodName} ===")
-
-    def tearDown(self):
-        self.logger.info(f"=== Ending test: {self._testMethodName} ===")
-
-    def save_response_data(self, data, prefix, error_reason=None):
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        response_data = {
-            "timestamp": datetime.now().isoformat(),
+        data = response.json()
+        logger.info("Delivery and Payments Response:")
+        logger.info(f"Status Code: {response.status_code}")
+        logger.info(f"Response: {data}")
+        
+        return {
+            "success": True,
             "data": data
         }
-        if error_reason:
-            response_data["error_reason"] = error_reason
-            
-        filename = f"{self.results_dir}/{prefix}_{timestamp}.json"
-        with open(filename, 'w') as f:
-            json.dump(response_data, f, indent=2)
-        self.logger.info(f"Saved response data to: {filename}")
-        return filename
-
-    def assertValidRateData(self, rate_data: dict):
-        required_keys = {
-            "provider", "timestamp", "send_amount", "send_currency",
-            "receive_country", "exchange_rate", "transfer_fee",
-            "payment_method", "delivery_method", "delivery_time", "receive_amount"
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to get delivery and payments: {e}")
+        return {
+            "success": False,
+            "error": str(e)
         }
-        for k in required_keys:
-            self.assertIn(k, rate_data, f"Missing key '{k}' in rate data")
 
-        self.assertGreaterEqual(rate_data["send_amount"], 0.0, "send_amount < 0")
-        self.assertGreaterEqual(rate_data["exchange_rate"], 0.0, "exchange_rate < 0")
-        self.assertGreaterEqual(rate_data["transfer_fee"], 0.0, "transfer_fee < 0")
-        self.assertGreaterEqual(rate_data["receive_amount"], 0.0, "receive_amount < 0")
-
-    def test_get_exchange_rate_real(self):
-        """Test getting exchange rates using real API calls."""
-        test_method_log = os.path.join(self.logs_dir, f"test_get_exchange_rate_real_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
-        
-        file_handler = logging.FileHandler(test_method_log)
-        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-        test_logger = logging.getLogger(f"{__name__}.{self._testMethodName}")
-        test_logger.addHandler(file_handler)
-        test_logger.setLevel(logging.DEBUG)
-        
-        try:
-            test_logger.info("Testing real exchange rate from USA to TUR")
-            
-            test_amount = Decimal("100.00")
-            send_currency = "USD"
-            receive_country = "TUR"
-            receive_currency = "TRY"
-            
-            rate_data = self.provider.get_exchange_rate(
-                send_amount=test_amount,
-                send_currency=send_currency,
-                receive_country=receive_country,
-                receive_currency=receive_currency,
-                payment_method="CreditCard",
-                delivery_method="BankDeposit"
-            )
-            
-            test_logger.info(f"Rate data: {rate_data}")
-            self.assertIsNotNone(rate_data, "Rate data should not be None")
-            
-            saved_file = self.save_response_data(rate_data, "exchange_rate_USA_TUR")
-            test_logger.info(f"Saved rate data to {saved_file}")
-            
-            self.assertValidRateData(rate_data)
-            
-            test_logger.info(f"Exchange rate: {rate_data.get('exchange_rate')} {receive_currency}/{send_currency}")
-            test_logger.info(f"Transfer fee: {rate_data.get('transfer_fee')} {send_currency}")
-            test_logger.info(f"Amount to be received: {rate_data.get('receive_amount')} {receive_currency}")
-            
-        except Exception as e:
-            test_logger.error(f"Unexpected error: {str(e)}")
-            test_logger.error(traceback.format_exc())
-            raise
-        finally:
-            test_logger.removeHandler(file_handler)
-            file_handler.close()
-            
-    def test_exchange_rates_for_corridors(self):
-        """Test exchange rates for the most important corridors."""
-        test_method_log = os.path.join(self.logs_dir, f"test_exchange_rates_corridors_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
-        
-        file_handler = logging.FileHandler(test_method_log)
-        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-        test_logger = logging.getLogger(f"{__name__}.{self._testMethodName}")
-        test_logger.addHandler(file_handler)
-        test_logger.setLevel(logging.DEBUG)
-        
-        try:
-            test_corridors = [
-                ("USA", "USD", "TUR", "TRY"),
-                ("USA", "USD", "MX", "MXN"),
-                ("USA", "USD", "CL", "COP"),
-                ("USA", "USD", "GU", "GTQ"),
-                ("USA", "USD", "SA", "USD"),
-                ("USA", "USD", "HO", "HNL"),
-                ("USA", "USD", "ESP", "EUR"),
-                ("USA", "USD", "IT", "EUR"),
-                ("USA", "USD", "EGY", "EGP"),
-                ("USA", "USD", "NG", "NGN"),
-                ("USA", "USD", "IND", "INR"),
-                ("USA", "USD", "PH", "PHP"),
-            ]
-            
-            test_logger.info(f"Testing exchange rates for {len(test_corridors)} corridors")
-            
-            success_count = 0
-            failure_count = 0
-            
-            for send_country, send_currency, receive_country, receive_currency in test_corridors:
-                corridor_label = f"{send_country}_{send_currency}_to_{receive_country}_{receive_currency}"
-                test_logger.info(f"Testing exchange rate for corridor: {corridor_label}")
-                
-                try:
-                    test_amount = Decimal("100.00")
-                    
-                    rate_data = self.provider.get_exchange_rate(
-                        send_amount=test_amount,
-                        send_currency=send_currency,
-                        receive_country=receive_country,
-                        receive_currency=receive_currency,
-                        payment_method="CreditCard",
-                        delivery_method="BankDeposit"
-                    )
-                    
-                    if rate_data and rate_data.get("exchange_rate") is not None:
-                        test_logger.info(f"✓ Exchange rate found: {rate_data.get('exchange_rate')}")
-                        test_logger.info(f"  Fee: {rate_data.get('transfer_fee')} {send_currency}")
-                        test_logger.info(f"  Receive amount: {rate_data.get('receive_amount')}")
-                        
-                        self.save_response_data(
-                            rate_data,
-                            f"exchange_rate_{corridor_label}"
-                        )
-                        success_count += 1
-                    else:
-                        test_logger.warning(f"✗ No exchange rate found for {corridor_label}")
-                        failure_count += 1
-                    
-                except Exception as e:
-                    test_logger.error(f"Error getting rate for {corridor_label}: {str(e)}")
-                    failure_count += 1
-                
-                time.sleep(2.0)
-            
-            test_logger.info(f"Test summary: {success_count} successful corridors, {failure_count} failed corridors")
-            if success_count > 0:
-                self.assertTrue(True, f"Successfully tested {success_count} corridors")
-            else:
-                self.fail("No corridors were successfully tested")
-                
-        except Exception as e:
-            test_logger.error(f"Test failed: {str(e)}")
-            test_logger.error(traceback.format_exc())
-            raise
-        finally:
-            test_logger.removeHandler(file_handler)
-            file_handler.close()
+def test_get_fees_rates(amount: Decimal = Decimal("1.00")) -> Dict[str, Any]:
+    """Test the fees and rates endpoint."""
+    url = "https://api.imxi.com/pricing/api/v2/feesrates"
     
-    def test_comprehensive_destinations(self):
-        """Test exchange rates for a comprehensive list of destinations."""
-        test_method_log = os.path.join(self.logs_dir, f"test_comprehensive_destinations_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+    params = {
+        "DestCountryAbbr": "MX",
+        "DestCurrency": "MXN",
+        "OriCountryAbbr": "USA",
+        "OriStateAbbr": "PA",
+        "StyleId": "3",
+        "TranTypeId": "1",
+        "DeliveryType": "W",
+        "OriCurrency": "USD",
+        "ChannelId": "1",
+        "OriAmount": str(amount),
+        "DestAmount": "0",
+        "SenderPaymentMethodId": "3"
+    }
+    
+    try:
+        response = requests.get(url, headers=get_headers(), params=params)
+        response.raise_for_status()
         
-        file_handler = logging.FileHandler(test_method_log)
-        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-        test_logger = logging.getLogger(f"{__name__}.{self._testMethodName}")
-        test_logger.addHandler(file_handler)
-        test_logger.setLevel(logging.DEBUG)
+        data = response.json()
+        logger.info("\nFees and Rates Response:")
+        logger.info(f"Status Code: {response.status_code}")
+        logger.info(f"Response: {data}")
         
-        try:
-            country_currency_map = {
-                "MX": "MXN",
-                "GU": "GTQ",
-                "SA": "USD",
-                "HO": "HNL",
-                "CL": "COP",
-                "EC": "USD",
-                "PE": "PEN",
-                "RP": "DOP",
-                "BR": "BRL",
-                "AR": "ARS",
-                "BO": "BOB",
-                "CR": "CRC",
-                "CH": "CLP",
-                "PA": "PAB",
-                "NI": "NIO",
-                "ESP": "EUR",
-                "IT": "EUR",
-                "FRA": "EUR",
-                "DEU": "EUR",
-                "GRC": "EUR",
-                "PRT": "EUR",
-                "BG": "BGN",
-                "TUR": "TRY",
-                "EGY": "EGP",
-                "NG": "NGN",
-                "GH": "GHS",
-                "ET": "ETB",
-                "KE": "KES",
-                "SN": "XOF",
-                "CM": "XAF",
-                "IND": "INR",
-                "PK": "PKR",
-                "PH": "PHP",
-                "VN": "VND",
-                "TH": "THB",
-            }
-            
-            test_countries = [
-                "MX", "GU", "SA", "HO", "CL",
-                "EC", "PE", "RP", "BR", "AR",
-                "ESP", "IT", "DEU", "TUR",
-                "EGY", "NG", "GH",
-                "IND", "PH", "TH"
-            ]
-            
-            test_logger.info(f"Testing exchange rates for {len(test_countries)} destinations")
-            
-            send_country = "USA"
-            send_currency = "USD"
-            test_amount = Decimal("100.00")
-            
-            success_count = 0
-            failure_count = 0
-            
-            for receive_country in test_countries:
-                receive_currency = country_currency_map.get(receive_country)
-                if not receive_currency:
-                    test_logger.warning(f"No currency mapping for {receive_country}, skipping")
-                    continue
-                    
-                corridor_label = f"{send_country}_{send_currency}_to_{receive_country}_{receive_currency}"
-                test_logger.info(f"Testing exchange rate for corridor: {corridor_label}")
-                
-                try:
-                    rate_data = self.provider.get_exchange_rate(
-                        send_amount=test_amount,
-                        send_currency=send_currency,
-                        receive_country=receive_country,
-                        receive_currency=receive_currency,
-                        payment_method="CreditCard",
-                        delivery_method="BankDeposit"
-                    )
-                    
-                    if rate_data and rate_data.get("exchange_rate") is not None:
-                        test_logger.info(f"✓ Exchange rate found: {rate_data.get('exchange_rate')}")
-                        test_logger.info(f"  Fee: {rate_data.get('transfer_fee')} {send_currency}")
-                        test_logger.info(f"  Receive amount: {rate_data.get('receive_amount')}")
-                        
-                        self.save_response_data(
-                            rate_data,
-                            f"exchange_rate_{corridor_label}"
-                        )
-                        success_count += 1
-                    else:
-                        test_logger.warning(f"✗ No exchange rate found for {corridor_label}")
-                        failure_count += 1
-                    
-                except Exception as e:
-                    test_logger.error(f"Error getting rate for {corridor_label}: {str(e)}")
-                    failure_count += 1
-                
-                time.sleep(2.0)
-            
-            test_logger.info(f"Test summary: {success_count} successful corridors, {failure_count} failed corridors")
-            if success_count > 0:
-                self.assertTrue(True, f"Successfully tested {success_count} corridors")
-            else:
-                self.fail("No corridors were successfully tested")
-                
-        except Exception as e:
-            test_logger.error(f"Test failed: {str(e)}")
-            test_logger.error(traceback.format_exc())
-            raise
-        finally:
-            test_logger.removeHandler(file_handler)
-            file_handler.close()
-            
-    def test_payment_methods(self):
-        """Test retrieving available payment methods for a specific corridor."""
-        test_method_log = os.path.join(self.logs_dir, f"test_payment_methods_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+        return {
+            "success": True,
+            "data": data
+        }
         
-        file_handler = logging.FileHandler(test_method_log)
-        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-        test_logger = logging.getLogger(f"{__name__}.{self._testMethodName}")
-        test_logger.addHandler(file_handler)
-        test_logger.setLevel(logging.DEBUG)
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to get fees and rates: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+def test_different_amounts():
+    """Test getting quotes for different amounts."""
+    amounts = [1.00, 100.00, 500.00, 1000.00]
+    
+    for amount in amounts:
+        logger.info(f"\nTesting amount: ${amount}")
+        result = test_get_fees_rates(Decimal(str(amount)))
         
-        try:
-            test_logger.info("Testing payment methods from USA to TUR")
+        if result["success"]:
+            data = result["data"]
+            logger.info(f"Exchange Rate: {data.get('rate', 'N/A')}")
+            logger.info(f"Fee Amount: ${data.get('feeAmount', 'N/A')}")
+            logger.info(f"Total Cost: ${data.get('totalAmount', 'N/A')}")
+            logger.info(f"Send Amount: ${data.get('origAmount', 'N/A')}")
+            logger.info(f"Receive Amount: {data.get('destAmount', 'N/A')} MXN")
             
-            rate_data = self.provider.get_exchange_rate(
-                send_amount=Decimal("100.00"),
-                send_currency="USD",
-                receive_country="TUR",
-                receive_currency="TRY",
-                payment_method="CreditCard",
-                delivery_method="BankDeposit"
-            )
-            
-            self.assertIsNotNone(rate_data, "Rate data should not be None")
-            
-            payment_methods = rate_data.get("available_payment_methods", [])
-            
-            test_logger.info(f"Payment methods: {payment_methods}")
-            self.assertIsNotNone(payment_methods, "Payment methods should not be None")
-            self.assertGreater(len(payment_methods), 0, "Should have at least one payment method")
-            
-            saved_file = self.save_response_data(payment_methods, "payment_methods_USA_TUR")
-            test_logger.info(f"Saved payment methods to {saved_file}")
-            
-            for method in payment_methods:
-                test_logger.info(f"Method: {method.get('name')} (ID: {method.get('id')}), Fee: {method.get('fee')}")
-                
-        except Exception as e:
-            test_logger.error(f"Unexpected error: {str(e)}")
-            test_logger.error(traceback.format_exc())
-            raise
-        finally:
-            test_logger.removeHandler(file_handler)
-            file_handler.close()
+            # Log available payment methods
+            payment_methods = data.get('paymentMethods', [])
+            if payment_methods:
+                logger.info("\nAvailable Payment Methods:")
+                for method in payment_methods:
+                    logger.info(f"- {method['senderPaymentMethodName']}: ${method['feeAmount']}")
+        else:
+            logger.error(f"Failed to get quote for amount {amount}: {result['error']}")
+
+def main():
+    """Run all tests."""
+    logger.info("=== Testing Intermex Integration ===")
+    
+    # Test delivery and payment methods
+    logger.info("\nTesting delivery and payment methods...")
+    delivery_result = test_get_delivery_and_payments()
+    
+    if not delivery_result["success"]:
+        logger.error("Failed to get delivery and payment methods")
+        return
+    
+    # Test different amounts
+    logger.info("\nTesting different amounts...")
+    test_different_amounts()
 
 if __name__ == "__main__":
-    unittest.main() 
+    main()

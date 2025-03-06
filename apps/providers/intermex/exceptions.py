@@ -1,33 +1,30 @@
-"""Intermex Money Transfer-specific exceptions."""
-from typing import Optional, Dict, Any
-from apps.providers.base.exceptions import ProviderError
+"""
+Intermex provider exceptions.
+"""
 
-
-class IntermexError(ProviderError):
-    """Exception raised for Intermex Money Transfer-specific errors."""
-    def __init__(self, message: str, error_code: str = None, details: Dict[str, Any] = None):
-        super().__init__(
-            message=message,
-            provider="Intermex",
-            error_code=error_code,
-            details=details
-        )
-
-
-class IntermexAuthenticationError(IntermexError):
-    """Raised when there are authentication/session issues with Intermex API."""
+class IntermexError(Exception):
+    """Base exception for Intermex provider."""
     pass
 
+class IntermexAuthError(IntermexError):
+    """Raised when authentication with Intermex API fails."""
+    def __init__(self, message: str):
+        super().__init__(message)
+
+class IntermexAPIError(IntermexError):
+    """Raised when Intermex API returns an error response."""
+    def __init__(self, message: str, status_code: int = None, response: dict = None):
+        super().__init__(message)
+        self.status_code = status_code
+        self.response = response
 
 class IntermexValidationError(IntermexError):
-    """Raised when the Intermex API rejects our input parameters."""
+    """Raised when input validation fails."""
     pass
-
 
 class IntermexConnectionError(IntermexError):
     """Raised when we can't connect to Intermex's API."""
     pass
-
 
 class IntermexRateLimitError(IntermexError):
     """Raised when we exceed the API rate limits."""

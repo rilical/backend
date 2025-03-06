@@ -1,0 +1,52 @@
+{
+  "IN": {
+    "country_id": 103,
+    "country_name": "India",
+    "currency_name": "Indian Rupee",
+    "currency_code": "INR",
+    "rate": 60.9,
+    "iso2": "IN",
+    "iso3": "IND",
+    "special_rate": false
+  },
+  "PH": {
+    "country_id": 175,
+    "country_name": "Philippines",
+    "currency_name": "Philippine Peso",
+    "currency_code": "PHP",
+    "rate": 42.3,
+    "iso2": "PH",
+    "iso3": "PHL",
+    "special_rate": false
+  },
+  "PK": {
+    "country_id": 173,
+    "country_name": "Pakistan",
+    "currency_name": "Pakistani Rupee",
+    "currency_code": "PKR",
+    "rate": 220.5,
+    "iso2": "PK",
+    "iso3": "PAK",
+    "special_rate": false
+  },
+  "BD": {
+    "country_id": 20,
+    "country_name": "Bangladesh",
+    "currency_name": "Bangladeshi Taka",
+    "currency_code": "BDT",
+    "rate": 110.2,
+    "iso2": "BD",
+    "iso3": "BGD",
+    "special_rate": false
+  },
+  "NP": {
+    "country_id": 152,
+    "country_name": "Nepal",
+    "currency_name": "Nepalese Rupee",
+    "currency_code": "NPR",
+    "rate": 97.5,
+    "iso2": "NP",
+    "iso3": "NPL",
+    "special_rate": false
+  }
+}

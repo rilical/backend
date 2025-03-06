@@ -7,17 +7,15 @@ This package provides integration with Intermex's money transfer service.
 from .integration import IntermexProvider
 from .exceptions import (
     IntermexError,
-    IntermexAuthenticationError,
-    IntermexConnectionError,
-    IntermexValidationError,
-    IntermexRateLimitError
+    IntermexAuthError,
+    IntermexAPIError,
+    IntermexValidationError
 )
 
 __all__ = [
     "IntermexProvider",
     "IntermexError",
-    "IntermexAuthenticationError",
-    "IntermexConnectionError",
-    "IntermexValidationError",
-    "IntermexRateLimitError"
+    "IntermexAuthError",
+    "IntermexAPIError",
+    "IntermexValidationError"
 ] 

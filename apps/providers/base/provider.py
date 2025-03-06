@@ -1,29 +1,73 @@
 """
 Base class for remittance providers.
 """
-from abc import ABC, abstractmethod
-from typing import Dict, Optional
+import abc
+import uuid
+import time
+import datetime
 from decimal import Decimal
+from typing import Dict, Any, Optional
 
-class RemittanceProvider(ABC):
-    """Abstract base class for remittance providers."""
-    
+
+class RemittanceProvider(abc.ABC):
+    """
+    Abstract base class enforcing a standardized quote interface.
+    Subclasses must implement `get_quote` and use `standardize_response`.
+    """
+
     def __init__(self, name: str, base_url: str):
         self.name = name
         self.base_url = base_url
-    
-    @abstractmethod
-    def get_exchange_rate(self, send_amount: Decimal, send_currency: str, 
-                         receive_country: str) -> Optional[Dict]:
+
+    @abc.abstractmethod
+    def get_quote(
+        self,
+        amount: Decimal,
+        source_currency: str,
+        dest_currency: str,
+        source_country: str,
+        dest_country: str,
+        payment_method: Optional[str] = None,
+        delivery_method: Optional[str] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
         """
-        Get exchange rate and fees for a money transfer.
-        
-        Args:
-            send_amount: Amount to send
-            send_currency: Currency code to send (e.g. 'USD')
-            receive_country: Destination country code (e.g. 'MX')
-            
-        Returns:
-            Dictionary containing rate information or None if failed
+        Subclasses must implement. Should call `self.standardize_response(...)` 
+        and return that dict.
         """
-        pass
+        raise NotImplementedError
+
+    def standardize_response(
+        self,
+        raw_result: Dict[str, Any],
+        provider_specific_data: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Standardize the response shape for aggregator consumption.
+        raw_result must contain keys like:
+            "success", "error_message", "send_amount", "send_currency",
+            "receive_amount", "receive_currency", "exchange_rate", "fee",
+            "payment_method", "delivery_method", "delivery_time_minutes",
+            ... plus any others your provider added
+        """
+        # Ensure required keys exist
+        output = {
+            "provider_id": self.name,
+            "success": raw_result.get("success", False),
+            "error_message": raw_result.get("error_message"),
+            "send_amount": raw_result.get("send_amount", 0.0),
+            "source_currency": raw_result.get("send_currency", "").upper(),
+            "destination_amount": raw_result.get("receive_amount", 0.0),
+            "destination_currency": raw_result.get("receive_currency", "").upper(),
+            "exchange_rate": raw_result.get("exchange_rate"),
+            "fee": raw_result.get("fee", 0.0),
+            "payment_method": raw_result.get("payment_method"),
+            "delivery_method": raw_result.get("delivery_method"),
+            "delivery_time_minutes": raw_result.get("delivery_time_minutes"),
+            "timestamp": datetime.datetime.now().isoformat(),
+        }
+
+        if provider_specific_data:
+            output["raw_response"] = raw_result.get("raw_response")
+
+        return output

@@ -2,15 +2,19 @@ import sys
 import unittest
 
 # Pull in each provider's test suite
-from apps.providers.moneygram.tests import TestMoneyGramProvider
-from apps.providers.westernunion.tests import TestWesternUnionProvider
-from apps.providers.ria.tests import TestRiaProvider
+from apps.providers.westernunion.tests import TestWesternUnionProviderRealAPI
+from apps.providers.ria.tests import TestRIAProviderRealAPI
+from apps.providers.wise.tests import TestWiseProviderRealAPI
+from apps.providers.pangea.tests import TestPangeaProviderRealAPI
 
 def main():
     suite = unittest.TestSuite()
-    suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestMoneyGramProvider))
-    suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestWesternUnionProvider))
-    suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestRiaProvider))
+    
+    # Add provider tests
+    suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestWesternUnionProviderRealAPI))
+    suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestRIAProviderRealAPI))
+    suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestWiseProviderRealAPI))
+    suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestPangeaProviderRealAPI))
 
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)

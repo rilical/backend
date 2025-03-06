@@ -1,0 +1,7181 @@
+{
+  "from_countries": [
+    {
+      "name": "Andorra",
+      "code": "ad",
+      "id": 20,
+      "seoNameFrom": "andorra",
+      "seoNameTo": "andorra",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            8,
+            20,
+            499,
+            688,
+            807
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Australia",
+      "code": "au",
+      "id": 36,
+      "seoNameFrom": "australia",
+      "seoNameTo": "australia",
+      "currencies": [
+        {
+          "code": "AUD",
+          "name": "Australian dollar",
+          "id": 36,
+          "cardCountries": [
+            36
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Austria",
+      "code": "at",
+      "id": 40,
+      "seoNameFrom": "austria",
+      "seoNameTo": "austria",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            233,
+            246,
+            250,
+            262,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Belgium",
+      "code": "be",
+      "id": 56,
+      "seoNameFrom": "belgium",
+      "seoNameTo": "belgium",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            233,
+            246,
+            250,
+            262,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Brazil",
+      "code": "br",
+      "id": 76,
+      "seoNameFrom": "brazil",
+      "seoNameTo": "brazil",
+      "currencies": [
+        {
+          "code": "BRL",
+          "name": "Real",
+          "id": 986,
+          "cardCountries": [
+            76
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Bulgaria",
+      "code": "bg",
+      "id": 100,
+      "seoNameFrom": "bulgaria",
+      "seoNameTo": "bulgaria",
+      "currencies": [
+        {
+          "code": "BGN",
+          "name": "Bulgarian Lev",
+          "id": 975,
+          "cardCountries": [
+            100
+          ]
+        },
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            233,
+            246,
+            250,
+            262,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Canada",
+      "code": "ca",
+      "id": 124,
+      "seoNameFrom": "canada",
+      "seoNameTo": "canada",
+      "currencies": [
+        {
+          "code": "CAD",
+          "name": "Canadian Dollar",
+          "id": 124,
+          "cardCountries": [
+            124
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Chile",
+      "code": "cl",
+      "id": 152,
+      "seoNameFrom": "chile",
+      "seoNameTo": "chile",
+      "currencies": [
+        {
+          "code": "CLP",
+          "name": "Peso",
+          "id": 152,
+          "cardCountries": [
+            152
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Colombia",
+      "code": "co",
+      "id": 170,
+      "seoNameFrom": "colombia",
+      "seoNameTo": "colombia",
+      "currencies": [
+        {
+          "code": "COP",
+          "name": "Colombian Peso",
+          "id": 170,
+          "cardCountries": [
+            170
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Croatia",
+      "code": "hr",
+      "id": 191,
+      "seoNameFrom": "croatia",
+      "seoNameTo": "croatia",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            233,
+            246,
+            250,
+            262,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cyprus",
+      "code": "cy",
+      "id": 196,
+      "seoNameFrom": "cyprus",
+      "seoNameTo": "cyprus",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            233,
+            246,
+            250,
+            262,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Czech Republic",
+      "code": "cz",
+      "id": 203,
+      "seoNameFrom": "czech-republic",
+      "seoNameTo": "czech-republic",
+      "currencies": [
+        {
+          "code": "CZK",
+          "name": "Czech Koruna",
+          "id": 203,
+          "cardCountries": [
+            203
+          ]
+        },
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            233,
+            246,
+            250,
+            262,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Denmark",
+      "code": "dk",
+      "id": 208,
+      "seoNameFrom": "denmark",
+      "seoNameTo": "denmark",
+      "currencies": [
+        {
+          "code": "DKK",
+          "name": "Danish Krone",
+          "id": 208,
+          "cardCountries": [
+            208
+          ]
+        },
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Estonia",
+      "code": "ee",
+      "id": 233,
+      "seoNameFrom": "estonia",
+      "seoNameTo": "estonia",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            233,
+            246,
+            250,
+            262,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Finland",
+      "code": "fi",
+      "id": 246,
+      "seoNameFrom": "finland",
+      "seoNameTo": "finland",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            233,
+            246,
+            250,
+            262,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "France",
+      "code": "fr",
+      "id": 250,
+      "seoNameFrom": "france",
+      "seoNameTo": "france",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            233,
+            246,
+            250,
+            262,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Germany",
+      "code": "de",
+      "id": 276,
+      "seoNameFrom": "germany",
+      "seoNameTo": "germany",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            233,
+            246,
+            250,
+            262,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Greece",
+      "code": "gr",
+      "id": 300,
+      "seoNameFrom": "greece",
+      "seoNameTo": "greece",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Hungary",
+      "code": "hu",
+      "id": 348,
+      "seoNameFrom": "hungary",
+      "seoNameTo": "hungary",
+      "currencies": [
+        {
+          "code": "HUF",
+          "name": "Forint",
+          "id": 348,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            703,
+            705,
+            724,
+            752
+          ]
+        },
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            233,
+            246,
+            250,
+            262,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Iceland",
+      "code": "is",
+      "id": 352,
+      "seoNameFrom": "iceland",
+      "seoNameTo": "iceland",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            233,
+            246,
+            250,
+            262,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Ireland",
+      "code": "ie",
+      "id": 372,
+      "seoNameFrom": "ireland",
+      "seoNameTo": "ireland",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Israel",
+      "code": "il",
+      "id": 376,
+      "seoNameFrom": "israel",
+      "seoNameTo": "israel",
+      "currencies": [
+        {
+          "code": "ILS",
+          "name": "New Israeli Sheqel",
+          "id": 376,
+          "cardCountries": [
+            376
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Italy",
+      "code": "it",
+      "id": 380,
+      "seoNameFrom": "italy",
+      "seoNameTo": "italy",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Kazakhstan",
+      "code": "kz",
+      "id": 398,
+      "seoNameFrom": "kazakhstan",
+      "seoNameTo": "kazakhstan",
+      "currencies": [
+        {
+          "code": "KZT",
+          "name": "Tenge",
+          "id": 398,
+          "cardCountries": [
+            398
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Kuwait",
+      "code": "kw",
+      "id": 414,
+      "seoNameFrom": "kuwait",
+      "seoNameTo": "kuwait",
+      "currencies": [
+        {
+          "code": "KWD",
+          "name": "Kuwaiti Dinar",
+          "id": 414,
+          "cardCountries": [
+            414
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Latvia",
+      "code": "lv",
+      "id": 428,
+      "seoNameFrom": "latvia",
+      "seoNameTo": "latvia",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Liechtenstein",
+      "code": "li",
+      "id": 438,
+      "seoNameFrom": "liechtenstein",
+      "seoNameTo": "liechtenstein",
+      "currencies": [
+        {
+          "code": "CHF",
+          "name": "Swiss Franc",
+          "id": 756,
+          "cardCountries": [
+            438,
+            756
+          ]
+        },
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            233,
+            246,
+            250,
+            262,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Lithuania ",
+      "code": "lt",
+      "id": 440,
+      "seoNameFrom": "lithuania",
+      "seoNameTo": "lithuania",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Luxembourg",
+      "code": "lu",
+      "id": 442,
+      "seoNameFrom": "luxembourg",
+      "seoNameTo": "luxembourg",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Malta",
+      "code": "mt",
+      "id": 470,
+      "seoNameFrom": "malta",
+      "seoNameTo": "malta",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Mexico",
+      "code": "mx",
+      "id": 484,
+      "seoNameFrom": "mexico",
+      "seoNameTo": "mexico",
+      "currencies": [
+        {
+          "code": "MXN",
+          "name": "Mexican Peso",
+          "id": 484,
+          "cardCountries": [
+            484
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Moldova",
+      "code": "md",
+      "id": 498,
+      "seoNameFrom": "moldova",
+      "seoNameTo": "moldova",
+      "currencies": [
+        {
+          "code": "MDL",
+          "name": "Moldovan Leu",
+          "id": 498,
+          "cardCountries": [
+            498,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Montenegro",
+      "code": "me",
+      "id": 499,
+      "seoNameFrom": "montenegro",
+      "seoNameTo": "montenegro",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            8,
+            20,
+            499,
+            688,
+            807
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Netherlands",
+      "code": "nl",
+      "id": 528,
+      "seoNameFrom": "netherlands",
+      "seoNameTo": "netherlands",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "North Macedonia ",
+      "code": "mk",
+      "id": 807,
+      "seoNameFrom": "north-macedonia",
+      "seoNameTo": "north-macedonia",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            8,
+            20,
+            40,
+            56,
+            70,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            440,
+            442,
+            470,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            756,
+            807
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Norway",
+      "code": "no",
+      "id": 578,
+      "seoNameFrom": "norway",
+      "seoNameTo": "norway",
+      "currencies": [
+        {
+          "code": "NOK",
+          "name": "Norwegian Krone",
+          "id": 578,
+          "cardCountries": [
+            578
+          ]
+        },
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Peru",
+      "code": "pe",
+      "id": 604,
+      "seoNameFrom": "peru",
+      "seoNameTo": "peru",
+      "currencies": [
+        {
+          "code": "PEN",
+          "name": "Peruvian sol",
+          "id": 604,
+          "cardCountries": [
+            604
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Poland",
+      "code": "pl",
+      "id": 616,
+      "seoNameFrom": "poland",
+      "seoNameTo": "poland",
+      "currencies": [
+        {
+          "code": "PLN",
+          "name": "Zloty",
+          "id": 985,
+          "cardCountries": [
+            616
+          ]
+        },
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Portugal",
+      "code": "pt",
+      "id": 620,
+      "seoNameFrom": "portugal",
+      "seoNameTo": "portugal",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Romania",
+      "code": "ro",
+      "id": 642,
+      "seoNameFrom": "romania",
+      "seoNameTo": "romania",
+      "currencies": [
+        {
+          "code": "RON",
+          "name": "Romanian Leu",
+          "id": 946,
+          "cardCountries": [
+            642
+          ]
+        },
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "San Marino",
+      "code": "sm",
+      "id": 674,
+      "seoNameFrom": "san-marino",
+      "seoNameTo": "san-marino",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            8,
+            20,
+            499,
+            688,
+            807
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Serbia",
+      "code": "rs",
+      "id": 688,
+      "seoNameFrom": "serbia",
+      "seoNameTo": "serbia",
+      "currencies": [
+        {
+          "code": "RSD",
+          "name": "Serbian Dinar",
+          "id": 941,
+          "cardCountries": [
+            688
+          ]
+        },
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            688
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Slovakia",
+      "code": "sk",
+      "id": 703,
+      "seoNameFrom": "slovakia",
+      "seoNameTo": "slovakia",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Slovenia",
+      "code": "si",
+      "id": 705,
+      "seoNameFrom": "slovenia",
+      "seoNameTo": "slovenia",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Spain",
+      "code": "es",
+      "id": 724,
+      "seoNameFrom": "spain",
+      "seoNameTo": "spain",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Sweden",
+      "code": "se",
+      "id": 752,
+      "seoNameFrom": "sweden",
+      "seoNameTo": "sweden",
+      "currencies": [
+        {
+          "code": "SEK",
+          "name": "Swedish Krona",
+          "id": 752,
+          "cardCountries": [
+            752
+          ]
+        },
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            703,
+            705,
+            724,
+            752
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Switzerland",
+      "code": "ch",
+      "id": 756,
+      "seoNameFrom": "switzerland",
+      "seoNameTo": "switzerland",
+      "currencies": [
+        {
+          "code": "CHF",
+          "name": "Swiss Franc",
+          "id": 756,
+          "cardCountries": [
+            756
+          ]
+        },
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            756
+          ]
+        }
+      ]
+    },
+    {
+      "name": "United Kingdom",
+      "code": "gb",
+      "id": 826,
+      "seoNameFrom": "united-kingdom",
+      "seoNameTo": "united-kingdom",
+      "currencies": [
+        {
+          "code": "GBP",
+          "name": "Pound Sterling",
+          "id": 826,
+          "cardCountries": [
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "USA",
+      "code": "us",
+      "id": 840,
+      "seoNameFrom": "the-united-states-of-america",
+      "seoNameTo": "the-united-states-of-america",
+      "currencies": [
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            840
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Uzbekistan",
+      "code": "uz",
+      "id": 860,
+      "seoNameFrom": "uzbekistan",
+      "seoNameTo": "uzbekistan",
+      "currencies": [
+        {
+          "code": "UZS",
+          "name": "Uzbekistan Sum",
+          "id": 860,
+          "cardCountries": [
+            860
+          ]
+        }
+      ]
+    }
+  ],
+  "to_countries": [
+    {
+      "name": "Algeria",
+      "code": "dz",
+      "id": 12,
+      "seoNameFrom": "algeria",
+      "seoNameTo": "algeria",
+      "currencies": [
+        {
+          "code": "DZD",
+          "name": "Dinar",
+          "id": 12,
+          "cardCountries": [
+            12
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Andorra",
+      "code": "ad",
+      "id": 20,
+      "seoNameFrom": "andorra",
+      "seoNameTo": "andorra",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Angola",
+      "code": "ao",
+      "id": 24,
+      "seoNameFrom": "angola",
+      "seoNameTo": "angola",
+      "currencies": [
+        {
+          "code": "AOA",
+          "name": "Kwanza",
+          "id": 973,
+          "cardCountries": [
+            24
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Antigua and Barbuda",
+      "code": "ag",
+      "id": 28,
+      "seoNameFrom": "antigua-and-barbuda",
+      "seoNameTo": "antigua-and-barbuda",
+      "currencies": [
+        {
+          "code": "XCD",
+          "name": "East Caribbean Dollar",
+          "id": 951,
+          "cardCountries": [
+            28,
+            308,
+            659,
+            662,
+            670
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Argentina",
+      "code": "ar",
+      "id": 32,
+      "seoNameFrom": "argentina",
+      "seoNameTo": "argentina",
+      "currencies": [
+        {
+          "code": "ARS",
+          "name": "Peso",
+          "id": 32,
+          "cardCountries": []
+        }
+      ]
+    },
+    {
+      "name": "Armenia",
+      "code": "am",
+      "id": 51,
+      "seoNameFrom": "armenia",
+      "seoNameTo": "armenia",
+      "currencies": [
+        {
+          "code": "AMD",
+          "name": "Armenian Dram",
+          "id": 51,
+          "cardCountries": [
+            51
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            112,
+            132,
+            170,
+            188,
+            212,
+            214,
+            218,
+            222,
+            242,
+            262,
+            268,
+            270,
+            288,
+            316,
+            340,
+            356,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            480,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            608,
+            626,
+            630,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            796,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Aruba",
+      "code": "aw",
+      "id": 533,
+      "seoNameFrom": "aruba",
+      "seoNameTo": "aruba",
+      "currencies": [
+        {
+          "code": "AWG",
+          "name": "Aruban Guilder",
+          "id": 533,
+          "cardCountries": [
+            533
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Austria",
+      "code": "at",
+      "id": 40,
+      "seoNameFrom": "austria",
+      "seoNameTo": "austria",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Azerbaijan",
+      "code": "az",
+      "id": 31,
+      "seoNameFrom": "azerbaijan",
+      "seoNameTo": "azerbaijan",
+      "currencies": [
+        {
+          "code": "AZN",
+          "name": "Azerbaijanian Manat",
+          "id": 944,
+          "cardCountries": [
+            31
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            214,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            356,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            480,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            600,
+            608,
+            630,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            796,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Bahamas",
+      "code": "bs",
+      "id": 44,
+      "seoNameFrom": "bahamas",
+      "seoNameTo": "bahamas",
+      "currencies": [
+        {
+          "code": "BSD",
+          "name": "Bahamian Dollar",
+          "id": 44,
+          "cardCountries": [
+            44
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Bahrain",
+      "code": "bh",
+      "id": 48,
+      "seoNameFrom": "bahrain",
+      "seoNameTo": "bahrain",
+      "currencies": [
+        {
+          "code": "BHD",
+          "name": "Bahraini Dinar",
+          "id": 48,
+          "cardCountries": [
+            48
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Bangladesh",
+      "code": "bd",
+      "id": 50,
+      "seoNameFrom": "bangladesh",
+      "seoNameTo": "bangladesh",
+      "currencies": [
+        {
+          "code": "BDT",
+          "name": "Taka",
+          "id": 50,
+          "cardCountries": []
+        }
+      ]
+    },
+    {
+      "name": "Belarus",
+      "code": "by",
+      "id": 112,
+      "seoNameFrom": "belarus",
+      "seoNameTo": "belarus",
+      "currencies": [
+        {
+          "code": "BYN",
+          "name": "Belarusian Ruble",
+          "id": 933,
+          "cardCountries": [
+            112
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            214,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            356,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            608,
+            630,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            796,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Belgium",
+      "code": "be",
+      "id": 56,
+      "seoNameFrom": "belgium",
+      "seoNameTo": "belgium",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Belize",
+      "code": "bz",
+      "id": 84,
+      "seoNameFrom": "belize",
+      "seoNameTo": "belize",
+      "currencies": [
+        {
+          "code": "BZD",
+          "name": "Belize Dollar",
+          "id": 84,
+          "cardCountries": [
+            84
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Benin",
+      "code": "bj",
+      "id": 204,
+      "seoNameFrom": "benin",
+      "seoNameTo": "benin",
+      "currencies": [
+        {
+          "code": "XOF",
+          "name": "CFA Franc",
+          "id": 952,
+          "cardCountries": [
+            204,
+            384,
+            686
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Bhutan",
+      "code": "bt",
+      "id": 64,
+      "seoNameFrom": "bhutan",
+      "seoNameTo": "bhutan",
+      "currencies": [
+        {
+          "code": "BTN",
+          "name": "Ngultrum",
+          "id": 64,
+          "cardCountries": [
+            64
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Bolivia",
+      "code": "bo",
+      "id": 68,
+      "seoNameFrom": "bolivia",
+      "seoNameTo": "bolivia",
+      "currencies": [
+        {
+          "code": "BOB",
+          "name": "Boliviano",
+          "id": 68,
+          "cardCountries": [
+            68
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            608,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Botswana",
+      "code": "bw",
+      "id": 72,
+      "seoNameFrom": "botswana",
+      "seoNameTo": "botswana",
+      "currencies": [
+        {
+          "code": "BWP",
+          "name": "Pula",
+          "id": 72,
+          "cardCountries": [
+            72
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Brazil",
+      "code": "br",
+      "id": 76,
+      "seoNameFrom": "brazil",
+      "seoNameTo": "brazil",
+      "currencies": [
+        {
+          "code": "BRL",
+          "name": "Real",
+          "id": 986,
+          "cardCountries": [
+            76
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Bulgaria",
+      "code": "bg",
+      "id": 100,
+      "seoNameFrom": "bulgaria",
+      "seoNameTo": "bulgaria",
+      "currencies": [
+        {
+          "code": "BGN",
+          "name": "Bulgarian Lev",
+          "id": 975,
+          "cardCountries": [
+            100
+          ]
+        },
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Burundi",
+      "code": "bi",
+      "id": 108,
+      "seoNameFrom": "burundi",
+      "seoNameTo": "burundi",
+      "currencies": [
+        {
+          "code": "BIF",
+          "name": "Burundi Franc",
+          "id": 108,
+          "cardCountries": [
+            108
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cambodia",
+      "code": "kh",
+      "id": 116,
+      "seoNameFrom": "cambodia",
+      "seoNameTo": "cambodia",
+      "currencies": [
+        {
+          "code": "KHR",
+          "name": "Riel",
+          "id": 116,
+          "cardCountries": [
+            116
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            608,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cameroon",
+      "code": "cm",
+      "id": 120,
+      "seoNameFrom": "cameroon",
+      "seoNameTo": "cameroon",
+      "currencies": [
+        {
+          "code": "XAF",
+          "name": "CFA Franc BEAC",
+          "id": 950,
+          "cardCountries": [
+            120,
+            140,
+            178,
+            266,
+            768
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Canada",
+      "code": "ca",
+      "id": 124,
+      "seoNameFrom": "canada",
+      "seoNameTo": "canada",
+      "currencies": [
+        {
+          "code": "CAD",
+          "name": "Canadian Dollar",
+          "id": 124,
+          "cardCountries": [
+            124
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Chad",
+      "code": "td",
+      "id": 148,
+      "seoNameFrom": "chad",
+      "seoNameTo": "chad",
+      "currencies": [
+        {
+          "code": "XAF",
+          "name": "CFA Franc BEAC",
+          "id": 950,
+          "cardCountries": [
+            120,
+            140,
+            178,
+            266,
+            768
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Chile",
+      "code": "cl",
+      "id": 152,
+      "seoNameFrom": "chile",
+      "seoNameTo": "chile",
+      "currencies": [
+        {
+          "code": "CLP",
+          "name": "Peso",
+          "id": 152,
+          "cardCountries": [
+            152
+          ]
+        }
+      ]
+    },
+    {
+      "name": "China",
+      "code": "cn",
+      "id": 156,
+      "seoNameFrom": "china",
+      "seoNameTo": "china",
+      "currencies": [
+        {
+          "code": "CNY",
+          "name": "Yuan Renminbi",
+          "id": 156,
+          "cardCountries": [
+            156
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Colombia",
+      "code": "co",
+      "id": 170,
+      "seoNameFrom": "colombia",
+      "seoNameTo": "colombia",
+      "currencies": [
+        {
+          "code": "COP",
+          "name": "Colombian Peso",
+          "id": 170,
+          "cardCountries": [
+            170
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            214,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            356,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            608,
+            630,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            796,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Comoros",
+      "code": "km",
+      "id": 174,
+      "seoNameFrom": "comoros",
+      "seoNameTo": "comoros",
+      "currencies": [
+        {
+          "code": "KMF",
+          "name": "Comoro Franc",
+          "id": 174,
+          "cardCountries": [
+            174
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Congo",
+      "code": "cg",
+      "id": 178,
+      "seoNameFrom": "congo",
+      "seoNameTo": "congo",
+      "currencies": [
+        {
+          "code": "XAF",
+          "name": "CFA Franc BEAC",
+          "id": 950,
+          "cardCountries": [
+            120,
+            140,
+            266,
+            768
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Costa Rica",
+      "code": "cr",
+      "id": 188,
+      "seoNameFrom": "costa-rica",
+      "seoNameTo": "costa-rica",
+      "currencies": [
+        {
+          "code": "CRC",
+          "name": "Costa Rican Colon",
+          "id": 188,
+          "cardCountries": [
+            188
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            608,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cote D-Ivoire",
+      "code": "ci",
+      "id": 384,
+      "seoNameFrom": "cote-divoire",
+      "seoNameTo": "cote-divoire",
+      "currencies": [
+        {
+          "code": "XOF",
+          "name": "CFA Franc",
+          "id": 952,
+          "cardCountries": [
+            204,
+            384,
+            686
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Croatia",
+      "code": "hr",
+      "id": 191,
+      "seoNameFrom": "croatia",
+      "seoNameTo": "croatia",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cyprus",
+      "code": "cy",
+      "id": 196,
+      "seoNameFrom": "cyprus",
+      "seoNameTo": "cyprus",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Czech Republic",
+      "code": "cz",
+      "id": 203,
+      "seoNameFrom": "czech-republic",
+      "seoNameTo": "czech-republic",
+      "currencies": [
+        {
+          "code": "CZK",
+          "name": "Czech Koruna",
+          "id": 203,
+          "cardCountries": [
+            203
+          ]
+        },
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Democratic Republic of the Congo",
+      "code": "cd",
+      "id": 180,
+      "seoNameFrom": "democratic-republic-of-the-congo",
+      "seoNameTo": "democratic-republic-of-the-congo",
+      "currencies": [
+        {
+          "code": "CDF",
+          "name": "Congolese Franc",
+          "id": 976,
+          "cardCountries": [
+            180
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": []
+        }
+      ]
+    },
+    {
+      "name": "Denmark",
+      "code": "dk",
+      "id": 208,
+      "seoNameFrom": "denmark",
+      "seoNameTo": "denmark",
+      "currencies": [
+        {
+          "code": "DKK",
+          "name": "Danish Krone",
+          "id": 208,
+          "cardCountries": [
+            208
+          ]
+        },
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Djibouti",
+      "code": "dj",
+      "id": 262,
+      "seoNameFrom": "djibouti",
+      "seoNameTo": "djibouti",
+      "currencies": [
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            480,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            600,
+            608,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Dominica",
+      "code": "dm",
+      "id": 212,
+      "seoNameFrom": "dominica",
+      "seoNameTo": "dominica",
+      "currencies": [
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            480,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            600,
+            608,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Dominican Republic",
+      "code": "do",
+      "id": 214,
+      "seoNameFrom": "dominican-republic",
+      "seoNameTo": "dominican-republic",
+      "currencies": [
+        {
+          "code": "DOP",
+          "name": "Dominican Peso",
+          "id": 214,
+          "cardCountries": [
+            214
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Ecuador",
+      "code": "ec",
+      "id": 218,
+      "seoNameFrom": "ecuador",
+      "seoNameTo": "ecuador",
+      "currencies": [
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            218
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Egypt",
+      "code": "eg",
+      "id": 818,
+      "seoNameFrom": "egypt",
+      "seoNameTo": "egypt",
+      "currencies": [
+        {
+          "code": "EGP",
+          "name": "Pound",
+          "id": 818,
+          "cardCountries": []
+        }
+      ]
+    },
+    {
+      "name": "El Salvador",
+      "code": "sv",
+      "id": 222,
+      "seoNameFrom": "el-salvador",
+      "seoNameTo": "el-salvador",
+      "currencies": [
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            214,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            356,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            608,
+            630,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            796,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Estonia",
+      "code": "ee",
+      "id": 233,
+      "seoNameFrom": "estonia",
+      "seoNameTo": "estonia",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Ethiopia",
+      "code": "et",
+      "id": 231,
+      "seoNameFrom": "ethiopia",
+      "seoNameTo": "ethiopia",
+      "currencies": [
+        {
+          "code": "ETB",
+          "name": "Birr",
+          "id": 230,
+          "cardCountries": [
+            231
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Fiji",
+      "code": "fj",
+      "id": 242,
+      "seoNameFrom": "fiji",
+      "seoNameTo": "fiji",
+      "currencies": [
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            480,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            600,
+            608,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Finland",
+      "code": "fi",
+      "id": 246,
+      "seoNameFrom": "finland",
+      "seoNameTo": "finland",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "France",
+      "code": "fr",
+      "id": 250,
+      "seoNameFrom": "france",
+      "seoNameTo": "france",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            703,
+            705,
+            724,
+            752,
+            807
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Gabon",
+      "code": "ga",
+      "id": 266,
+      "seoNameFrom": "gabon",
+      "seoNameTo": "gabon",
+      "currencies": [
+        {
+          "code": "XAF",
+          "name": "CFA Franc BEAC",
+          "id": 950,
+          "cardCountries": [
+            266
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Gambia",
+      "code": "gm",
+      "id": 270,
+      "seoNameFrom": "gambia",
+      "seoNameTo": "gambia",
+      "currencies": [
+        {
+          "code": "GMD",
+          "name": "Dalasi",
+          "id": 270,
+          "cardCountries": [
+            270
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Georgia",
+      "code": "ge",
+      "id": 268,
+      "seoNameFrom": "georgia",
+      "seoNameTo": "georgia",
+      "currencies": [
+        {
+          "code": "GEL",
+          "name": "Lari",
+          "id": 981,
+          "cardCountries": [
+            268
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            214,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            356,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            608,
+            630,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            796,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Germany",
+      "code": "de",
+      "id": 276,
+      "seoNameFrom": "germany",
+      "seoNameTo": "germany",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Greece",
+      "code": "gr",
+      "id": 300,
+      "seoNameFrom": "greece",
+      "seoNameTo": "greece",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Guatemala",
+      "code": "gt",
+      "id": 320,
+      "seoNameFrom": "guatemala",
+      "seoNameTo": "guatemala",
+      "currencies": [
+        {
+          "code": "GTQ",
+          "name": "Guatemalan quetzal",
+          "id": 320,
+          "cardCountries": [
+            320
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Guinea",
+      "code": "gn",
+      "id": 324,
+      "seoNameFrom": "guinea",
+      "seoNameTo": "guinea",
+      "currencies": [
+        {
+          "code": "GNF",
+          "name": "Guinea Franc",
+          "id": 324,
+          "cardCountries": [
+            324
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Guyana",
+      "code": "gy",
+      "id": 328,
+      "seoNameFrom": "guyana",
+      "seoNameTo": "guyana",
+      "currencies": [
+        {
+          "code": "GYD",
+          "name": "Guyana Dollar",
+          "id": 328,
+          "cardCountries": [
+            328
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Honduras",
+      "code": "hn",
+      "id": 340,
+      "seoNameFrom": "honduras",
+      "seoNameTo": "honduras",
+      "currencies": [
+        {
+          "code": "HNL",
+          "name": "Lempira",
+          "id": 340,
+          "cardCountries": [
+            340
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            608,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Hong Kong SAR, China",
+      "code": "hk",
+      "id": 344,
+      "seoNameFrom": "hong-kong",
+      "seoNameTo": "hong-kong",
+      "currencies": [
+        {
+          "code": "HKD",
+          "name": "Hong Kong Dollar",
+          "id": 344,
+          "cardCountries": [
+            344
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Hungary",
+      "code": "hu",
+      "id": 348,
+      "seoNameFrom": "hungary",
+      "seoNameTo": "hungary",
+      "currencies": [
+        {
+          "code": "HUF",
+          "name": "Forint",
+          "id": 348,
+          "cardCountries": [
+            348
+          ]
+        },
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Iceland",
+      "code": "is",
+      "id": 352,
+      "seoNameFrom": "iceland",
+      "seoNameTo": "iceland",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "India",
+      "code": "in",
+      "id": 356,
+      "seoNameFrom": "india",
+      "seoNameTo": "india",
+      "currencies": [
+        {
+          "code": "INR",
+          "name": "Indian Rupee",
+          "id": 356,
+          "cardCountries": [
+            356
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            112,
+            132,
+            170,
+            188,
+            212,
+            214,
+            218,
+            222,
+            242,
+            262,
+            268,
+            270,
+            288,
+            316,
+            340,
+            356,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            480,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            608,
+            626,
+            630,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            796,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Indonesia",
+      "code": "id",
+      "id": 360,
+      "seoNameFrom": "indonesia",
+      "seoNameTo": "indonesia",
+      "currencies": [
+        {
+          "code": "IDR",
+          "name": "Rupiah",
+          "id": 360,
+          "cardCountries": [
+            360
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Ireland",
+      "code": "ie",
+      "id": 372,
+      "seoNameFrom": "ireland",
+      "seoNameTo": "ireland",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            703,
+            705,
+            724,
+            752,
+            756,
+            807
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Israel",
+      "code": "il",
+      "id": 376,
+      "seoNameFrom": "israel",
+      "seoNameTo": "israel",
+      "currencies": [
+        {
+          "code": "ILS",
+          "name": "New Israeli Sheqel",
+          "id": 376,
+          "cardCountries": [
+            376
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            214,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            356,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            608,
+            630,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            796,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Italy",
+      "code": "it",
+      "id": 380,
+      "seoNameFrom": "italy",
+      "seoNameTo": "italy",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Jamaica",
+      "code": "jm",
+      "id": 388,
+      "seoNameFrom": null,
+      "seoNameTo": "jamaica",
+      "currencies": [
+        {
+          "code": "JMD",
+          "name": "Jamaican dollar",
+          "id": 388,
+          "cardCountries": [
+            388
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            608,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Japan",
+      "code": "jp",
+      "id": 392,
+      "seoNameFrom": "japan",
+      "seoNameTo": "japan",
+      "currencies": [
+        {
+          "code": "JPY",
+          "name": "Yen",
+          "id": 392,
+          "cardCountries": []
+        }
+      ]
+    },
+    {
+      "name": "Jordan",
+      "code": "jo",
+      "id": 400,
+      "seoNameFrom": "jordan",
+      "seoNameTo": "jordan",
+      "currencies": [
+        {
+          "code": "JOD",
+          "name": "Jordanian Dinar",
+          "id": 400,
+          "cardCountries": [
+            400
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            608,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Kazakhstan",
+      "code": "kz",
+      "id": 398,
+      "seoNameFrom": "kazakhstan",
+      "seoNameTo": "kazakhstan",
+      "currencies": [
+        {
+          "code": "KZT",
+          "name": "Tenge",
+          "id": 398,
+          "cardCountries": [
+            398
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            214,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            356,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            608,
+            630,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            796,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Kenya",
+      "code": "ke",
+      "id": 404,
+      "seoNameFrom": "kenya",
+      "seoNameTo": "kenya",
+      "currencies": [
+        {
+          "code": "KES",
+          "name": "Kenyan Shilling",
+          "id": 404,
+          "cardCountries": [
+            404
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            214,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            356,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            608,
+            630,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            796,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Kuwait",
+      "code": "kw",
+      "id": 414,
+      "seoNameFrom": "kuwait",
+      "seoNameTo": "kuwait",
+      "currencies": [
+        {
+          "code": "KWD",
+          "name": "Kuwaiti Dinar",
+          "id": 414,
+          "cardCountries": [
+            414
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Kyrgyzstan",
+      "code": "kg",
+      "id": 417,
+      "seoNameFrom": "kyrgyzstan",
+      "seoNameTo": "kyrgyzstan",
+      "currencies": [
+        {
+          "code": "KGS",
+          "name": "Som",
+          "id": 417,
+          "cardCountries": [
+            417
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            112,
+            132,
+            170,
+            188,
+            212,
+            214,
+            218,
+            222,
+            242,
+            262,
+            268,
+            270,
+            288,
+            316,
+            340,
+            356,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            480,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            608,
+            626,
+            630,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            796,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Latvia",
+      "code": "lv",
+      "id": 428,
+      "seoNameFrom": "latvia",
+      "seoNameTo": "latvia",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Lebanon",
+      "code": "lb",
+      "id": 422,
+      "seoNameFrom": "lebanon",
+      "seoNameTo": "lebanon",
+      "currencies": [
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            76,
+            218,
+            222,
+            360,
+            458,
+            566,
+            702,
+            862
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Lesotho",
+      "code": "ls",
+      "id": 426,
+      "seoNameFrom": "lesotho",
+      "seoNameTo": "lesotho",
+      "currencies": [
+        {
+          "code": "LSL",
+          "name": "Loti",
+          "id": 426,
+          "cardCountries": [
+            426
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Liberia",
+      "code": "lr",
+      "id": 430,
+      "seoNameFrom": "liberia",
+      "seoNameTo": "liberia",
+      "currencies": [
+        {
+          "code": "LRD",
+          "name": "Liberian Dollar",
+          "id": 430,
+          "cardCountries": [
+            430
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": []
+        }
+      ]
+    },
+    {
+      "name": "Liechtenstein",
+      "code": "li",
+      "id": 438,
+      "seoNameFrom": "liechtenstein",
+      "seoNameTo": "liechtenstein",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            703,
+            705,
+            724,
+            752,
+            807
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Lithuania ",
+      "code": "lt",
+      "id": 440,
+      "seoNameFrom": "lithuania",
+      "seoNameTo": "lithuania",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Luxembourg",
+      "code": "lu",
+      "id": 442,
+      "seoNameFrom": "luxembourg",
+      "seoNameTo": "luxembourg",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Madagascar",
+      "code": "mg",
+      "id": 450,
+      "seoNameFrom": "madagascar",
+      "seoNameTo": "madagascar",
+      "currencies": [
+        {
+          "code": "MGA",
+          "name": "Malagasy Ariary",
+          "id": 969,
+          "cardCountries": [
+            450
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Malawi",
+      "code": "mw",
+      "id": 454,
+      "seoNameFrom": "malawi",
+      "seoNameTo": "malawi",
+      "currencies": [
+        {
+          "code": "MWK",
+          "name": "Kwacha",
+          "id": 454,
+          "cardCountries": []
+        }
+      ]
+    },
+    {
+      "name": "Malaysia",
+      "code": "my",
+      "id": 458,
+      "seoNameFrom": "malaysia",
+      "seoNameTo": "malaysia",
+      "currencies": [
+        {
+          "code": "MYR",
+          "name": "Ringgit",
+          "id": 458,
+          "cardCountries": [
+            458
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            214,
+            218,
+            222,
+            262,
+            268,
+            288,
+            316,
+            340,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            484,
+            498,
+            504,
+            516,
+            524,
+            558,
+            566,
+            586,
+            591,
+            608,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Malta",
+      "code": "mt",
+      "id": 470,
+      "seoNameFrom": "malta",
+      "seoNameTo": "malta",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Mauritania",
+      "code": "mr",
+      "id": 478,
+      "seoNameFrom": "mauritania",
+      "seoNameTo": "mauritania",
+      "currencies": [
+        {
+          "code": "MRU",
+          "name": "Ouguiya",
+          "id": 929,
+          "cardCountries": [
+            478
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Mexico",
+      "code": "mx",
+      "id": 484,
+      "seoNameFrom": "mexico",
+      "seoNameTo": "mexico",
+      "currencies": [
+        {
+          "code": "MXN",
+          "name": "Mexican Peso",
+          "id": 484,
+          "cardCountries": [
+            484
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Moldova",
+      "code": "md",
+      "id": 498,
+      "seoNameFrom": "moldova",
+      "seoNameTo": "moldova",
+      "currencies": [
+        {
+          "code": "MDL",
+          "name": "Moldovan Leu",
+          "id": 498,
+          "cardCountries": [
+            498
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            214,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            356,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            608,
+            630,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            796,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Mongolia",
+      "code": "mn",
+      "id": 496,
+      "seoNameFrom": "mongolia",
+      "seoNameTo": "mongolia",
+      "currencies": [
+        {
+          "code": "MNT",
+          "name": "Tughrig",
+          "id": 496,
+          "cardCountries": [
+            496
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Montenegro",
+      "code": "me",
+      "id": 499,
+      "seoNameFrom": "montenegro",
+      "seoNameTo": "montenegro",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            440,
+            442,
+            470,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Morocco",
+      "code": "ma",
+      "id": 504,
+      "seoNameFrom": "morocco",
+      "seoNameTo": "morocco",
+      "currencies": [
+        {
+          "code": "MAD",
+          "name": "Moroccan Dirham",
+          "id": 504,
+          "cardCountries": [
+            504
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            214,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            356,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            608,
+            630,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            796,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Mozambique",
+      "code": "mz",
+      "id": 508,
+      "seoNameFrom": "mozambique",
+      "seoNameTo": "mozambique",
+      "currencies": [
+        {
+          "code": "MZN",
+          "name": "Mozambique Metical",
+          "id": 943,
+          "cardCountries": [
+            508
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Nepal",
+      "code": "np",
+      "id": 524,
+      "seoNameFrom": "nepal",
+      "seoNameTo": "nepal",
+      "currencies": [
+        {
+          "code": "NPR",
+          "name": "Nepalese Rupee",
+          "id": 524,
+          "cardCountries": [
+            524
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Netherlands",
+      "code": "nl",
+      "id": 528,
+      "seoNameFrom": "netherlands",
+      "seoNameTo": "netherlands",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "New Zealand",
+      "code": "nz",
+      "id": 554,
+      "seoNameFrom": "new-zealand",
+      "seoNameTo": "new-zealand",
+      "currencies": [
+        {
+          "code": "NZD",
+          "name": "New Zealand dollar",
+          "id": 554,
+          "cardCountries": [
+            554
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Niger",
+      "code": "ne",
+      "id": 562,
+      "seoNameFrom": "niger",
+      "seoNameTo": "niger",
+      "currencies": [
+        {
+          "code": "XOF",
+          "name": "CFA Franc",
+          "id": 952,
+          "cardCountries": [
+            204,
+            384,
+            398,
+            686
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Nigeria",
+      "code": "ng",
+      "id": 566,
+      "seoNameFrom": "nigeria",
+      "seoNameTo": "nigeria",
+      "currencies": [
+        {
+          "code": "NGN",
+          "name": "Naira",
+          "id": 566,
+          "cardCountries": []
+        }
+      ]
+    },
+    {
+      "name": "North Macedonia ",
+      "code": "mk",
+      "id": 807,
+      "seoNameFrom": "north-macedonia",
+      "seoNameTo": "north-macedonia",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            440,
+            442,
+            470,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            756,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Norway",
+      "code": "no",
+      "id": 578,
+      "seoNameFrom": "norway",
+      "seoNameTo": "norway",
+      "currencies": [
+        {
+          "code": "NOK",
+          "name": "Norwegian Krone",
+          "id": 578,
+          "cardCountries": [
+            578
+          ]
+        },
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Panama",
+      "code": "pa",
+      "id": 591,
+      "seoNameFrom": "panama",
+      "seoNameTo": "panama",
+      "currencies": [
+        {
+          "code": "PAB",
+          "name": "Balboa",
+          "id": 590,
+          "cardCountries": [
+            591
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            608,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Papua New Guinea",
+      "code": "pg",
+      "id": 598,
+      "seoNameFrom": "papua-new-guinea",
+      "seoNameTo": "papua-new-guinea",
+      "currencies": [
+        {
+          "code": "PGK",
+          "name": "Kina",
+          "id": 598,
+          "cardCountries": [
+            598
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Peru",
+      "code": "pe",
+      "id": 604,
+      "seoNameFrom": "peru",
+      "seoNameTo": "peru",
+      "currencies": [
+        {
+          "code": "PEN",
+          "name": "Peruvian sol",
+          "id": 604,
+          "cardCountries": [
+            604
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": []
+        }
+      ]
+    },
+    {
+      "name": "Philippines",
+      "code": "ph",
+      "id": 608,
+      "seoNameFrom": "philippines",
+      "seoNameTo": "philippines",
+      "currencies": [
+        {
+          "code": "PHP",
+          "name": "Philippine Peso",
+          "id": 608,
+          "cardCountries": [
+            608
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            214,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            356,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            608,
+            630,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            796,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Poland",
+      "code": "pl",
+      "id": 616,
+      "seoNameFrom": "poland",
+      "seoNameTo": "poland",
+      "currencies": [
+        {
+          "code": "PLN",
+          "name": "Zloty",
+          "id": 985,
+          "cardCountries": [
+            616
+          ]
+        },
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Portugal",
+      "code": "pt",
+      "id": 620,
+      "seoNameFrom": "portugal",
+      "seoNameTo": "portugal",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Romania",
+      "code": "ro",
+      "id": 642,
+      "seoNameFrom": "romania",
+      "seoNameTo": "romania",
+      "currencies": [
+        {
+          "code": "RON",
+          "name": "Romanian Leu",
+          "id": 946,
+          "cardCountries": [
+            642
+          ]
+        },
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Rwanda",
+      "code": "rw",
+      "id": 646,
+      "seoNameFrom": "rwanda",
+      "seoNameTo": "rwanda",
+      "currencies": [
+        {
+          "code": "RWF",
+          "name": "Rwanda Franc",
+          "id": 646,
+          "cardCountries": [
+            646
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Saint Kitts and Nevis",
+      "code": "kn",
+      "id": 659,
+      "seoNameFrom": "saint-kitts-and-nevis",
+      "seoNameTo": "saint-kitts-and-nevis",
+      "currencies": [
+        {
+          "code": "XCD",
+          "name": "East Caribbean Dollar",
+          "id": 951,
+          "cardCountries": [
+            28,
+            659,
+            662
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Saudi Arabia",
+      "code": "sa",
+      "id": 682,
+      "seoNameFrom": "saudi-arabia",
+      "seoNameTo": "saudi-arabia",
+      "currencies": [
+        {
+          "code": "SAR",
+          "name": "Saudi Riyal",
+          "id": 682,
+          "cardCountries": [
+            682
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Senegal",
+      "code": "sn",
+      "id": 686,
+      "seoNameFrom": "senegal",
+      "seoNameTo": "senegal",
+      "currencies": [
+        {
+          "code": "XOF",
+          "name": "CFA Franc",
+          "id": 952,
+          "cardCountries": [
+            204,
+            384,
+            562,
+            686,
+            768,
+            854
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Serbia",
+      "code": "rs",
+      "id": 688,
+      "seoNameFrom": "serbia",
+      "seoNameTo": "serbia",
+      "currencies": [
+        {
+          "code": "RSD",
+          "name": "Serbian Dinar",
+          "id": 941,
+          "cardCountries": [
+            688
+          ]
+        },
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            440,
+            442,
+            470,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Sierra Leone",
+      "code": "sl",
+      "id": 694,
+      "seoNameFrom": "sierraleone",
+      "seoNameTo": "sierraleone",
+      "currencies": [
+        {
+          "code": "SLE",
+          "name": "Sierra Leonean leone",
+          "id": 925,
+          "cardCountries": []
+        }
+      ]
+    },
+    {
+      "name": "Singapore",
+      "code": "sg",
+      "id": 702,
+      "seoNameFrom": "singapore",
+      "seoNameTo": "singapore",
+      "currencies": [
+        {
+          "code": "SGD",
+          "name": "Singapore Dollar",
+          "id": 702,
+          "cardCountries": [
+            702
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            76,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            360,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            480,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            600,
+            608,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            800,
+            860,
+            862
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Slovakia",
+      "code": "sk",
+      "id": 703,
+      "seoNameFrom": "slovakia",
+      "seoNameTo": "slovakia",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Slovenia",
+      "code": "si",
+      "id": 705,
+      "seoNameFrom": "slovenia",
+      "seoNameTo": "slovenia",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "South Africa",
+      "code": "za",
+      "id": 710,
+      "seoNameFrom": "south-africa",
+      "seoNameTo": "south-africa",
+      "currencies": [
+        {
+          "code": "ZAR",
+          "name": "Rand",
+          "id": 710,
+          "cardCountries": [
+            710
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            214,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            356,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            608,
+            630,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            796,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "South Korea",
+      "code": "kr",
+      "id": 410,
+      "seoNameFrom": "south-korea",
+      "seoNameTo": "south-korea",
+      "currencies": [
+        {
+          "code": "KRW",
+          "name": "Won",
+          "id": 410,
+          "cardCountries": []
+        }
+      ]
+    },
+    {
+      "name": "Spain",
+      "code": "es",
+      "id": 724,
+      "seoNameFrom": "spain",
+      "seoNameTo": "spain",
+      "currencies": [
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Sri Lanka",
+      "code": "lk",
+      "id": 144,
+      "seoNameFrom": "sri-lanka",
+      "seoNameTo": "sri-lanka",
+      "currencies": [
+        {
+          "code": "LKR",
+          "name": "Sri Lanka Rupee",
+          "id": 144,
+          "cardCountries": [
+            144
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            214,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            356,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            608,
+            630,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            796,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Sweden",
+      "code": "se",
+      "id": 752,
+      "seoNameFrom": "sweden",
+      "seoNameTo": "sweden",
+      "currencies": [
+        {
+          "code": "SEK",
+          "name": "Swedish Krona",
+          "id": 752,
+          "cardCountries": [
+            752
+          ]
+        },
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Switzerland",
+      "code": "ch",
+      "id": 756,
+      "seoNameFrom": "switzerland",
+      "seoNameTo": "switzerland",
+      "currencies": [
+        {
+          "code": "CHF",
+          "name": "Swiss Franc",
+          "id": 756,
+          "cardCountries": [
+            756
+          ]
+        },
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            8,
+            20,
+            40,
+            56,
+            70,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            250,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            438,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            756,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Tajikistan",
+      "code": "tj",
+      "id": 762,
+      "seoNameFrom": "tajikistan",
+      "seoNameTo": "tajikistan",
+      "currencies": [
+        {
+          "code": "TJS",
+          "name": "Somoni",
+          "id": 972,
+          "cardCountries": [
+            762
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": []
+        }
+      ]
+    },
+    {
+      "name": "Tanzania",
+      "code": "tz",
+      "id": 834,
+      "seoNameFrom": "tanzania",
+      "seoNameTo": "tanzania",
+      "currencies": [
+        {
+          "code": "TZS",
+          "name": "Tanzanian Shilling",
+          "id": 834,
+          "cardCountries": [
+            834
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            834
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Thailand",
+      "code": "th",
+      "id": 764,
+      "seoNameFrom": "thailand",
+      "seoNameTo": "thailand",
+      "currencies": [
+        {
+          "code": "THB",
+          "name": "Baht",
+          "id": 764,
+          "cardCountries": [
+            764
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            214,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            356,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            608,
+            630,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            796,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Togo",
+      "code": "tg",
+      "id": 768,
+      "seoNameFrom": "togo",
+      "seoNameTo": "togo",
+      "currencies": [
+        {
+          "code": "XOF",
+          "name": "CFA Franc",
+          "id": 952,
+          "cardCountries": [
+            204,
+            384,
+            686,
+            768
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Tunisia",
+      "code": "tn",
+      "id": 788,
+      "seoNameFrom": null,
+      "seoNameTo": "tunisia",
+      "currencies": [
+        {
+          "code": "TND",
+          "name": "Tunisian dinar",
+          "id": 788,
+          "cardCountries": [
+            788
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Turkey",
+      "code": "tr",
+      "id": 792,
+      "seoNameFrom": "turkey",
+      "seoNameTo": "turkey",
+      "currencies": [
+        {
+          "code": "TRY",
+          "name": "Turkish Lira",
+          "id": 949,
+          "cardCountries": [
+            792
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            792
+          ]
+        }
+      ]
+    },
+    {
+      "name": "UAE",
+      "code": "ae",
+      "id": 784,
+      "seoNameFrom": "uae",
+      "seoNameTo": "uae",
+      "currencies": [
+        {
+          "code": "AED",
+          "name": "UAE Dirham",
+          "id": 784,
+          "cardCountries": [
+            784
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            608,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Uganda",
+      "code": "ug",
+      "id": 800,
+      "seoNameFrom": null,
+      "seoNameTo": "uganda",
+      "currencies": [
+        {
+          "code": "UGX",
+          "name": "Uganda Shilling",
+          "id": 800,
+          "cardCountries": [
+            800
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            31,
+            51,
+            68,
+            112,
+            116,
+            132,
+            170,
+            188,
+            212,
+            214,
+            218,
+            222,
+            268,
+            288,
+            316,
+            340,
+            356,
+            376,
+            388,
+            398,
+            400,
+            404,
+            417,
+            458,
+            484,
+            498,
+            504,
+            524,
+            566,
+            586,
+            591,
+            608,
+            630,
+            702,
+            710,
+            716,
+            762,
+            764,
+            768,
+            784,
+            792,
+            796,
+            800,
+            860
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Ukraine",
+      "code": "ua",
+      "id": 804,
+      "seoNameFrom": "ukraine",
+      "seoNameTo": "ukraine",
+      "currencies": [
+        {
+          "code": "UAH",
+          "name": "Hryvnia",
+          "id": 980,
+          "cardCountries": [
+            804
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            804
+          ]
+        }
+      ]
+    },
+    {
+      "name": "United Kingdom",
+      "code": "gb",
+      "id": 826,
+      "seoNameFrom": "united-kingdom",
+      "seoNameTo": "united-kingdom",
+      "currencies": [
+        {
+          "code": "GBP",
+          "name": "Pound Sterling",
+          "id": 826,
+          "cardCountries": [
+            826
+          ]
+        },
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "id": 978,
+          "cardCountries": [
+            20,
+            40,
+            56,
+            100,
+            191,
+            196,
+            203,
+            208,
+            233,
+            246,
+            276,
+            300,
+            348,
+            352,
+            372,
+            380,
+            428,
+            440,
+            442,
+            470,
+            492,
+            499,
+            528,
+            578,
+            616,
+            620,
+            642,
+            674,
+            688,
+            703,
+            705,
+            724,
+            752,
+            807,
+            826
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Uruguay",
+      "code": "uy",
+      "id": 858,
+      "seoNameFrom": "uruguay",
+      "seoNameTo": "uruguay",
+      "currencies": [
+        {
+          "code": "UYU",
+          "name": "Peso Uruguayo",
+          "id": 858,
+          "cardCountries": [
+            858
+          ]
+        }
+      ]
+    },
+    {
+      "name": "USA",
+      "code": "us",
+      "id": 840,
+      "seoNameFrom": "the-united-states-of-america",
+      "seoNameTo": "the-united-states-of-america",
+      "currencies": [
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": [
+            840
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Uzbekistan",
+      "code": "uz",
+      "id": 860,
+      "seoNameFrom": "uzbekistan",
+      "seoNameTo": "uzbekistan",
+      "currencies": [
+        {
+          "code": "UZS",
+          "name": "Uzbekistan Sum",
+          "id": 860,
+          "cardCountries": [
+            860
+          ]
+        },
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "id": 840,
+          "cardCountries": []
+        }
+      ]
+    },
+    {
+      "name": "Vietnam",
+      "code": "vn",
+      "id": 704,
+      "seoNameFrom": "vietnam",
+      "seoNameTo": "vietnam",
+      "currencies": [
+        {
+          "code": "VND",
+          "name": "Dong",
+          "id": 704,
+          "cardCountries": [
+            704
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Zambia",
+      "code": "zm",
+      "id": 894,
+      "seoNameFrom": "zambia",
+      "seoNameTo": "zambia",
+      "currencies": [
+        {
+          "code": "ZMW",
+          "name": "Zambian Kwacha",
+          "id": 967,
+          "cardCountries": [
+            894
+          ]
+        }
+      ]
+    }
+  ]
+}
