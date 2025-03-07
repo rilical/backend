@@ -1,16 +1,152 @@
-# Remitly Provider Integration
+# Remitly Provider
 
-This module provides integration with the Remitly money transfer service. It implements the RemittanceProvider interface and provides methods to fetch exchange rates and fees for international money transfers.
+An aggregator-ready implementation of Remitly's money transfer service API with no mock data fallbacks.
 
 ## Features
 
-- Fetch real-time exchange rate quotes from Remitly
-- Support for multiple corridors (source/destination country pairs)
-- Comprehensive multi-source country support (USD, EUR, GBP, CAD, AUD, and more)
-- Support for 75+ destination countries worldwide
-- Proper error handling and retry logic
-- Fallback mechanisms if API calls fail
-- Standardized response format matching other provider integrations
+- **Live API Integration**: Fetches real-time quotes and exchange rates from Remitly's public API
+- **Standardized Response Format**: Follows the aggregator's standard format for consistent integration
+- **No Mock Data**: Returns proper error responses instead of fallback data for unsupported corridors or API errors
+- **Error Handling**: Comprehensive error handling with retry logic for network issues and rate limiting
+- **Wide Coverage**: Supports numerous currency pairs and countries offered by Remitly
+
+## Supported Corridors
+
+Remitly offers a wide range of corridors, primarily for sending money from:
+- United States (USD)
+- Canada (CAD)
+- United Kingdom (GBP)
+- Europe (EUR)
+- Australia (AUD)
+
+To destinations including:
+- Philippines (PHP)
+- India (INR)
+- Mexico (MXN)
+- Colombia (COP)
+- And many more (see `get_supported_countries()` method)
+
+## Usage
+
+### Basic Usage
+
+```python
+from decimal import Decimal
+from apps.providers.remitly.integration import RemitlyProvider
+
+# Create provider instance
+with RemitlyProvider() as provider:
+    # Get a quote
+    quote = provider.get_quote(
+        amount=Decimal("500"),
+        source_currency="USD",
+        dest_currency="PHP",
+        source_country="US",
+        dest_country="PH"
+    )
+    
+    print(quote)
+```
+
+### Response Format
+
+Successful response:
+
+```python
+{
+    "provider_id": "remitly",
+    "success": True,
+    "error_message": None,
+    "send_amount": 500.0,
+    "source_currency": "USD",
+    "destination_amount": 28110.0,
+    "destination_currency": "PHP",
+    "exchange_rate": 56.22,
+    "fee": 0.0,
+    "payment_method": "bank",
+    "delivery_method": "bank",
+    "delivery_time_minutes": 1440,
+    "timestamp": 1709764388.690806
+}
+```
+
+Error response:
+
+```python
+{
+    "provider_id": "remitly",
+    "success": False,
+    "error_message": "API error: Unable to provide quote for this corridor",
+    "send_amount": 500.0,
+    "source_currency": "JPY",
+    "destination_amount": 0.0,
+    "destination_currency": "ZAR",
+    "exchange_rate": None,
+    "fee": 0.0,
+    "payment_method": "bank",
+    "delivery_method": "bank",
+    "delivery_time_minutes": 1440,
+    "timestamp": 1709764388.690806
+}
+```
+
+## Implementation Details
+
+### API Endpoints
+
+- Base URL: `https://api.remitly.io`
+- Quote Endpoint: `/v3/calculator/estimate`
+
+### Authentication
+
+The provider uses a device environment ID and browser fingerprint to authenticate with the Remitly API. It includes appropriate headers and implements retry logic for authentication failures.
+
+### Country and Currency Handling
+
+The provider includes conversion methods between:
+- 2-letter and 3-letter country codes
+- Country codes and their default currencies
+- Currency codes and representative countries
+
+### Error Handling and Retries
+
+The implementation includes sophisticated error handling:
+- Automatic retries for network issues
+- Session refresh on authentication failures
+- Rate limiting detection and backoff
+- Proper error categorization via exception types
+
+## Testing
+
+To test the provider, run:
+
+```bash
+python -m apps.providers.remitly.test
+```
+
+This runs a comprehensive test suite that:
+1. Tests quotes for supported corridors (e.g., USD → PHP, USD → INR)
+2. Tests error handling for unsupported corridors
+3. Verifies the exchange rate method
+4. Tests utility methods for country/currency handling
+
+## Error Cases Handled
+
+1. Unsupported corridors
+2. Authentication failures
+3. Network issues with automatic retries
+4. Rate limiting with backoff
+5. API errors
+6. Invalid responses
+
+## Integration with the Aggregator
+
+This provider follows the aggregator's standardized format for easy integration into the comparison engine. It implements the abstract methods required by the `RemittanceProvider` base class:
+
+- `get_quote()`: Get a standardized quote for a specific corridor
+- `get_exchange_rate()`: Legacy method for backward compatibility
+- `get_supported_countries()`: List countries in ISO alpha-2 format
+- `get_supported_currencies()`: List supported currencies in ISO format
 
 ## Requirements
 

@@ -45,7 +45,6 @@ class PaysendProvider(RemittanceProvider):
     Features:
       - Direct API calls
       - Optional browser automation fallback for captcha
-      - Mock data fallback if all else fails
     """
     
     BASE_URL = "https://paysend.com"
@@ -547,62 +546,14 @@ class PaysendProvider(RemittanceProvider):
                 except Exception as browser_error:
                     logger.error(f"Error using browser automation: {browser_error}")
             
-            if "captcha" in str(e).lower():
-                logger.warning("Paysend API requires captcha, using mock data for testing")
-                
-                mock_data = self._get_mock_quote_data(
-                    from_currency=from_currency,
-                    to_currency=to_currency,
-                    amount=amount
-                )
-                
-                local_result.update({
-                    "success": True,
-                    "receive_amount": mock_data["receive_amount"],
-                    "exchange_rate": mock_data["exchange_rate"],
-                    "fee": mock_data["fee"],
-                    "raw_json": mock_data
-                })
-                return local_result
-            else:
-                local_result["error_message"] = str(e)
-                return local_result
+            local_result["error_message"] = str(e)
+            return local_result
                 
         except Exception as ex:
             logger.error(f"Paysend get_quote error: {ex}")
             local_result["error_message"] = str(ex)
             return local_result
 
-    def _get_mock_quote_data(self, from_currency: str, to_currency: str, amount: Decimal) -> Dict[str, Any]:
-        """Return a realistic mock quote if captcha or other blocking occurs."""
-        mock_rates = {
-            "USD-INR": Decimal("82.75"),
-            "USD-PHP": Decimal("55.50"),
-            "USD-MXN": Decimal("17.25"),
-            "USD-NGN": Decimal("753.00"),
-            "EUR-INR": Decimal("88.50"),
-            "GBP-INR": Decimal("103.25"),
-        }
-        corridor = f"{from_currency.upper()}-{to_currency.upper()}"
-        exchange_rate = mock_rates.get(corridor, Decimal("1.0"))
-        
-        if amount < 500:
-            fee = Decimal("2.99")
-        elif amount < 1000:
-            fee = Decimal("3.99")
-        else:
-            fee = Decimal("4.99")
-        
-        receive_amount = (amount - fee) * exchange_rate
-        return {
-            "success": True,
-            "exchange_rate": float(exchange_rate),
-            "fee": float(fee),
-            "receive_amount": float(receive_amount),
-            "currency_from": from_currency,
-            "currency_to": to_currency
-        }
-    
     def get_exchange_rate(
         self,
         send_amount: Decimal,
@@ -754,15 +705,6 @@ class PaysendProvider(RemittanceProvider):
             if quote.get("success"):
                 result["success"] = True
                 result["fee"] = quote.get("fee")
-            else:
-                # If quote failed, use mock data as fallback
-                mock_data = self._get_mock_quote_data(
-                    from_currency=send_currency,
-                    to_currency=payout_currency,
-                    amount=send_amount
-                )
-                result["success"] = True
-                result["fee"] = mock_data.get("fee")
                 
         except Exception as e:
             error_msg = f"Failed to retrieve fee information: {e}"

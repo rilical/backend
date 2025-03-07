@@ -97,25 +97,43 @@ class ExchangeRateResult:
         }
 
 class RemitlyProvider(RemittanceProvider):
-    """Integration with Remitly money transfer service."""
+    """
+    Aggregator-ready integration with Remitly money transfer service.
+    Produces standardized dictionary responses, with no fallback data.
+    
+    If an API call fails, it returns a standardized response with success=False
+    and an appropriate error message rather than using mock data.
+    
+    Example usage:
+        provider = RemitlyProvider()
+        result = provider.get_quote(
+            amount=Decimal("1000.00"),
+            source_currency="USD",
+            dest_currency="PHP",
+            source_country="US",
+            dest_country="PH"
+        )
+    """
     
     BASE_URL = "https://api.remitly.io"
     CALCULATOR_ENDPOINT = "/v3/calculator/estimate"
     
-    # Sample default header values from real Safari on macOS
+    # Default payment/delivery methods and estimated delivery time (minutes)
+    DEFAULT_PAYMENT_METHOD = "bank"
+    DEFAULT_DELIVERY_METHOD = "bank"
+    DEFAULT_DELIVERY_TIME = 1440  # 24 hours in minutes
+    
     DEFAULT_USER_AGENT = (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
         "AppleWebKit/605.1.15 (KHTML, like Gecko) "
         "Version/18.3 Safari/605.1.15"
     )
-    
-    # Example device environment ID; in practice you might discover or refresh this dynamically
+
     DEFAULT_DEVICE_ENV_ID = (
         "3RoCMEE0ZDG79rpNP7sK7MoEVrYFpVS4TgavrNTpz405kCFlIwl0s49e1xh4okoKhH2bA"
         "HxYPg0GZINPtd1BG4xDZGA0b0wOoffs2ZSr9Lm1"
     )
-    
-    # Optional browser fingerprint data (from Branch)
+
     DEFAULT_BROWSER_FINGERPRINT = {
         "browser_fingerprint_id": "1424498403190294011",
         "session_id": "1424498403198931748",
@@ -126,69 +144,82 @@ class RemitlyProvider(RemittanceProvider):
         "has_app": False
     }
     
-    # Mapping of Remitly payment method types to standardized names
-    PAYMENT_METHODS = {
-        "BANK_ACCOUNT": "Bank Account",
-        "DEBIT_CARD": "Debit Card",
-        "CREDIT_CARD": "Credit Card"
-    }
-    
-    # Mapping of Remitly delivery methods to standardized names
-    DELIVERY_METHODS = {
-        "BANK_DEPOSIT": "Bank Deposit",
-        "CASH_PICKUP": "Cash Pickup",
-        "HOME_DELIVERY": "Home Delivery",
-        "MOBILE_WALLET": "Mobile Wallet"
-    }
-    
     def __init__(
         self,
+        name="remitly",
         device_env_id: Optional[str] = None,
         user_agent: Optional[str] = None,
-        timeout: int = 30
+        timeout: int = 30,
+        **kwargs
     ):
         """
         Initialize the Remitly provider.
         
         Args:
-            device_env_id: Remitly-DeviceEnvironmentID to send in headers
-            user_agent: Custom user agent string (or None to use a default Safari-like UA)
+            name: Provider identifier
+            device_env_id: Remitly-DeviceEnvironmentID header
+            user_agent: Custom user agent string
             timeout: Request timeout in seconds
+            **kwargs: Additional parameters
         """
-        super().__init__(name="Remitly", base_url=self.BASE_URL)
-        
+        super().__init__(name=name, base_url=self.BASE_URL)
         self.timeout = timeout
         self.device_env_id = device_env_id or self.DEFAULT_DEVICE_ENV_ID
         self.user_agent = user_agent or self.DEFAULT_USER_AGENT
         
-        # Initialize session and cookies
         self.session = requests.Session()
         self._setup_session()
+        self.logger = logging.getLogger(f'providers.{name}')
+
+    def standardize_response(
+        self,
+        raw_result: Dict[str, Any],
+        provider_specific_data: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Standardize the response shape for aggregator consumption.
         
-        # Set up logger
-        self.logger = logging.getLogger('remitly_provider')
-    
+        Follows the structure defined in RemittanceProvider base class
+        to ensure consistent response format across all providers.
+        """
+        # Ensure required keys exist with proper formatting
+        output = {
+            "provider_id": self.name,
+            "success": raw_result.get("success", False),
+            "error_message": raw_result.get("error_message"),
+            "send_amount": raw_result.get("send_amount", 0.0),
+            "source_currency": raw_result.get("source_currency", "").upper(),
+            "destination_amount": raw_result.get("destination_amount", 0.0),
+            "destination_currency": raw_result.get("destination_currency", "").upper(),
+            "exchange_rate": raw_result.get("exchange_rate"),
+            "fee": raw_result.get("fee", 0.0),
+            "payment_method": raw_result.get("payment_method", self.DEFAULT_PAYMENT_METHOD),
+            "delivery_method": raw_result.get("delivery_method", self.DEFAULT_DELIVERY_METHOD),
+            "delivery_time_minutes": raw_result.get("delivery_time_minutes", self.DEFAULT_DELIVERY_TIME),
+            "timestamp": raw_result.get("timestamp", time.time())
+        }
+
+        # Include raw API response if requested and available
+        if provider_specific_data and "details" in raw_result and "raw_response" in raw_result["details"]:
+            output["raw_response"] = raw_result["details"]["raw_response"]
+
+        return output
+
     def _setup_session(self) -> None:
-        """Configure default headers, cookies, and retry logic for the requests session."""
-        # Common headers used by Remitly from a real browser:
+        """Set up the HTTP session with appropriate headers and retry strategy."""
         self.session.headers.update({
             "User-Agent": self.user_agent,
             "Accept": "application/json, text/javascript, */*; q=0.01",
             "Accept-Language": "en-US,en;q=0.9",
-            "Origin": "https://www.remitly.com",  # The site that might embed the JS
+            "Origin": "https://www.remitly.com",
             "Referer": "https://www.remitly.com/",
             "Cache-Control": "no-cache",
             "Pragma": "no-cache",
         })
-        
-        # Example of including "Branch" or "browser fingerprint" data in a custom header
         fingerprint_json = json.dumps(self.DEFAULT_BROWSER_FINGERPRINT)
         self.session.headers["X-Remitly-Browser-Fingerprint"] = fingerprint_json
-        
-        # The critical Remitly device environment ID:
         self.session.headers["Remitly-DeviceEnvironmentID"] = self.device_env_id
         
-        # Configure retry logic with backoff
         retry_strategy = Retry(
             total=3,
             backoff_factor=1.0,
@@ -198,7 +229,7 @@ class RemitlyProvider(RemittanceProvider):
         adapter = HTTPAdapter(max_retries=retry_strategy)
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)
-    
+
     def _make_api_request(
         self,
         method: str,
@@ -209,741 +240,404 @@ class RemitlyProvider(RemittanceProvider):
         max_retries: int = 2
     ) -> Dict:
         """
-        Make a request to the Remitly API with proper error handling.
+        Make a request to the Remitly API with retry logic.
         
         Args:
-            method: HTTP method (GET or POST)
+            method: HTTP method (GET, POST)
             url: API endpoint URL
-            params: URL parameters for GET requests
-            data: Request payload for POST requests
-            retry_auth: Whether to retry with a new session if authentication fails
-            max_retries: Maximum number of retries for authentication issues
+            params: Query parameters
+            data: Request body for POST requests
+            retry_auth: Whether to retry on authentication failures
+            max_retries: Maximum number of retries
             
         Returns:
-            API response as a dictionary
+            API response as dictionary
+            
+        Raises:
+            RemitlyError: General API errors
+            RemitlyAuthenticationError: Authentication failures
+            RemitlyConnectionError: Network issues
+            RemitlyRateLimitError: Rate limiting
         """
         retry_count = 0
-        
+
         while retry_count <= max_retries:
             try:
-                # Make the request
                 if method.upper() == "GET":
-                    response = self.session.get(
-                        url=url,
-                        params=params,
-                        timeout=self.timeout,
-                        allow_redirects=False  # Don't automatically follow redirects
-                    )
-                else:  # POST
-                    response = self.session.post(
-                        url=url,
-                        json=data,
-                        params=params,
-                        timeout=self.timeout,
-                        allow_redirects=False  # Don't automatically follow redirects
-                    )
+                    response = self.session.get(url, params=params, timeout=self.timeout, allow_redirects=False)
+                else:
+                    response = self.session.post(url, json=data, params=params, timeout=self.timeout, allow_redirects=False)
                 
-                # Log response status
                 logger.debug(f"Remitly API response status: {response.status_code}")
                 
-                # Handle redirects manually to capture authentication issues
+                # Handle 3xx redirects if they point to sign-in pages
                 if response.status_code in (301, 302, 303, 307, 308):
                     redirect_url = response.headers.get('Location')
                     logger.debug(f"Redirected to: {redirect_url}")
-                    
-                    # Check if redirected to sign-in page
                     if redirect_url and '/sign-in' in redirect_url:
                         if retry_auth and retry_count < max_retries:
-                            logger.warning(f"Redirected to sign-in page, refreshing session (attempt {retry_count + 1}/{max_retries})")
+                            logger.warning(f"Redirected to sign-in, refreshing session (attempt {retry_count + 1})")
                             self._setup_session()
-                            time.sleep(1)  # Add delay between retries
+                            time.sleep(1)
                             retry_count += 1
                             continue
                         else:
-                            raise RemitlyAuthenticationError("Authentication failed: redirected to sign-in page")
+                            raise RemitlyAuthenticationError("Redirected to sign-in page")
                 
-                # Check for common error status codes
                 if response.status_code in (401, 403):
                     if retry_auth and retry_count < max_retries:
-                        logger.warning(f"Authentication failed, refreshing session and retrying (attempt {retry_count + 1}/{max_retries})")
+                        logger.warning(f"Authentication failed, refreshing session (attempt {retry_count + 1})")
                         self._setup_session()
-                        time.sleep(1)  # Add delay between retries
+                        time.sleep(1)
                         retry_count += 1
                         continue
                     raise RemitlyAuthenticationError("Authentication failed")
                 
                 if response.status_code == 429:
-                    # With rate limits, we should wait longer before retrying
                     if retry_count < max_retries:
-                        wait_time = 5 * (retry_count + 1)  # Progressive backoff
-                        logger.warning(f"Rate limit exceeded, waiting {wait_time} seconds before retry")
+                        wait_time = 5 * (retry_count + 1)
+                        logger.warning(f"Rate limit exceeded, waiting {wait_time}s (attempt {retry_count + 1})")
                         time.sleep(wait_time)
                         retry_count += 1
                         continue
                     raise RemitlyRateLimitError("Rate limit exceeded")
-                    
+                
                 if response.status_code >= 400:
                     try:
                         error_data = response.json()
-                        error_message = error_data.get("error", {}).get("message", "Unknown API error")
-                        raise RemitlyError(f"API error: {error_message}")
+                        error_msg = error_data.get("error", {}).get("message", "Unknown API error")
+                        raise RemitlyError(f"API error: {error_msg}")
                     except (ValueError, KeyError):
                         raise RemitlyError(f"API error: {response.status_code}")
                 
-                # Parse and return response
                 try:
                     return response.json()
                 except ValueError:
-                    # If the response is empty but status is 200, return empty dict
                     if response.status_code == 200 and not response.text.strip():
                         return {}
                     raise RemitlyError("Invalid JSON response from API")
                     
             except requests.RequestException as e:
                 logger.error(f"Request failed: {e}")
-                
-                # Retry network errors
                 if retry_count < max_retries:
-                    logger.warning(f"Connection error, retrying (attempt {retry_count + 1}/{max_retries})")
+                    logger.warning(f"Network error, retrying (attempt {retry_count + 1})")
                     time.sleep(2)
                     retry_count += 1
                     continue
-                    
                 raise RemitlyConnectionError(f"Connection error: {e}")
-        
-        # This should not be reached, but just in case
+
         raise RemitlyError("Maximum retries exceeded")
-    
-    def get_exchange_rate(
+
+    def get_quote(
         self,
-        send_amount: Decimal,
-        send_currency: str = "USD",
-        receive_country: str = None,
-        receive_currency: str = None,
-        delivery_method: str = None,  # Optional 
-        payment_method: str = None,   # Optional
-        purpose: str = "OTHER",
-        customer_segment: str = "UNRECOGNIZED",
-        strict_promo: bool = False
-    ) -> Dict:
+        amount: Decimal,
+        source_currency: str,
+        dest_currency: str,
+        source_country: str,
+        dest_country: str,
+        payment_method: Optional[str] = None,
+        delivery_method: Optional[str] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
         """
-        Get the exchange rate for a given amount and corridor.
+        Get a standardized quote for money transfer between currencies.
         
-        Args:
-            send_amount: The amount to send.
-            send_currency: The currency to send (default: USD).
-            receive_country: The destination country code.
-            receive_currency: The destination currency code.
-            delivery_method: Optional delivery method preference.
-            payment_method: Optional payment method preference.
-            purpose: One of the recognized "purpose" strings (ex: "OTHER", "BILLS", etc.)
-            customer_segment: e.g. "UNRECOGNIZED", "REFERRAL", "EXISTING", etc.
-            strict_promo: Whether or not to force ignoring promotions
-            
-        Returns:
-            Dict containing exchange rate details.
+        This implements the abstract method from RemittanceProvider.
         """
-        if receive_country is None:
-            raise RemitlyValidationError("Receive country is required")
+        # Convert 2-letter country codes to 3-letter format needed by Remitly
+        source_country_3 = self._convert_country_code(source_country)
+        dest_country_3 = self._convert_country_code(dest_country)
+        
+        # Verify destination currency matches the country
+        expected_dest_currency = dest_currency
+        if not dest_currency:
+            expected_dest_currency = self._get_currency_for_country(dest_country_3)
             
-        # Map the send currency to an appropriate source country
-        source_country = self._get_country_for_currency(send_currency)
+        if dest_currency and dest_currency != expected_dest_currency:
+            logger.warning(f"Provided currency {dest_currency} may not match default currency for {dest_country_3} ({expected_dest_currency})")
         
-        # Convert country codes if needed (e.g., 2-letter to 3-letter)
-        if len(receive_country) == 2:
-            receive_country = self._convert_country_code(receive_country)
+        send_amount_float = float(amount)
+
+        # Build corridor string for Remitly (e.g., "USA:USD-PHL:PHP")
+        conduit_str = f"{source_country_3}:{source_currency}-{dest_country_3}:{dest_currency or expected_dest_currency}"
         
-        # If receive_currency is not provided, try to determine from country
-        if receive_currency is None:
-            receive_currency = self._get_currency_for_country(receive_country)
-        
-        # Convert decimal to float for API request
-        send_amount_float = float(send_amount)
-        
-        # Construct the `conduit` param e.g. "USA:USD-PHL:PHP"
-        conduit_str = f"{source_country}:{send_currency}-{receive_country}:{receive_currency}"
-        
-        # Build the request URL and parameters
         url = f"{self.base_url}{self.CALCULATOR_ENDPOINT}"
         params = {
             "conduit": conduit_str,
-            "anchor": "SEND",  # Fixed to "SEND" since we're providing the send amount
+            "anchor": "SEND",
             "amount": str(send_amount_float),
-            "purpose": purpose,
-            "customer_segment": customer_segment,
-            "strict_promo": str(strict_promo).lower()
+            "purpose": kwargs.get("purpose", "OTHER"),
+            "customer_segment": kwargs.get("customer_segment", "UNRECOGNIZED"),
+            "strict_promo": str(kwargs.get("strict_promo", False)).lower()
         }
-        
-        # Log the request for debugging
-        logger.debug(f"Requesting Remitly rate with URL: {url}")
-        logger.debug(f"Params: {params}")
-        
+
         try:
-            # Make the API request
-            response = self._make_api_request(
-                method="GET",
-                url=url,
-                params=params
-            )
+            response_data = self._make_api_request("GET", url, params=params)
+            if not response_data:
+                return self.standardize_response({
+                    "success": False,
+                    "error_message": "Empty response from Remitly API",
+                    "send_amount": send_amount_float,
+                    "source_currency": source_currency,
+                    "destination_currency": dest_currency or expected_dest_currency,
+                    "payment_method": payment_method or self.DEFAULT_PAYMENT_METHOD,
+                    "delivery_method": delivery_method or self.DEFAULT_DELIVERY_METHOD
+                })
             
-            # Process the response to extract exchange rate info
-            if not response:
-                raise RemitlyError("Failed to get exchange rate data")
-            
-            # The Remitly estimate JSON is typically in response["estimate"]
-            estimate = response.get("estimate", {})
+            estimate = response_data.get("estimate")
             if not estimate:
-                raise RemitlyError("No estimate data available")
-            
+                return self.standardize_response({
+                    "success": False,
+                    "error_message": "No 'estimate' data in Remitly response",
+                    "send_amount": send_amount_float,
+                    "source_currency": source_currency,
+                    "destination_currency": dest_currency or expected_dest_currency,
+                    "payment_method": payment_method or self.DEFAULT_PAYMENT_METHOD,
+                    "delivery_method": delivery_method or self.DEFAULT_DELIVERY_METHOD
+                })
+
             # Extract exchange rate
             exchange_rate_data = estimate.get("exchange_rate", {})
             exchange_rate = float(exchange_rate_data.get("base_rate", 0.0))
-            
+
             # Extract fee
             fee_data = estimate.get("fee", {})
             fee = float(fee_data.get("total_fee_amount", 0.0))
-            
+
             # Extract receive amount
             receive_amount_str = estimate.get("receive_amount", "0.0")
-            receive_amount = float(receive_amount_str) if receive_amount_str else 0.0
-            
-            # Extract delivery time if available
-            delivery_time_minutes = None
+            try:
+                receive_amount = float(receive_amount_str)
+            except ValueError:
+                receive_amount = 0.0
+
+            # Extract delivery time
+            delivery_time_minutes = self.DEFAULT_DELIVERY_TIME
             delivery_time_text = estimate.get("delivery_speed_description", "")
-            
-            # Parse delivery time
             if "minutes" in delivery_time_text.lower():
-                try:
-                    minutes_match = re.search(r'(\d+)\s*minutes', delivery_time_text.lower())
-                    if minutes_match:
-                        delivery_time_minutes = int(minutes_match.group(1))
-                except (ValueError, AttributeError):
-                    pass
+                match = re.search(r'(\d+)\s*minutes', delivery_time_text.lower())
+                if match:
+                    delivery_time_minutes = int(match.group(1))
             elif "hours" in delivery_time_text.lower():
-                try:
-                    hours_match = re.search(r'(\d+)\s*hours', delivery_time_text.lower())
-                    if hours_match:
-                        delivery_time_minutes = int(hours_match.group(1)) * 60
-                except (ValueError, AttributeError):
-                    pass
+                match = re.search(r'(\d+)\s*hours', delivery_time_text.lower())
+                if match:
+                    delivery_time_minutes = int(match.group(1)) * 60
+
+            # Extract delivery method
+            normalized_delivery_method = self._normalize_delivery_method(
+                estimate.get("delivery_method", "")
+            ) or delivery_method or self.DEFAULT_DELIVERY_METHOD
             
-            # Build standardized result object
-            result = ExchangeRateResult(
-                provider_id="Remitly",
-                source_currency=send_currency,
-                source_amount=send_amount_float,
-                destination_currency=receive_currency,
-                destination_amount=receive_amount,
-                exchange_rate=exchange_rate,
-                fee=fee,
-                delivery_method=self._normalize_delivery_method(estimate.get("delivery_method", "")),
-                delivery_time_minutes=delivery_time_minutes,
-                corridor=f"{source_country}-{receive_country}",
-                payment_method=estimate.get("payment_method", ""),
-                details={"raw_response": response}  # Store raw response for reference
-            )
-            
-            return result.to_dict()
-            
+            # Extract payment method
+            pm = estimate.get("payment_method", "") or payment_method or self.DEFAULT_PAYMENT_METHOD
+
+            return self.standardize_response({
+                "success": True,
+                "error_message": None,
+                "send_amount": send_amount_float,
+                "source_currency": source_currency,
+                "destination_currency": dest_currency or expected_dest_currency,
+                "destination_amount": receive_amount,
+                "exchange_rate": exchange_rate,
+                "fee": fee,
+                "delivery_method": normalized_delivery_method,
+                "delivery_time_minutes": delivery_time_minutes,
+                "payment_method": pm,
+                "details": {"raw_response": response_data}
+            })
+
+        except (RemitlyError, RemitlyConnectionError, RemitlyAuthenticationError, RemitlyRateLimitError) as e:
+            logger.error(f"Remitly API error: {e}")
+            return self.standardize_response({
+                "success": False,
+                "error_message": str(e),
+                "send_amount": send_amount_float,
+                "source_currency": source_currency,
+                "destination_currency": dest_currency or expected_dest_currency,
+                "payment_method": payment_method or self.DEFAULT_PAYMENT_METHOD,
+                "delivery_method": delivery_method or self.DEFAULT_DELIVERY_METHOD
+            })
         except Exception as e:
-            logger.error(f"Error getting exchange rate from Remitly: {str(e)}")
-            
-            # Return fallback/mockup data if API call failed
-            return self._get_fallback_exchange_rate(
-                send_amount_float, 
-                send_currency, 
-                receive_country, 
-                receive_currency
-            )
-    
-    def _get_fallback_exchange_rate(
+            logger.error(f"Unexpected error from Remitly: {e}")
+            return self.standardize_response({
+                "success": False,
+                "error_message": f"Unexpected error: {str(e)}",
+                "send_amount": send_amount_float,
+                "source_currency": source_currency,
+                "destination_currency": dest_currency or expected_dest_currency,
+                "payment_method": payment_method or self.DEFAULT_PAYMENT_METHOD,
+                "delivery_method": delivery_method or self.DEFAULT_DELIVERY_METHOD
+            })
+
+    def get_exchange_rate(
         self,
-        send_amount: float,
+        send_amount: Decimal,
         send_currency: str,
-        receive_country: str,
-        receive_currency: str
-    ) -> Dict:
+        target_currency: str,
+        **kwargs
+    ) -> Dict[str, Any]:
         """
-        Return fallback exchange rate data if the API call fails.
+        Legacy method for getting exchange rates.
         
-        Args:
-            send_amount: The amount to send
-            send_currency: The currency to send
-            receive_country: The destination country code
-            receive_currency: The destination currency code
-            
-        Returns:
-            Dict containing mocked exchange rate details
+        This method is maintained for backward compatibility.
+        For new code, use get_quote instead.
         """
-        # Source country from send currency
-        source_country = self._get_country_for_currency(send_currency)
-        
-        # Comprehensive mock rates for common currencies (against USD)
-        usd_rates = {
-            # North America
-            "USD": 1.0, "CAD": 1.36, "MXN": 19.85,
+        # Determine sending and receiving countries from currencies
+        source_country = kwargs.get("source_country") or self._get_country_for_currency(send_currency)
+        if len(source_country) == 2:
+            source_country = self._convert_country_code(source_country)
             
-            # Central/South America
-            "PHP": 56.20, "INR": 83.10, "COP": 3900.0, "GTQ": 7.75,
-            "BRL": 5.45, "ARS": 875.0, "CLP": 950.0, "PEN": 3.75,
-            "DOP": 58.0, "HNL": 24.8, "NIO": 36.5, "BOB": 6.91,
-            
-            # Europe
-            "EUR": 0.93, "GBP": 0.79, "CHF": 0.91, "SEK": 10.55,
-            "NOK": 10.65, "DKK": 6.95, "PLN": 4.0, "CZK": 23.3,
-            "HUF": 356.0, "RON": 4.65, "BGN": 1.82, "RSD": 110.0,
-            "UAH": 39.5, "RUB": 92.0,
-            
-            # Asia/Pacific
-            "CNY": 7.25, "JPY": 151.0, "KRW": 1360.0, "IDR": 16000.0,
-            "MYR": 4.6, "SGD": 1.35, "THB": 35.8, "VND": 25000.0,
-            "PKR": 278.0, "BDT": 110.0, "NPR": 133.0, "LKR": 315.0, 
-            "ILS": 3.7, "SAR": 3.75, "AED": 3.67, "TRY": 31.8,
-            
-            # Africa
-            "DZD": 134.0, "EGP": 47.0, "MAD": 10.0, "NGN": 1550.0,
-            "KES": 129.0, "GHS": 15.0, "ZAR": 18.6, "TND": 3.15,
-            "ETB": 57.0, "UGX": 3800.0, "TZS": 2600.0,
-            
-            # Oceania
-            "AUD": 1.54, "NZD": 1.67, "FJD": 2.25, "PGK": 3.7
-        }
+        dest_country = kwargs.get("receive_country") or self._get_country_for_currency(target_currency)
+        if len(dest_country) == 2:
+            dest_country = self._convert_country_code(dest_country)
         
-        # Calculate exchange rate based on source and destination currencies
-        # First convert source currency to USD equivalent
-        if send_currency == "USD":
-            usd_amount = send_amount
-        else:
-            # If source is not USD, convert to USD first (using inverse rate)
-            source_usd_rate = usd_rates.get(send_currency, 1.0)
-            usd_amount = send_amount / source_usd_rate if source_usd_rate != 0 else send_amount
-        
-        # Then convert from USD to destination currency
-        dest_usd_rate = usd_rates.get(receive_currency, 10.0)
-        exchange_rate = dest_usd_rate
-        
-        # If source is not USD, we need to calculate the direct exchange rate
-        if send_currency != "USD":
-            source_usd_rate = usd_rates.get(send_currency, 1.0)
-            exchange_rate = dest_usd_rate / source_usd_rate if source_usd_rate != 0 else dest_usd_rate
-        
-        # Calculate receive amount based on the exchange rate
-        receive_amount = send_amount * exchange_rate
-        
-        # Define standard fees based on amount and currency
-        fee = 0.0
-        if send_currency == "USD":
-            if send_amount >= 1000:
-                fee = 3.99
-            elif send_amount >= 500:
-                fee = 1.99
-            elif send_amount >= 100:
-                fee = 0.99
-        elif send_currency == "EUR":
-            if send_amount >= 1000:
-                fee = 3.49
-            elif send_amount >= 500:
-                fee = 1.99
-            elif send_amount >= 100:
-                fee = 0.99
-        elif send_currency == "GBP":
-            if send_amount >= 800:
-                fee = 2.99
-            elif send_amount >= 400:
-                fee = 1.49
-            elif send_amount >= 80:
-                fee = 0.79
-        else:
-            # Default fee structure for other currencies
-            if send_amount >= 1000:
-                fee = 3.99
-            elif send_amount >= 500:
-                fee = 1.99
-            elif send_amount >= 100:
-                fee = 0.99
-        
-        # Build fallback result with source country
-        return {
-            "provider_id": "Remitly",
-            "source_currency": send_currency,
-            "source_amount": send_amount,
-            "destination_currency": receive_currency,
-            "destination_amount": receive_amount,
-            "exchange_rate": exchange_rate,
-            "fee": fee,
-            "delivery_method": "bank deposit",
-            "delivery_time_minutes": 60,  # Default: 1 hour
-            "corridor": f"{source_country}-{receive_country}",
-            "payment_method": "Bank Account",
-            "details": {"is_fallback": True}
-        }
-    
+        # Call standardized get_quote method
+        return self.get_quote(
+            amount=send_amount,
+            source_currency=send_currency,
+            dest_currency=target_currency,
+            source_country=source_country,
+            dest_country=dest_country,
+            payment_method=kwargs.get("payment_method"),
+            delivery_method=kwargs.get("delivery_method"),
+            **kwargs
+        )
+
     def _get_currency_for_country(self, country_code: str) -> str:
         """
-        Get the currency code for a country.
+        Map a country code to its default currency.
         
         Args:
-            country_code: Two-letter or three-letter country code
+            country_code: 3-letter country code (e.g., "USA" or "PHL")
             
         Returns:
-            Currency code for the country
+            ISO currency code (e.g., "USD" or "PHP")
         """
-        # Comprehensive country to currency mappings
         country_to_currency = {
-            # North America
             "USA": "USD", "US": "USD",
             "CAN": "CAD", "CA": "CAD",
             "MEX": "MXN", "MX": "MXN",
-            
-            # Central America
-            "GTM": "GTQ", "GT": "GTQ",
-            "SLV": "USD", "SV": "USD",
-            "HND": "HNL", "HN": "HNL",
-            "NIC": "NIO", "NI": "NIO",
-            "CRI": "CRC", "CR": "CRC",
-            "PAN": "PAB", "PA": "PAB",
-            "BLZ": "BZD", "BZ": "BZD",
-            
-            # Caribbean
-            "DOM": "DOP", "DO": "DOP",
-            "JAM": "JMD", "JM": "JMD",
-            "HTI": "HTG", "HT": "HTG",
-            "CUB": "CUP", "CU": "CUP",
-            
-            # South America
-            "COL": "COP", "CO": "COP",
-            "PER": "PEN", "PE": "PEN",
-            "ECU": "USD", "EC": "USD",
-            "BOL": "BOB", "BO": "BOB",
-            "CHL": "CLP", "CL": "CLP",
-            "BRA": "BRL", "BR": "BRL",
-            "ARG": "ARS", "AR": "ARS",
-            "VEN": "VES", "VE": "VES",
-            "PRY": "PYG", "PY": "PYG",
-            "URY": "UYU", "UY": "UYU",
-            "GUY": "GYD", "GY": "GYD",
-            
-            # Europe
-            "ESP": "EUR", "ES": "EUR",
-            "DEU": "EUR", "DE": "EUR",
-            "FRA": "EUR", "FR": "EUR",
-            "ITA": "EUR", "IT": "EUR",
-            "NLD": "EUR", "NL": "EUR",
-            "BEL": "EUR", "BE": "EUR",
-            "PRT": "EUR", "PT": "EUR",
-            "GRC": "EUR", "GR": "EUR",
-            "AUT": "EUR", "AT": "EUR",
-            "IRL": "EUR", "IE": "EUR",
-            "FIN": "EUR", "FI": "EUR",
-            "GBR": "GBP", "GB": "GBP",
-            "CHE": "CHF", "CH": "CHF",
-            "SWE": "SEK", "SE": "SEK",
-            "NOR": "NOK", "NO": "NOK",
-            "DNK": "DKK", "DK": "DKK",
-            "POL": "PLN", "PL": "PLN",
-            "CZE": "CZK", "CZ": "CZK",
-            "HUN": "HUF", "HU": "HUF",
-            "ROU": "RON", "RO": "RON",
-            "BGR": "BGN", "BG": "BGN",
-            "HRV": "EUR", "HR": "EUR",
-            "SRB": "RSD", "RS": "RSD",
-            "UKR": "UAH", "UA": "UAH",
-            "RUS": "RUB", "RU": "RUB",
-            
-            # Asia
-            "IND": "INR", "IN": "INR",
-            "PHL": "PHP", "PH": "PHP",
-            "CHN": "CNY", "CN": "CNY",
-            "JPN": "JPY", "JP": "JPY",
-            "KOR": "KRW", "KR": "KRW",
-            "IDN": "IDR", "ID": "IDR",
-            "MYS": "MYR", "MY": "MYR",
-            "SGP": "SGD", "SG": "SGD",
-            "THA": "THB", "TH": "THB",
-            "VNM": "VND", "VN": "VND",
-            "PAK": "PKR", "PK": "PKR",
-            "BGD": "BDT", "BD": "BDT",
-            "NPL": "NPR", "NP": "NPR",
-            "LKA": "LKR", "LK": "LKR",
-            "MMR": "MMK", "MM": "MMK",
-            "KHM": "KHR", "KH": "KHR",
-            "LAO": "LAK", "LA": "LAK",
-            "ISR": "ILS", "IL": "ILS",
-            "SAU": "SAR", "SA": "SAR",
-            "ARE": "AED", "AE": "AED",
-            "TUR": "TRY", "TR": "TRY",
-            
-            # Africa
-            "DZA": "DZD", "DZ": "DZD",
-            "EGY": "EGP", "EG": "EGP",
-            "MAR": "MAD", "MA": "MAD",
-            "NGA": "NGN", "NG": "NGN",
-            "KEN": "KES", "KE": "KES",
-            "GHA": "GHS", "GH": "GHS",
-            "ZAF": "ZAR", "ZA": "ZAR",
-            "TUN": "TND", "TN": "TND",
-            "ETH": "ETB", "ET": "ETB",
-            "UGA": "UGX", "UG": "UGX",
-            "TZA": "TZS", "TZ": "TZS",
-            "SEN": "XOF", "SN": "XOF",
-            "CMR": "XAF", "CM": "XAF",
-            
-            # Oceania
-            "AUS": "AUD", "AU": "AUD",
-            "NZL": "NZD", "NZ": "NZD",
-            "FJI": "FJD", "FJ": "FJD",
-            "PNG": "PGK", "PG": "PGK"
+            "GTM": "GTQ", "SV": "USD", "HND": "HNL", "NIC": "NIO",
+            "CRI": "CRC", "PAN": "PAB", "COL": "COP", "PER": "PEN",
+            "ECU": "USD", "BRA": "BRL", "CHL": "CLP", "ARG": "ARS",
+            "VEN": "VES", "PRY": "PYG", "URY": "UYU", "BOL": "BOB",
+            "PHL": "PHP", "IND": "INR", "CHN": "CNY", "VNM": "VND",
+            "THA": "THB", "IDN": "IDR", "KOR": "KRW", "NPL": "NPR",
+            "BGD": "BDT", "PAK": "PKR", "JPN": "JPY", "LKA": "LKR",
+            "MYS": "MYR", "SGP": "SGD", "MMR": "MMK", "KHM": "KHR",
+            "LAO": "LAK", "ISR": "ILS", "SAU": "SAR", "ARE": "AED",
+            "TUR": "TRY", "EGY": "EGP", "MAR": "MAD", "NGA": "NGN",
+            "KEN": "KES", "GHA": "GHS", "ZAF": "ZAR", "TUN": "TND",
+            "ETH": "ETB", "UGA": "UGX", "TZA": "TZS", "DZA": "DZD",
+            "SEN": "XOF", "CMR": "XAF",
+            "ESP": "EUR", "DEU": "EUR", "FRA": "EUR", "ITA": "EUR",
+            "NLD": "EUR", "BEL": "EUR", "PRT": "EUR", "FIN": "EUR",
+            "GBR": "GBP", "CHE": "CHF", "SWE": "SEK", "NOR": "NOK",
+            "DNK": "DKK", "POL": "PLN", "ROU": "RON", "AUT": "EUR",
+            "IRL": "EUR",
+            "AUS": "AUD", "NZL": "NZD"
         }
-        
         return country_to_currency.get(country_code, "USD")
-    
-    def _convert_country_code(self, country_code: str) -> str:
+
+    def _convert_country_code(self, cc2: str) -> str:
         """
-        Convert 2-letter country code to 3-letter code.
+        Convert 2-letter country code to 3-letter country code.
         
         Args:
-            country_code: Two-letter country code
+            cc2: 2-letter country code (e.g., "US")
             
         Returns:
-            Three-letter country code
+            3-letter country code (e.g., "USA")
         """
-        if len(country_code) != 2:
-            return country_code
-            
-        # Comprehensive mapping of 2-letter to 3-letter country codes
-        country_code_map = {
-            # North America
-            "US": "USA", "CA": "CAN", "MX": "MEX",
-            
-            # Central America
-            "GT": "GTM", "SV": "SLV", "HN": "HND", "NI": "NIC", 
-            "CR": "CRI", "PA": "PAN", "BZ": "BLZ",
-            
-            # Caribbean
-            "DO": "DOM", "JM": "JAM", "HT": "HTI", "CU": "CUB",
-            
-            # South America
-            "CO": "COL", "PE": "PER", "EC": "ECU", "BO": "BOL",
-            "CL": "CHL", "BR": "BRA", "AR": "ARG", "VE": "VEN",
-            "PY": "PRY", "UY": "URY", "GY": "GUY",
-            
-            # Europe
+        cc_map = {
+            "US": "USA", "CA": "CAN", "MX": "MEX", "GT": "GTM",
+            "SV": "SLV", "HN": "HND", "NI": "NIC", "CR": "CRI",
+            "PA": "PAN", "CO": "COL", "PE": "PER", "EC": "ECU",
+            "BR": "BRA", "CL": "CHL", "AR": "ARG", "VE": "VEN",
+            "PY": "PRY", "UY": "URY", "BO": "BOL", "PH": "PHL",
+            "IN": "IND", "CN": "CHN", "VN": "VNM", "TH": "THA",
+            "ID": "IDN", "KR": "KOR", "NP": "NPL", "BD": "BGD",
+            "PK": "PAK", "JP": "JPN", "LK": "LKA", "MY": "MYS",
+            "SG": "SGP", "MM": "MMR", "KH": "KHM", "LA": "LAO",
+            "IL": "ISR", "SA": "SAU", "AE": "ARE", "TR": "TUR",
+            "DZ": "DZA", "EG": "EGY", "MA": "MAR", "GH": "GHA",
+            "KE": "KES", "NG": "NGA", "SN": "SEN", "TN": "TUN",
+            "ZA": "ZAF", "UG": "UGA", "TZ": "TZA", "ET": "ETH",
             "ES": "ESP", "DE": "DEU", "FR": "FRA", "IT": "ITA",
-            "NL": "NLD", "BE": "BEL", "PT": "PRT", "GR": "GRC",
-            "AT": "AUT", "IE": "IRL", "FI": "FIN", "GB": "GBR",
-            "CH": "CHE", "SE": "SWE", "NO": "NOR", "DK": "DNK",
-            "PL": "POL", "CZ": "CZE", "HU": "HUN", "RO": "ROU",
-            "BG": "BGR", "HR": "HRV", "RS": "SRB", "UA": "UKR",
-            "RU": "RUS",
-            
-            # Asia
-            "IN": "IND", "PH": "PHL", "CN": "CHN", "JP": "JPN",
-            "KR": "KOR", "ID": "IDN", "MY": "MYS", "SG": "SGP",
-            "TH": "THA", "VN": "VNM", "PK": "PAK", "BD": "BGD",
-            "NP": "NPL", "LK": "LKA", "MM": "MMR", "KH": "KHM",
-            "LA": "LAO", "IL": "ISR", "SA": "SAU", "AE": "ARE",
-            "TR": "TUR",
-            
-            # Africa
-            "DZ": "DZA", "EG": "EGY", "MA": "MAR", "NG": "NGA",
-            "KE": "KEN", "GH": "GHA", "ZA": "ZAF", "TN": "TUN",
-            "ET": "ETH", "UG": "UGA", "TZ": "TZA", "SN": "SEN",
-            "CM": "CMR",
-            
-            # Oceania
-            "AU": "AUS", "NZ": "NZL", "FJ": "FJI", "PG": "PNG"
+            "PT": "PRT", "PL": "POL", "RO": "ROU", "NL": "NLD",
+            "BE": "BEL", "GR": "GRC", "IE": "IRL", "UK": "GBR",
+            "GB": "GBR",  # Both UK and GB map to GBR
+            "AU": "AUS", "NZ": "NZL", "FI": "FIN", "DK": "DNK",
+            "SE": "SWE", "NO": "NOR", "AT": "AUT"
         }
-        
-        return country_code_map.get(country_code, country_code)
-    
+        return cc_map.get(cc2.upper(), cc2)
+
     def _get_country_for_currency(self, currency_code: str) -> str:
         """
-        Get a default country for a currency code.
+        Map a currency code to its most common country.
         
         Args:
-            currency_code: Currency code (e.g., USD, EUR)
+            currency_code: ISO currency code (e.g., "USD")
             
         Returns:
-            The three-letter country code for a common country using this currency
+            3-letter country code (e.g., "USA")
         """
-        # Map common currencies to representative countries
         currency_to_country = {
-            "USD": "USA",
-            "EUR": "ESP",  # Using Spain as default for Euro
-            "GBP": "GBR",
-            "CAD": "CAN",
-            "AUD": "AUS",
-            "JPY": "JPN",
-            "CHF": "CHE",
-            "INR": "IND",
-            "SGD": "SGP",
-            "SEK": "SWE",
-            "NOK": "NOR",
-            "DKK": "DNK",
-            "HKD": "HKG",
-            "CNY": "CHN",
-            "MXN": "MEX",
-            "BRL": "BRA",
-            "ZAR": "ZAF",
-            "RUB": "RUS",
-            "TRY": "TUR",
-            "PLN": "POL",
-            "PHP": "PHL",
-            "THB": "THA",
-            "MYR": "MYS",
-            "IDR": "IDN",
-            "NZD": "NZL"
+            "USD": "USA", "EUR": "ESP", "GBP": "GBR", "CAD": "CAN",
+            "AUD": "AUS", "JPY": "JPN", "CHF": "CHE", "INR": "IND",
+            "SGD": "SGP", "SEK": "SWE", "NOK": "NOR", "DKK": "DNK",
+            "HKD": "HKG", "CNY": "CHN", "MXN": "MEX", "BRL": "BRA",
+            "ZAR": "ZAF", "RUB": "RUS", "TRY": "TUR", "PLN": "POL",
+            "PHP": "PHL", "THB": "THA", "MYR": "MYS", "IDR": "IDN",
+            "NZD": "NZL", "PKR": "PAK"
         }
-        
         return currency_to_country.get(currency_code, "USA")
-    
+
     def _normalize_delivery_method(self, method_type: str) -> str:
         """
-        Normalize delivery method to consistent format.
+        Normalize delivery method strings to standardized format.
         
         Args:
-            method_type: Raw delivery method from API
+            method_type: Raw delivery method string from API
             
         Returns:
             Normalized delivery method string
         """
         method_map = {
-            "BANK_DEPOSIT": "bank deposit",
-            "CASH_PICKUP": "cash pickup",
-            "HOME_DELIVERY": "home delivery",
-            "MOBILE_WALLET": "mobile wallet"
+            "BANK_DEPOSIT": "bank",
+            "CASH_PICKUP": "cash",
+            "HOME_DELIVERY": "delivery",
+            "MOBILE_WALLET": "mobile"
         }
-        
         return method_map.get(method_type, method_type.lower())
-    
-    def get_supported_countries(self) -> List[Dict]:
-        """
-        Get a list of supported destination countries for Remitly.
-        
-        Returns:
-            A list of country objects with code, name, and currency
-        """
-        # Return a comprehensive list of Remitly destinations
+
+    def get_supported_countries(self) -> List[str]:
+        """Return list of supported countries in ISO alpha-2 format."""
+        # These are commonly supported destination countries by Remitly
         return [
-            # Latin America
-            {"country_code": "MEX", "country_name": "Mexico", "currency_code": "MXN"},
-            {"country_code": "COL", "country_name": "Colombia", "currency_code": "COP"},
-            {"country_code": "GTM", "country_name": "Guatemala", "currency_code": "GTQ"},
-            {"country_code": "SLV", "country_name": "El Salvador", "currency_code": "USD"},
-            {"country_code": "DOM", "country_name": "Dominican Republic", "currency_code": "DOP"},
-            {"country_code": "HND", "country_name": "Honduras", "currency_code": "HNL"},
-            {"country_code": "PER", "country_name": "Peru", "currency_code": "PEN"},
-            {"country_code": "ECU", "country_name": "Ecuador", "currency_code": "USD"},
-            {"country_code": "BRA", "country_name": "Brazil", "currency_code": "BRL"},
-            {"country_code": "CHL", "country_name": "Chile", "currency_code": "CLP"},
-            {"country_code": "ARG", "country_name": "Argentina", "currency_code": "ARS"},
-            {"country_code": "PAN", "country_name": "Panama", "currency_code": "PAB"},
-            {"country_code": "CRI", "country_name": "Costa Rica", "currency_code": "CRC"},
-            {"country_code": "BOL", "country_name": "Bolivia", "currency_code": "BOB"},
-            {"country_code": "PRY", "country_name": "Paraguay", "currency_code": "PYG"},
-            {"country_code": "URY", "country_name": "Uruguay", "currency_code": "UYU"},
-            {"country_code": "VEN", "country_name": "Venezuela", "currency_code": "VES"},
-            {"country_code": "NIC", "country_name": "Nicaragua", "currency_code": "NIO"},
-            
-            # Asia
-            {"country_code": "PHL", "country_name": "Philippines", "currency_code": "PHP"},
-            {"country_code": "IND", "country_name": "India", "currency_code": "INR"},
-            {"country_code": "CHN", "country_name": "China", "currency_code": "CNY"},
-            {"country_code": "VNM", "country_name": "Vietnam", "currency_code": "VND"},
-            {"country_code": "THA", "country_name": "Thailand", "currency_code": "THB"},
-            {"country_code": "IDN", "country_name": "Indonesia", "currency_code": "IDR"},
-            {"country_code": "KOR", "country_name": "South Korea", "currency_code": "KRW"},
-            {"country_code": "NPL", "country_name": "Nepal", "currency_code": "NPR"},
-            {"country_code": "BGD", "country_name": "Bangladesh", "currency_code": "BDT"},
-            {"country_code": "PAK", "country_name": "Pakistan", "currency_code": "PKR"},
-            {"country_code": "JPN", "country_name": "Japan", "currency_code": "JPY"},
-            {"country_code": "LKA", "country_name": "Sri Lanka", "currency_code": "LKR"},
-            {"country_code": "MYS", "country_name": "Malaysia", "currency_code": "MYR"},
-            {"country_code": "SGP", "country_name": "Singapore", "currency_code": "SGD"},
-            {"country_code": "MMR", "country_name": "Myanmar", "currency_code": "MMK"},
-            {"country_code": "KHM", "country_name": "Cambodia", "currency_code": "KHR"},
-            {"country_code": "LAO", "country_name": "Laos", "currency_code": "LAK"},
-            
-            # Africa
-            {"country_code": "DZA", "country_name": "Algeria", "currency_code": "DZD"},
-            {"country_code": "EGY", "country_name": "Egypt", "currency_code": "EGP"},
-            {"country_code": "MAR", "country_name": "Morocco", "currency_code": "MAD"},
-            {"country_code": "GHA", "country_name": "Ghana", "currency_code": "GHS"},
-            {"country_code": "KEN", "country_name": "Kenya", "currency_code": "KES"},
-            {"country_code": "NGA", "country_name": "Nigeria", "currency_code": "NGN"},
-            {"country_code": "SEN", "country_name": "Senegal", "currency_code": "XOF"},
-            {"country_code": "TUN", "country_name": "Tunisia", "currency_code": "TND"},
-            {"country_code": "ZAF", "country_name": "South Africa", "currency_code": "ZAR"},
-            {"country_code": "UGA", "country_name": "Uganda", "currency_code": "UGX"},
-            {"country_code": "TZA", "country_name": "Tanzania", "currency_code": "TZS"},
-            {"country_code": "ETH", "country_name": "Ethiopia", "currency_code": "ETB"},
-            
-            # Europe
-            {"country_code": "ESP", "country_name": "Spain", "currency_code": "EUR"},
-            {"country_code": "GBR", "country_name": "United Kingdom", "currency_code": "GBP"},
-            {"country_code": "DEU", "country_name": "Germany", "currency_code": "EUR"},
-            {"country_code": "FRA", "country_name": "France", "currency_code": "EUR"},
-            {"country_code": "ITA", "country_name": "Italy", "currency_code": "EUR"},
-            {"country_code": "PRT", "country_name": "Portugal", "currency_code": "EUR"},
-            {"country_code": "POL", "country_name": "Poland", "currency_code": "PLN"},
-            {"country_code": "ROU", "country_name": "Romania", "currency_code": "RON"},
-            {"country_code": "NLD", "country_name": "Netherlands", "currency_code": "EUR"},
-            {"country_code": "BEL", "country_name": "Belgium", "currency_code": "EUR"},
-            {"country_code": "GRC", "country_name": "Greece", "currency_code": "EUR"},
-            {"country_code": "IRL", "country_name": "Ireland", "currency_code": "EUR"},
-            {"country_code": "TUR", "country_name": "Turkey", "currency_code": "TRY"},
-            {"country_code": "UKR", "country_name": "Ukraine", "currency_code": "UAH"},
-            {"country_code": "RUS", "country_name": "Russia", "currency_code": "RUB"},
-            
-            # Middle East
-            {"country_code": "ARE", "country_name": "United Arab Emirates", "currency_code": "AED"},
-            {"country_code": "SAU", "country_name": "Saudi Arabia", "currency_code": "SAR"},
-            {"country_code": "ISR", "country_name": "Israel", "currency_code": "ILS"},
-            {"country_code": "JOR", "country_name": "Jordan", "currency_code": "JOD"},
-            {"country_code": "LBN", "country_name": "Lebanon", "currency_code": "LBP"},
-            
-            # Oceania
-            {"country_code": "AUS", "country_name": "Australia", "currency_code": "AUD"},
-            {"country_code": "NZL", "country_name": "New Zealand", "currency_code": "NZD"},
-            {"country_code": "FJI", "country_name": "Fiji", "currency_code": "FJD"}
+            "MX", "PH", "IN", "CO", "SV", "GT", "HN", "NI", 
+            "DO", "EC", "PE", "PL", "RO", "VN", "BD", "CN", 
+            "KR", "LK", "NP", "PK", "TH", "ID", "MY", "KH"
         ]
     
-    def get_source_countries(self) -> List[Dict]:
-        """
-        Get a list of supported source countries for Remitly.
-        
-        Returns:
-            A list of country objects with code, name, and currency
-        """
-        # Return a list of source countries where Remitly operates
+    def get_supported_currencies(self) -> List[str]:
+        """Return list of supported currencies in ISO format."""
+        # These are currencies Remitly commonly supports
         return [
-            {"country_code": "USA", "country_name": "United States", "currency_code": "USD"},
-            {"country_code": "CAN", "country_name": "Canada", "currency_code": "CAD"},
-            {"country_code": "GBR", "country_name": "United Kingdom", "currency_code": "GBP"},
-            {"country_code": "ESP", "country_name": "Spain", "currency_code": "EUR"},
-            {"country_code": "FRA", "country_name": "France", "currency_code": "EUR"},
-            {"country_code": "DEU", "country_name": "Germany", "currency_code": "EUR"},
-            {"country_code": "ITA", "country_name": "Italy", "currency_code": "EUR"},
-            {"country_code": "IRL", "country_name": "Ireland", "currency_code": "EUR"},
-            {"country_code": "AUT", "country_name": "Austria", "currency_code": "EUR"},
-            {"country_code": "BEL", "country_name": "Belgium", "currency_code": "EUR"},
-            {"country_code": "NLD", "country_name": "Netherlands", "currency_code": "EUR"},
-            {"country_code": "PRT", "country_name": "Portugal", "currency_code": "EUR"},
-            {"country_code": "FIN", "country_name": "Finland", "currency_code": "EUR"},
-            {"country_code": "AUS", "country_name": "Australia", "currency_code": "AUD"},
-            {"country_code": "NZL", "country_name": "New Zealand", "currency_code": "NZD"},
-            {"country_code": "SGP", "country_name": "Singapore", "currency_code": "SGD"},
-            {"country_code": "SWE", "country_name": "Sweden", "currency_code": "SEK"},
-            {"country_code": "NOR", "country_name": "Norway", "currency_code": "NOK"},
-            {"country_code": "DNK", "country_name": "Denmark", "currency_code": "DKK"}
+            "USD", "CAD", "GBP", "EUR", "AUD", "MXN", "PHP", 
+            "INR", "COP", "PEN", "SVC", "GTQ", "HNL", "NIO", 
+            "DOP", "ECU", "PLN", "RON", "VND", "BDT", "CNY", 
+            "KRW", "LKR", "NPR", "PKR", "THB", "IDR", "MYR", "KHR"
         ]
-    
+
     def close(self):
-        """Close the underlying HTTP session."""
-        self.session.close()
+        """Close the session if it's open."""
+        if self.session:
+            self.session.close()
+            self.session = None
     
     def __enter__(self):
         return self
-        
+    
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close() 

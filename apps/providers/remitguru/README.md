@@ -1,79 +1,131 @@
-# RemitGuru Integration
+# RemitGuru Provider
 
-This directory contains the integration with RemitGuru's API for fetching exchange rates and fees for international money transfers.
+An aggregator-ready implementation of RemitGuru's money transfer service API.
 
-## Overview
+> **IMPORTANT**: RemitGuru currently only supports money transfers from United Kingdom (GBP) to India (INR). All other corridors will return appropriate error responses.
 
-RemitGuru is an international money transfer service that offers competitive exchange rates for various corridors. This integration allows us to fetch live exchange rates and fees for money transfers.
+## Features
 
-## API Details
-
-The RemitGuru integration uses the following API endpoint:
-
-- Exchange Rate Endpoint: `https://www.remitguru.com/transfer/jsp/getQTStatistics.jsp`
-  - Method: `POST`
-  - Content-Type: `application/x-www-form-urlencoded`
-
-### Request Parameters
-
-| Parameter       | Description                                                |
-|-----------------|------------------------------------------------------------|
-| amountTransfer  | Amount to send (in integer format)                         |
-| corridor        | Format: `{FROM_COUNTRY}~{FROM_CURRENCY}~{TO_COUNTRY}~{TO_CURRENCY}` |
-| sendMode        | Default is "CIP-FER"                                       |
-
-### Response Format
-
-The API returns a pipe-delimited string with the following format:
-
-```
-receive_amount|exchange_rate|fee|send_amount|error_message|is_valid|send_currency|error_code
-```
-
-Example valid response:
-```
-811902.00|104.09|0.00|7800.00||true|GBP|
-```
-
-Example error response:
-```
-0.00|0.00|0.00|1000.00|Fee Not Define.|false|GBP|FBERR1001
-```
+- **Live API Integration**: Fetches real-time quotes and exchange rates from RemitGuru's public API.
+- **Standardized Response Format**: Follows the aggregator's standard format for consistent integration.
+- **No Mock Data**: Returns proper error responses instead of fallback data for unsupported corridors.
+- **Corridor Validation**: Validates transfer corridors before making API requests.
+- **Error Handling**: Comprehensive error handling with meaningful error messages.
 
 ## Supported Corridors
 
-Based on our testing, the following corridors are currently confirmed to be supported by RemitGuru:
+RemitGuru's API has been extensively tested and currently only supports:
 
-- GBP to INR (United Kingdom to India)
+- United Kingdom (GBP) → India (INR)
 
-Other corridors we tested returned "Fee Not Define" errors.
+All other corridors will return error responses with appropriate messages.
+
+## Usage
+
+### Basic Usage
+
+```python
+from decimal import Decimal
+from apps.providers.remitguru.integration import RemitGuruProvider
+
+# Create provider instance
+with RemitGuruProvider() as provider:
+    # Get a quote for the only supported corridor (GB → IN)
+    quote = provider.get_quote(
+        amount=Decimal("500"),
+        source_currency="GBP",
+        dest_currency="INR",
+        source_country="GB",
+        dest_country="IN"
+    )
+    
+    print(quote)
+```
+
+### Response Format
+
+Successful response:
+
+```python
+{
+    "provider_id": "remitguru",
+    "success": True,
+    "error_message": None,
+    "send_amount": 500.0,
+    "source_currency": "GBP",
+    "destination_amount": 51995.0,
+    "destination_currency": "INR",
+    "exchange_rate": 103.99,
+    "fee": 0.0,
+    "payment_method": "bank",
+    "delivery_method": "bank",
+    "delivery_time_minutes": 1440,
+    "timestamp": "2025-03-06T21:53:36.133712"
+}
+```
+
+Error response:
+
+```python
+{
+    "provider_id": "remitguru",
+    "success": False,
+    "error_message": "Fee Not Define.",  # Error message from RemitGuru API
+    "send_amount": 500.0,
+    "source_currency": "USD",
+    "destination_amount": 0.0,
+    "destination_currency": "PKR",
+    "exchange_rate": None,
+    "fee": 0.0,
+    "payment_method": "bank",
+    "delivery_method": "bank",
+    "delivery_time_minutes": 1440,
+    "timestamp": "2025-03-06T21:53:36.440556"
+}
+```
 
 ## Implementation Details
 
-The implementation is in the `integration.py` file, which includes:
+### Country and Currency Mapping
 
-1. `RemitGuruProvider` class that extends the base `RemittanceProvider`
-2. Methods for getting exchange rates and other information
-3. Error handling and logging
+The provider includes mappings for countries and currencies:
 
-### Key Methods
+- `CORRIDOR_MAPPING`: Maps standard ISO country codes to RemitGuru's format (mostly the same)
+- `CURRENCY_MAPPING`: Maps country codes to their default currencies
+- `SUPPORTED_CORRIDORS`: List of corridors known to work properly
 
-- `get_exchange_rate`: Main method to fetch exchange rates for a given corridor
-- `get_quote`: Internal method that makes the actual API request
-- `get_supported_countries`: Returns a list of supported corridors
+### API Endpoints
+
+- Base URL: `https://www.remitguru.com`
+- Quote Endpoint: `/transfer/jsp/getQTStatistics.jsp`
+- Methods: Primarily POST requests for quotes
 
 ## Testing
 
-The integration includes a test script (`test_remitguru.py`) that tests the functionality with various corridors.
-
-To run the test:
+To test the provider, run:
 
 ```bash
-python3 apps/providers/remitguru/test_remitguru.py
+python -m apps.providers.remitguru.test_provider
 ```
 
-## Notes
+This runs a comprehensive test suite that:
+1. Tests quotes for supported and unsupported corridors
+2. Verifies the exchange rate functionality
+3. Lists supported countries and currencies
 
-- The API requires cookies from the homepage, so a visit to the homepage is made first to get the necessary cookies.
-- The API may return error messages for unsupported corridors or invalid requests.
-- Rate limits and other restrictions may apply to the API. 
+## Error Cases Handled
+
+1. Unsupported corridors
+2. API connection failures
+3. Malformed API responses
+4. Unsupported currencies
+5. Validation errors
+
+## Integration with the Aggregator
+
+This provider follows the aggregator's standardized format for easy integration into the comparison engine. It implements the abstract methods required by the `RemittanceProvider` base class:
+
+- `get_quote()`: Get a standardized quote for a specific corridor
+- `get_exchange_rate()`: Legacy method for backward compatibility
+- `get_supported_countries()`: List countries in ISO alpha-2 format
+- `get_supported_currencies()`: List supported currencies in ISO format 
