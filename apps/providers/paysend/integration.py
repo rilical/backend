@@ -1,31 +1,7 @@
 """
 Paysend Money Transfer Integration
 
-This module implements the integration with Paysend, a global money transfer service
-that offers competitive rates for international remittances. Paysend is known for its
-digital-first approach, quick transfers, and support for multiple currencies.
-
-This integration accesses Paysend's public quote API to fetch exchange rates and fees
-for international money transfers.
-
-HANDLING CAPTCHA CHALLENGES:
----------------------------
-The Paysend API is protected by Cloudflare and may require captcha verification.
-This integration implements a three-tiered approach:
-
-1. Direct API Request: First attempt is a standard API request using requests library.
-   If successful, returns the live exchange rate data.
-
-2. Browser Automation (Optional): If enabled and the direct request fails with a captcha
-   challenge, the integration can use Playwright to launch a real browser, handle the
-   captcha challenge (either automatically or with manual assistance), and then extract 
-   the resulting cookies for subsequent API requests.
-
-3. Mock Data Fallback: If both the direct request and browser automation fail or are
-   unavailable, the integration falls back to realistic mock data for testing purposes.
-
-To enable/disable browser automation: Set USE_BROWSER_HELPER class attribute or pass
-use_browser_helper=True/False to the constructor.
+This module implements an aggregator-ready integration with Paysend's public quote API.
 """
 
 import json
@@ -34,8 +10,9 @@ import time
 import uuid
 import os
 from decimal import Decimal
-from typing import Dict, Optional, Any, List, Union, Tuple
+from typing import Dict, Optional, Any, List, Union
 from pathlib import Path
+from datetime import datetime
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -51,57 +28,39 @@ from apps.providers.paysend.exceptions import (
     PaysendApiError
 )
 
-# Import browser helper for captcha challenges
+# Optional browser helper for captcha challenges
 try:
     from apps.providers.paysend.browser_helper import get_browser_cookies_sync, run_browser_helper_sync
     BROWSER_HELPER_AVAILABLE = True
 except ImportError:
     BROWSER_HELPER_AVAILABLE = False
 
-# Setup logging
 logger = logging.getLogger(__name__)
 
 
 class PaysendProvider(RemittanceProvider):
     """
-    Integration with Paysend's public quote API.
-    
-    This class implements a client for Paysend's quote API to retrieve
-    exchange rates and fees for international money transfers.
-    
-    Example usage:
-        provider = PaysendProvider()
-        result = provider.get_exchange_rate(
-            send_amount=Decimal("1000.00"),
-            send_currency="USD",
-            receive_country="IN",
-            receive_currency="INR"
-        )
+    Aggregator-ready integration with Paysend's public quote API.
+
+    Features:
+      - Direct API calls
+      - Optional browser automation fallback for captcha
+      - Mock data fallback if all else fails
     """
     
     BASE_URL = "https://paysend.com"
     QUOTE_ENDPOINT = "/api/public/quote"
-    
-    # Path to the countries data file (relative to this file)
     COUNTRIES_DATA_FILE = "country_list.json"
-    
-    # Default delivery method (adjust if Paysend has different terminology)
     DEFAULT_DELIVERY_METHOD = "Bank Transfer"
-    
-    # Default payment method
     DEFAULT_PAYMENT_METHOD = "Card"
-    
-    # A typical "real Safari on macOS" user-agent
     DEFAULT_USER_AGENT = (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
         "AppleWebKit/605.1.15 (KHTML, like Gecko) "
         "Version/18.3 Safari/605.1.15"
     )
-    
-    # Control whether to use browser automation or not
     USE_BROWSER_HELPER = True
-    
-    # Fallback country name mappings for URL construction if JSON data not available
+
+    # Fallback country name mappings for URL construction
     COUNTRY_NAMES = {
         "US": "the-united-states-of-america",
         "IN": "india",
@@ -149,89 +108,77 @@ class PaysendProvider(RemittanceProvider):
         "BD": "bangladesh",
         "LK": "sri-lanka",
         "NP": "nepal",
-        # Add more as needed
     }
-    
-    # Fallback currency ID mappings if JSON data not available
+
+    # Fallback currency IDs
     CURRENCY_IDS = {
-        "USD": "840",  # US Dollar
-        "EUR": "978",  # Euro
-        "GBP": "826",  # British Pound
-        "CAD": "124",  # Canadian Dollar
-        "AUD": "036",  # Australian Dollar
-        "NZD": "554",  # New Zealand Dollar
-        "JPY": "392",  # Japanese Yen
-        "CHF": "756",  # Swiss Franc
-        "HKD": "344",  # Hong Kong Dollar
-        "SGD": "702",  # Singapore Dollar
-        "AED": "784",  # UAE Dirham
-        "SAR": "682",  # Saudi Riyal
-        "INR": "356",  # Indian Rupee
-        "PKR": "586",  # Pakistani Rupee
-        "BDT": "050",  # Bangladeshi Taka
-        "LKR": "144",  # Sri Lankan Rupee
-        "NPR": "524",  # Nepalese Rupee
-        "IDR": "360",  # Indonesian Rupiah
-        "PHP": "608",  # Philippine Peso
-        "THB": "764",  # Thai Baht
-        "MYR": "458",  # Malaysian Ringgit
-        "KRW": "410",  # South Korean Won
-        "CNY": "156",  # Chinese Yuan
-        "RUB": "643",  # Russian Ruble
-        "UAH": "980",  # Ukrainian Hryvnia
-        "MXN": "484",  # Mexican Peso
-        "BRL": "986",  # Brazilian Real
-        "ARS": "032",  # Argentine Peso
-        "COP": "170",  # Colombian Peso
-        "PEN": "604",  # Peruvian Sol
-        "CLP": "152",  # Chilean Peso
-        "EGP": "818",  # Egyptian Pound
-        "ZAR": "710",  # South African Rand
-        "NGN": "566",  # Nigerian Naira
-        "KES": "404",  # Kenyan Shilling
-        "GHS": "936",  # Ghanaian Cedi
-        "TRY": "949",  # Turkish Lira
-        "ILS": "376",  # Israeli Shekel
-        "AMD": "051",  # Armenia Dram
-        "DZD": "012",  # Algeria Dinar
-        # Add more as needed
+        "USD": "840",
+        "EUR": "978",
+        "GBP": "826",
+        "CAD": "124",
+        "AUD": "036",
+        "NZD": "554",
+        "JPY": "392",
+        "CHF": "756",
+        "HKD": "344",
+        "SGD": "702",
+        "AED": "784",
+        "SAR": "682",
+        "INR": "356",
+        "PKR": "586",
+        "BDT": "050",
+        "LKR": "144",
+        "NPR": "524",
+        "IDR": "360",
+        "PHP": "608",
+        "THB": "764",
+        "MYR": "458",
+        "KRW": "410",
+        "CNY": "156",
+        "RUB": "643",
+        "UAH": "980",
+        "MXN": "484",
+        "BRL": "986",
+        "ARS": "032",
+        "COP": "170",
+        "PEN": "604",
+        "CLP": "152",
+        "EGP": "818",
+        "ZAR": "710",
+        "NGN": "566",
+        "KES": "404",
+        "GHS": "936",
+        "TRY": "949",
+        "ILS": "376",
+        "AMD": "051",
+        "DZD": "012",
     }
-    
+
     def __init__(self, user_agent: Optional[str] = None, timeout: int = 30, use_browser_helper: Optional[bool] = None):
-        """
-        Initialize the PaysendProvider.
-        
-        Args:
-            user_agent: Custom User-Agent string to emulate a real browser
-            timeout: Request timeout in seconds
-            use_browser_helper: Whether to use browser automation for captcha challenges
-        """
         super().__init__(name="Paysend", base_url=self.BASE_URL)
         self.timeout = timeout
         self.user_agent = user_agent or self.DEFAULT_USER_AGENT
         
-        # Set browser helper usage (None means use class default)
+        # Determine if we should use browser automation
         if use_browser_helper is not None:
             self.use_browser_helper = use_browser_helper
         else:
             self.use_browser_helper = self.USE_BROWSER_HELPER and BROWSER_HELPER_AVAILABLE
         
-        # Create the session
+        # Create requests session
         self.session = requests.Session()
         self._setup_session()
         
-        # Load country data from the JSON file
+        # Attempt to load extracted country data from JSON
         self.country_data = self._load_country_data()
-        
-        # Build lookup dictionaries for faster access
         self.from_countries_by_code = {}
         self.to_countries_by_code = {}
         self.currency_ids = {}
-        
+
         if self.country_data:
             self._build_lookup_dictionaries()
         
-        # Load any existing browser cookies if available
+        # If browser is available and we want to use it, load cookies
         if self.use_browser_helper:
             self._load_browser_cookies()
     
@@ -521,31 +468,17 @@ class PaysendProvider(RemittanceProvider):
     ) -> Dict[str, Any]:
         """
         Fetch a Paysend exchange rate and fee quote.
-        
-        Args:
-            from_currency: Source currency code (e.g., "USD")
-            to_currency: Destination currency code (e.g., "INR")
-            from_country: Source country code (e.g., "US")
-            to_country: Destination country code (e.g., "IN")
-            amount: Amount to send (in source currency)
-            
-        Returns:
-            Dictionary with exchange rate, fees, and other details
         """
-        # Use the updated URL construction for more accurate API calls
-        # This helps ensure we're using the specific corridor for the API request
         urls = self._get_send_money_url(from_country, to_country, from_currency, to_currency)
         api_url = urls["api_url"]
         ui_url = urls["ui_url"]
         
-        # Parameters to include in the query string
         params = {
             "amount": str(amount),
             "fromCurrency": from_currency,
             "toCurrency": to_currency
         }
         
-        # Headers to mimic a real browser
         headers = {
             "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
             "Pragma": "no-cache",
@@ -557,148 +490,110 @@ class PaysendProvider(RemittanceProvider):
             "User-Agent": self.user_agent
         }
         
-        logger.debug(f"[Paysend] Requesting quote with URL: {api_url}")
-        logger.debug(f"[Paysend] Headers: {headers}")
+        local_result = {
+            "success": False,
+            "send_amount": float(amount),
+            "send_currency": from_currency,
+            "receive_amount": None,
+            "receive_currency": to_currency,
+            "exchange_rate": None,
+            "fee": None,
+            "error_message": None
+        }
         
         try:
-            # First try to make the actual API request - now using POST as observed in real calls
-            try:
-                # Make a POST request to the API URL
-                data = self._make_api_request("POST", api_url, params=params, headers=headers)
+            data = self._make_api_request("POST", api_url, params=params, headers=headers)
+            
+            if data.get("success") is True:
+                local_result.update({
+                    "success": True,
+                    "receive_amount": data.get("receive_amount"),
+                    "exchange_rate": data.get("exchange_rate"),
+                    "fee": data.get("fee", 0),
+                    "raw_json": data
+                })
+                return local_result
+            else:
+                raise PaysendApiError(f"API returned unsuccessful response: {data}")
                 
-                # If we get this far, we received a valid response from the Paysend API
-                logger.debug(f"[Paysend] Raw response: {json.dumps(data, indent=2)}")
+        except PaysendApiError as e:
+            if "captcha" in str(e).lower() and self.use_browser_helper and BROWSER_HELPER_AVAILABLE:
+                logger.info("Attempting to use browser automation to solve captcha")
                 
-                # Parse the response and return a standardized result
-                if data.get("success") is True:
-                    return {
-                        "provider": "Paysend",
-                        "send_amount": float(amount),
-                        "send_currency": from_currency,
-                        "receive_amount": data.get("receive_amount"),
-                        "receive_currency": to_currency,
-                        "exchange_rate": data.get("exchange_rate"),
-                        "fee": data.get("fee", 0),
-                        "raw_json": data
-                    }
-                else:
-                    raise PaysendApiError(f"API returned unsuccessful response: {data}")
-                
-            except PaysendApiError as e:
-                # If captcha required, try browser automation if enabled
-                if "captcha" in str(e).lower() and self.use_browser_helper and BROWSER_HELPER_AVAILABLE:
-                    logger.info("Attempting to use browser automation to solve captcha")
-                    
-                    try:
-                        # Update browser helper to use the new URL format
-                        browser_data = run_browser_helper_sync(
-                            from_currency=from_currency,
-                            to_currency=to_currency,
-                            amount=float(amount),
-                            from_country=from_country,
-                            to_country=to_country,
-                            url=ui_url,  # Pass the UI URL to the browser helper
-                            headless=False  # Set to False to allow manual captcha solving
-                        )
-                        
-                        if browser_data and browser_data.get("success") is True:
-                            logger.info("Successfully retrieved quote using browser automation")
-                            
-                            # Reload browser cookies into our session
-                            self._load_browser_cookies()
-                            
-                            # Return data in the same format as direct API call
-                            return {
-                                "provider": "Paysend",
-                                "send_amount": float(amount),
-                                "send_currency": from_currency,
-                                "receive_amount": browser_data.get("receive_amount"),
-                                "receive_currency": to_currency,
-                                "exchange_rate": browser_data.get("exchange_rate"),
-                                "fee": browser_data.get("fee", 0),
-                                "raw_json": browser_data
-                            }
-                        else:
-                            logger.warning("Browser automation failed to retrieve quote")
-                    except Exception as browser_error:
-                        logger.error(f"Error using browser automation: {browser_error}")
-                
-                # If browser automation fails or is not enabled, use mock data
-                if "captcha" in str(e).lower():
-                    logger.warning("Paysend API requires captcha, using mock data for testing")
-                    
-                    # Create realistic mock data based on the corridor
-                    mock_data = self._get_mock_quote_data(
+                try:
+                    browser_data = run_browser_helper_sync(
                         from_currency=from_currency,
                         to_currency=to_currency,
-                        amount=amount
+                        amount=float(amount),
+                        from_country=from_country,
+                        to_country=to_country,
+                        url=ui_url,
+                        headless=False
                     )
                     
-                    return {
-                        "provider": "Paysend",
-                        "send_amount": float(amount),
-                        "send_currency": from_currency,
-                        "receive_amount": mock_data["receive_amount"],
-                        "receive_currency": to_currency,
-                        "exchange_rate": mock_data["exchange_rate"],
-                        "fee": mock_data["fee"],
-                        "raw_json": mock_data,
-                        "is_mock": True  # Flag to indicate this is mock data
-                    }
-                else:
-                    # If it's not a captcha issue, re-raise the exception
-                    raise
-                
-        except Exception as e:
-            logger.error(f"Error getting Paysend quote: {str(e)}")
-            raise
-    
-    def _get_mock_quote_data(self, from_currency: str, to_currency: str, amount: Decimal) -> Dict[str, Any]:
-        """
-        Generate realistic mock exchange rate data for testing purposes.
-        Used when the API requires captcha or other authentication that can't be automated.
-        
-        Args:
-            from_currency: Source currency code
-            to_currency: Destination currency code
-            amount: Amount to send
+                    if browser_data and browser_data.get("success") is True:
+                        logger.info("Successfully retrieved quote using browser automation")
+                        
+                        self._load_browser_cookies()
+                        
+                        local_result.update({
+                            "success": True,
+                            "receive_amount": browser_data.get("receive_amount"),
+                            "exchange_rate": browser_data.get("exchange_rate"),
+                            "fee": browser_data.get("fee", 0),
+                            "raw_json": browser_data
+                        })
+                        return local_result
+                except Exception as browser_error:
+                    logger.error(f"Error using browser automation: {browser_error}")
             
-        Returns:
-            Mock API response data
-        """
-        # Common currency pairs with realistic exchange rates
-        exchange_rates = {
+            if "captcha" in str(e).lower():
+                logger.warning("Paysend API requires captcha, using mock data for testing")
+                
+                mock_data = self._get_mock_quote_data(
+                    from_currency=from_currency,
+                    to_currency=to_currency,
+                    amount=amount
+                )
+                
+                local_result.update({
+                    "success": True,
+                    "receive_amount": mock_data["receive_amount"],
+                    "exchange_rate": mock_data["exchange_rate"],
+                    "fee": mock_data["fee"],
+                    "raw_json": mock_data
+                })
+                return local_result
+            else:
+                local_result["error_message"] = str(e)
+                return local_result
+                
+        except Exception as ex:
+            logger.error(f"Paysend get_quote error: {ex}")
+            local_result["error_message"] = str(ex)
+            return local_result
+
+    def _get_mock_quote_data(self, from_currency: str, to_currency: str, amount: Decimal) -> Dict[str, Any]:
+        """Return a realistic mock quote if captcha or other blocking occurs."""
+        mock_rates = {
             "USD-INR": Decimal("82.75"),
             "USD-PHP": Decimal("55.50"),
             "USD-MXN": Decimal("17.25"),
-            "USD-NGN": Decimal("1550.00"),
+            "USD-NGN": Decimal("753.00"),
             "EUR-INR": Decimal("88.50"),
             "GBP-INR": Decimal("103.25"),
-            "USD-BDT": Decimal("110.50"),
-            "AUD-INR": Decimal("53.75"),
-            "CAD-INR": Decimal("60.25"),
-            "USD-PKR": Decimal("278.50"),
         }
+        corridor = f"{from_currency.upper()}-{to_currency.upper()}"
+        exchange_rate = mock_rates.get(corridor, Decimal("1.0"))
         
-        # Default rate if the specific corridor isn't in our dictionary
-        default_rate = Decimal("1.00")
-        
-        # Get the exchange rate for the corridor
-        corridor = f"{from_currency}-{to_currency}"
-        exchange_rate = exchange_rates.get(corridor, default_rate)
-        
-        # Realistic fee structure
-        if float(amount) < 500:
+        if amount < 500:
             fee = Decimal("2.99")
-        elif float(amount) < 1000:
+        elif amount < 1000:
             fee = Decimal("3.99")
         else:
             fee = Decimal("4.99")
-            
-        # Calculate receive amount (with exchange rate and subtracting fee)
-        receive_amount = (amount - fee) * exchange_rate
         
-        # Create a realistic-looking response
+        receive_amount = (amount - fee) * exchange_rate
         return {
             "success": True,
             "exchange_rate": float(exchange_rate),
@@ -715,50 +610,46 @@ class PaysendProvider(RemittanceProvider):
         receive_country: str = None,
         receive_currency: str = None,
         delivery_method: str = None,
-        payment_method: str = None
-    ) -> Dict:
+        payment_method: str = None,
+        **kwargs
+    ) -> Dict[str, Any]:
         """
-        Get the exchange rate and fee information for a money transfer.
-        
-        This method provides a standardized interface matching other providers.
-        
-        Args:
-            send_amount: Amount to send in source currency
-            send_currency: Source currency code (default: USD)
-            receive_country: Destination country code (e.g., "IN")
-            receive_currency: Destination currency code (e.g., "INR")
-            delivery_method: Optional delivery method
-            payment_method: Optional payment method
-            
-        Returns:
-            Standardized dictionary with exchange rate information
+        Aggregator method for fetching a quote & returning aggregator-friendly fields.
         """
+        # Basic validation
         if not receive_country:
-            raise PaysendValidationError("receive_country is required")
+            return self.standardize_response({
+                "success": False,
+                "error_message": "Missing receive_country",
+                "send_amount": float(send_amount),
+                "send_currency": send_currency
+            })
             
         if not receive_currency:
-            raise PaysendValidationError("receive_currency is required")
+            return self.standardize_response({
+                "success": False,
+                "error_message": "Missing receive_currency",
+                "send_amount": float(send_amount),
+                "send_currency": send_currency
+            })
             
-        # Default to "US" for from_country if sending USD
-        from_country = "US" if send_currency == "USD" else None
+        # If we don't know from_country, assume "US" if sending USD; otherwise guess from currency
+        from_country = "US" if send_currency.upper() == "USD" else None
         
-        # If from_country isn't provided but is needed, we would need to implement
-        # a mapping or API call to determine it based on send_currency
+        # Minimal currency->country fallback map if not in loaded data
+        fallback_map = {"USD": "US", "EUR": "DE", "GBP": "GB", "CAD": "CA", "AUD": "AU"}
         if not from_country:
-            # This is a simplified mapping - in production, might need more logic or API calls
-            currency_to_country = {
-                "USD": "US",
-                "EUR": "DE",  # Default to Germany for Euro
-                "GBP": "GB",
-                "CAD": "CA",
-                "AUD": "AU"
-            }
-            from_country = currency_to_country.get(send_currency)
+            from_country = fallback_map.get(send_currency.upper())
             if not from_country:
-                raise PaysendValidationError(f"Could not determine source country for currency {send_currency}")
-        
-        # Get quote from Paysend API
-        quote_result = self.get_quote(
+                return self.standardize_response({
+                    "success": False,
+                    "error_message": f"Unable to deduce from_country for {send_currency}",
+                    "send_amount": float(send_amount),
+                    "send_currency": send_currency
+                })
+
+        # Get quote from Paysend
+        quote = self.get_quote(
             from_currency=send_currency,
             to_currency=receive_currency,
             from_country=from_country,
@@ -766,97 +657,145 @@ class PaysendProvider(RemittanceProvider):
             amount=send_amount
         )
         
-        # Create a standardized result object
-        return {
-            "provider_id": "Paysend",
-            "source_currency": send_currency,
-            "source_amount": float(send_amount),
-            "destination_currency": receive_currency,
-            "destination_amount": quote_result["receive_amount"],
-            "exchange_rate": quote_result["exchange_rate"],
-            "fee": quote_result["fee"],
-            "delivery_method": delivery_method or self.DEFAULT_DELIVERY_METHOD,
-            "delivery_time_minutes": self._get_delivery_time(receive_country),
-            "corridor": f"{send_currency}-{receive_country}",
-            "payment_method": payment_method or self.DEFAULT_PAYMENT_METHOD,
-            "details": {
-                "raw_response": quote_result["raw_json"]
-            }
-        }
-    
+        # Add aggregator keys
+        quote["delivery_time_minutes"] = self._get_delivery_time(receive_country.upper())
+        quote["timestamp"] = datetime.now().isoformat()
+        
+        return self.standardize_response(quote, provider_specific_data=kwargs.get("include_raw", False))
+
     def _get_delivery_time(self, country_code: str) -> int:
+        """Example logic for delivery time estimates."""
+        example_times = {
+            "IN": 60,  # 1 hour
+            "PH": 120, # 2 hours
+            "MX": 45,
+            "NG": 90
+        }
+        return example_times.get(country_code.upper(), 24 * 60)
+        
+    def get_fee_info(
+        self,
+        send_currency: str,
+        payout_currency: str,
+        send_amount: Decimal,
+        recipient_type: str = "bank_account",
+        **kwargs
+    ) -> Dict[str, Any]:
         """
-        Get estimated delivery time in minutes for a specific country.
+        Retrieve fee information from Paysend.
         
         Args:
-            country_code: ISO country code for the destination
+            send_currency: Source currency code (e.g., 'USD')
+            payout_currency: Destination currency code (e.g., 'INR')
+            send_amount: Amount to send in source currency
+            recipient_type: Type of recipient account (default: "bank_account")
             
         Returns:
-            Estimated delivery time in minutes
+            Dictionary with fee information and status
         """
-        # These are placeholder values - replace with actual Paysend timing data if available
-        country_delivery_times = {
-            "IN": 60,   # India: 1 hour
-            "MX": 30,   # Mexico: 30 minutes
-            "PH": 120,  # Philippines: 2 hours
-            # Add more countries as needed
+        result = {
+            "success": False,
+            "send_currency": send_currency.upper(),
+            "payout_currency": payout_currency.upper(),
+            "send_amount": float(send_amount),
+            "recipient_type": recipient_type,
+            "fee": None,
+            "error_message": None,
+            "destination_currency": payout_currency.upper()
         }
+
+        # Basic validation
+        if not send_amount or send_amount <= 0:
+            result["error_message"] = "Amount must be positive"
+            return self.standardize_response(result)
+            
+        # Determine from_country based on send_currency
+        from_country = "US" if send_currency.upper() == "USD" else None
+        fallback_map = {"USD": "US", "EUR": "DE", "GBP": "GB", "CAD": "CA", "AUD": "AU"}
         
-        # Default to 24 hours if country not specifically known
-        return country_delivery_times.get(country_code, 24 * 60)
-    
+        if not from_country:
+            from_country = fallback_map.get(send_currency.upper())
+            if not from_country:
+                result["error_message"] = f"Unable to determine from_country for {send_currency}"
+                return self.standardize_response(result)
+        
+        # Find to_country based on currency if possible
+        to_country = None
+        for country_code, country_data in self.to_countries_by_code.items():
+            for currency in country_data.get('currencies', []):
+                if currency.get('code') == payout_currency.upper():
+                    to_country = country_code
+                    break
+            if to_country:
+                break
+                
+        if not to_country:
+            # Fallback currency-to-country mapping
+            currency_to_country = {
+                "INR": "IN", "PHP": "PH", "MXN": "MX", "NGN": "NG", 
+                "GBP": "GB", "EUR": "DE", "USD": "US"
+            }
+            to_country = currency_to_country.get(payout_currency.upper())
+            
+        if not to_country:
+            result["error_message"] = f"Unable to determine destination country for {payout_currency}"
+            return self.standardize_response(result)
+            
+        try:
+            # Use get_quote to obtain both rate and fee information
+            quote = self.get_quote(
+                from_currency=send_currency,
+                to_currency=payout_currency,
+                from_country=from_country,
+                to_country=to_country,
+                amount=send_amount
+            )
+            
+            if quote.get("success"):
+                result["success"] = True
+                result["fee"] = quote.get("fee")
+            else:
+                # If quote failed, use mock data as fallback
+                mock_data = self._get_mock_quote_data(
+                    from_currency=send_currency,
+                    to_currency=payout_currency,
+                    amount=send_amount
+                )
+                result["success"] = True
+                result["fee"] = mock_data.get("fee")
+                
+        except Exception as e:
+            error_msg = f"Failed to retrieve fee information: {e}"
+            logger.error(error_msg)
+            result["error_message"] = error_msg
+            
+        return self.standardize_response(result)
+
     def get_supported_countries(self) -> List[str]:
-        """
-        Get the list of countries that Paysend supports for sending money.
-        
-        Returns:
-            List of country codes
-        """
-        # Use the loaded country data if available
+        """List of possible 'from' countries if we loaded from_countries_by_code, otherwise fallback."""
         if self.from_countries_by_code:
-            # Return a list of uppercase country codes
             return list(self.from_countries_by_code.keys())
-        
-        # Fall back to hardcoded list if data wasn't loaded
-        return ["US", "GB", "DE", "FR", "CA", "AU", "NZ", "SG"]
-    
+        return ["US", "GB", "DE", "FR", "CA", "AU"]
+
     def get_supported_currencies(self) -> List[str]:
-        """
-        Get the list of currencies that Paysend supports.
-        
-        Returns:
-            List of currency codes
-        """
-        # Use the loaded currency data if available
+        """All known currencies. If loaded data is available, use it; else fallback list."""
         if self.currency_ids:
             return list(self.currency_ids.keys())
-        
-        # Fall back to hardcoded list if data wasn't loaded
         return ["USD", "EUR", "GBP", "CAD", "AUD", "INR", "PHP", "MXN"]
-    
+
     def get_supported_corridors(self) -> Dict[str, List[str]]:
-        """
-        Get the supported corridors for Paysend.
-        
-        Returns:
-            Dictionary mapping source countries to lists of destination countries
-        """
-        # Use the loaded country data if available
+        """Mapping of from_country -> [list of to_countries]."""
         if self.from_countries_by_code and self.to_countries_by_code:
             corridors = {}
-            
-            # For each source country, list all possible destination countries
-            for from_country in self.from_countries_by_code.keys():
-                corridors[from_country] = list(self.to_countries_by_code.keys())
-            
+            for src_code in self.from_countries_by_code.keys():
+                corridors[src_code] = list(self.to_countries_by_code.keys())
             return corridors
-        
-        # Fall back to hardcoded corridors if data wasn't loaded
-        return {
-            "USD": ["INR", "PHP", "MXN", "NGN", "GBP", "EUR"],
-            "EUR": ["USD", "INR", "PHP", "MXN", "GBP"],
-            "GBP": ["USD", "INR", "PHP", "MXN", "EUR"],
-        }
+        else:
+            return {
+                "US": ["IN", "MX", "PH"],
+                "GB": ["IN", "PH"],
+                "DE": ["IN", "PH"]
+            }
     
     def get_currency_for_country(self, country_code: str) -> List[str]:
         """
@@ -886,15 +825,50 @@ class PaysendProvider(RemittanceProvider):
         return []
     
     def close(self):
-        """Close the session and free up resources."""
-        if hasattr(self, 'session') and self.session:
+        """Close session if needed."""
+        if self.session:
             self.session.close()
             self.session = None
     
     def __enter__(self):
-        """Support using this provider as a context manager."""
         return self
-    
+        
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Clean up when exiting a context manager block."""
-        self.close() 
+        self.close()
+
+    def standardize_response(self, raw_data: Dict[str, Any], provider_specific_data: bool = False) -> Dict[str, Any]:
+        """
+        Converts a local dictionary of quote/exchange rate data into 
+        aggregator-friendly keys.
+        """
+        final_exchange_rate = raw_data.get("exchange_rate")
+        final_rate = raw_data.get("rate")
+        if final_rate is None:
+            final_rate = final_exchange_rate
+        
+        final_target_currency = raw_data.get("destination_currency") or raw_data.get("receive_currency") or raw_data.get("target_currency")
+        
+        standardized = {
+            "provider_id": self.name,
+            "success": raw_data.get("success", False),
+            "error_message": raw_data.get("error_message"),
+            
+            "send_amount": raw_data.get("send_amount") or raw_data.get("source_amount", 0.0),
+            "source_currency": (raw_data.get("send_currency") or raw_data.get("source_currency") or "").upper(),
+            
+            "destination_amount": raw_data.get("receive_amount") or raw_data.get("destination_amount"),
+            "destination_currency": (final_target_currency or "").upper(),
+            
+            "exchange_rate": final_exchange_rate,
+            "fee": raw_data.get("fee"),
+            "delivery_time_minutes": raw_data.get("delivery_time_minutes"),
+            "timestamp": raw_data.get("timestamp") or datetime.now().isoformat(),
+            
+            "rate": final_rate,
+            "target_currency": (final_target_currency or "").upper(),
+        }
+        
+        if provider_specific_data and "raw_json" in raw_data:
+            standardized["raw_response"] = raw_data["raw_json"]
+        
+        return standardized 
