@@ -13,12 +13,6 @@ PAYMENT METHODS:
 ---------------------------------
 - DebitCard: Debit card payment (Primary method we use for exchange rates)
 - BankAccount: Bank account transfer
-
-Important API notes:
-1. RIA requires token-based authentication via the /Authorization/session endpoint
-2. The calculator must be initialized to get country codes and options
-3. Exchange rates vary by delivery method and payment method
-4. The API response structure has calculations in two possible locations
 """
 
 import logging
@@ -35,7 +29,9 @@ import string
 from datetime import datetime
 import uuid
 import certifi
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List
+from decimal import Decimal
+import os
 
 from apps.providers.ria.exceptions import (
     RIAError,
@@ -43,15 +39,14 @@ from apps.providers.ria.exceptions import (
     RIAValidationError,
     RIAConnectionError
 )
+from apps.providers.base.provider import RemittanceProvider
 
-# Enable debug logging for urllib3 if needed
 urllib3.add_stderr_logger()
 
 class TLSAdapter(HTTPAdapter):
-    """Custom adapter to handle RIA's TLS requirements."""
     def init_poolmanager(self, *args, **kwargs):
         ctx = create_urllib3_context()
-        ctx.options |= 0x4  # OP_LEGACY_SERVER_CONNECT
+        ctx.options |= 0x4
         kwargs["ssl_context"] = ctx
         return super().init_poolmanager(*args, **kwargs)
 
@@ -59,436 +54,551 @@ class TLSAdapter(HTTPAdapter):
         kwargs["ssl_context"] = create_urllib3_context()
         return super().proxy_manager_for(*args, **kwargs)
 
-class RIAProvider:
-    """RIA Money Transfer API integration provider."""
-    
+class RIAProvider(RemittanceProvider):
     BASE_URL = "https://public.riamoneytransfer.com"
+    DEFAULT_PAYMENT_METHOD = "debitCard"
+    DEFAULT_DELIVERY_METHOD = "bankDeposit"
+    DEFAULT_DELIVERY_TIME = 48 * 60
+
+    # Mapping of RIA delivery method codes to standardized names
+    DELIVERY_METHOD_MAP = {
+        "BankDeposit": "bank_deposit",
+        "OfficePickup": "cash_pickup",
+        "UPI": "mobile_wallet",  # Universal Payment Interface (India)
+        "HomeDelivery": "home_delivery",
+        "MobileWallet": "mobile_wallet",
+        "MobilePayment": "mobile_wallet",
+        "MobileTopup": "mobile_topup",
+        "CardDeposit": "card_deposit"
+    }
+    
+    # Mapping of RIA payment method codes to standardized names
+    PAYMENT_METHOD_MAP = {
+        "DebitCard": "debit_card",
+        "CreditCard": "credit_card",
+        "BankAccount": "bank_account",
+        "PayNearMe": "cash"
+    }
 
     def __init__(self, timeout: int = 30):
-        """
-        Initialize RIA provider with automatic token retrieval.
-        
-        Args:
-            timeout: Request timeout in seconds
-        """
-        self.name = "RIA"
+        super().__init__(name="ria", base_url=self.BASE_URL)
+
+        self.logger = logging.getLogger("providers.ria")
         self.timeout = timeout
-        self.logger = logging.getLogger(__name__)
-        self._session = requests.Session()
-        self.bearer_token = None
-        self.token_expiry = None
-        self.calculator_data = None
-        self.debug_mode = True  # Always on debug mode to capture full responses
+        self.session = requests.Session()
 
-        # Use certifi's CA bundle for SSL verification
-        self._session.verify = certifi.where()
-        self.logger.debug("Using certifi CA bundle from: %s", certifi.where())
+        self.session.verify = certifi.where()
 
-        # Set default Country/ISO headers to US
-        country_code = "US"
-        
-        # Safari-based browser headers for better compatibility
-        self._session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept': 'application/json, text/plain, */*',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-            'Sec-Fetch-Mode': 'cors',
-            'Sec-Fetch-Site': 'same-site',
-            'Sec-Fetch-Dest': 'empty',
-            'Priority': 'u=3, i',
-            'AppType': '2',
-            'AppVersion': '4.0',
-            'Client-Type': 'PublicSite',
-            'CultureCode': 'en-US',
-            'Content-Type': 'application/json',
-            'Origin': 'https://www.riamoneytransfer.com',
-            'Referer': 'https://www.riamoneytransfer.com/',
-            'X-Client-Platform': 'Web',
-            'X-Client-Version': '4.0.0',
-            'X-Device-Id': 'WEB-'+''.join(random.choices(string.ascii_uppercase + string.digits, k=16)),
-            'Connection': 'keep-alive',
-            'IAmFrom': country_code,
-            'CountryId': country_code,
-            'IsoCode': country_code
+        self.session.headers.update({
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/605.1.15 (KHTML, like Gecko) "
+                "Version/18.3 Safari/605.1.15"
+            ),
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
+            "Origin": "https://www.riamoneytransfer.com",
+            "Referer": "https://www.riamoneytransfer.com/",
+            "Content-Type": "application/json",
+            "AppType": "2",
+            "AppVersion": "4.0",
+            "Client-Type": "PublicSite",
+            "CultureCode": "en-US",
+            "X-Client-Platform": "Web",
+            "X-Client-Version": "4.0.0",
+            "IAmFrom": "US",
+            "CountryId": "US",
+            "IsoCode": "US",
+            "X-Device-Id": "WEB-" + "".join(random.choices(string.ascii_uppercase + string.digits, k=16)),
         })
 
-        # Configure modern TLS settings
-        self._session.mount('https://', TLSAdapter())
-        self._configure_tls()
+        adapter = TLSAdapter()
+        self.session.mount("https://", adapter)
 
-        # Configure retries
         retry_strategy = Retry(
             total=3,
             backoff_factor=1,
             status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["POST", "GET"]
+            allowed_methods=["GET", "POST"]
         )
-        self._session.mount('https://', TLSAdapter(max_retries=retry_strategy))
+        self.session.mount("https://", TLSAdapter(max_retries=retry_strategy))
 
-        # Initialize by getting session token and initializing calculator
-        self.get_session_info()
-        self.initialize_calculator()
+        self.bearer_token: Optional[str] = None
+        self.token_expiry: Optional[float] = None
+        self.calculator_data: Optional[Dict[str, Any]] = None
 
-    def _configure_tls(self):
-        """Force modern TLS configuration."""
-        ctx = create_urllib3_context()
-        ctx.options |= (
-            0x4  # OP_LEGACY_SERVER_CONNECT
-            | 0x80000  # OP_ENABLE_MIDDLEBOX_COMPAT
-        )
-        ctx.load_default_certs()
+        self._session_init()
+        self._calculator_init()
 
-    def get_session_info(self) -> dict:
+    def standardize_response(
+        self,
+        raw_result: Dict[str, Any],
+        provider_specific_data: bool = False
+    ) -> Dict[str, Any]:
         """
-        Get session info and bearer token via GET /Authorization/session.
-        
-        Returns:
-            Dict containing session information.
-        
-        Raises:
-            RIAConnectionError: If connection to API fails
-            RIAError: For other RIA-specific errors
+        Convert local results to aggregator's standard shape:
+            provider_id, success, error_message,
+            send_amount, source_currency,
+            destination_amount, destination_currency,
+            exchange_rate, fee,
+            payment_method, delivery_method,
+            delivery_time_minutes, timestamp
         """
+        now_ts = datetime.now().isoformat()
+        output = {
+            "provider_id": self.name,
+            "success": raw_result.get("success", False),
+            "error_message": raw_result.get("error_message"),
+            "send_amount": raw_result.get("send_amount", 0.0),
+            "source_currency": raw_result.get("source_currency", "").upper(),
+            "destination_amount": raw_result.get("destination_amount", 0.0),
+            "destination_currency": raw_result.get("destination_currency", "").upper(),
+            "exchange_rate": raw_result.get("exchange_rate"),
+            "fee": raw_result.get("fee", 0.0),
+            "payment_method": raw_result.get("payment_method", self.DEFAULT_PAYMENT_METHOD),
+            "delivery_method": raw_result.get("delivery_method", self.DEFAULT_DELIVERY_METHOD),
+            "delivery_time_minutes": raw_result.get("delivery_time_minutes", self.DEFAULT_DELIVERY_TIME),
+            "timestamp": raw_result.get("timestamp", now_ts)
+        }
+        
+        # Ensure delivery methods are preserved
+        if "available_delivery_methods" in raw_result:
+            self.logger.debug(f"Preserving {len(raw_result['available_delivery_methods'])} delivery methods in standardized response")
+            output["available_delivery_methods"] = raw_result["available_delivery_methods"]
+            
+        # Ensure payment methods are preserved
+        if "available_payment_methods" in raw_result:
+            self.logger.debug(f"Preserving {len(raw_result['available_payment_methods'])} payment methods in standardized response")
+            output["available_payment_methods"] = raw_result["available_payment_methods"]
+            
+        # Include any raw data if aggregator wants it
+        if provider_specific_data and "raw_response" in raw_result:
+            output["raw_response"] = raw_result["raw_response"]
+            
+        return output
+
+    def _session_init(self) -> None:
         try:
-            self.logger.debug("Getting session info and token from /Authorization/session")
-            
-            response = self._session.get(
-                f"{self.BASE_URL}/Authorization/session",
-                timeout=self.timeout
-            )
-            response.raise_for_status()
-            
-            self.logger.debug("Response headers: %s", dict(response.headers))
-            
-            session_data = response.json()
-            
-            # Check for bearer token in response headers
-            if 'bearer' in response.headers:
-                self.bearer_token = response.headers['bearer']
-                self._session.headers['Authorization'] = f'Bearer {self.bearer_token}'
-                self.logger.info("Acquired bearer token from session response headers")
-                
-                # Check for expiry information
-                if 'expiresIn' in response.headers:
-                    expires_in = int(response.headers['expiresIn'])
+            url = f"{self.BASE_URL}/Authorization/session"
+            self.logger.debug("GET session info from %s", url)
+            resp = self.session.get(url, timeout=self.timeout)
+            resp.raise_for_status()
+
+            if "bearer" in resp.headers:
+                self.bearer_token = resp.headers["bearer"]
+                self.session.headers["Authorization"] = f"Bearer {self.bearer_token}"
+                if "expiresIn" in resp.headers:
+                    expires_in = int(resp.headers["expiresIn"])
                     self.token_expiry = time.time() + expires_in
                 else:
-                    self.token_expiry = time.time() + 1800  # Default 30 minutes
+                    self.token_expiry = time.time() + 1800
             else:
                 self.logger.warning("No bearer token in session response headers")
-            
-            # Store any cookies that were set
-            if response.cookies:
-                self.logger.debug("Received cookies: %s", dict(response.cookies))
-            
-            return session_data
-            
-        except requests.RequestException as e:
-            self.logger.error("Session initialization failed: %s", str(e), exc_info=True)
-            if hasattr(e, 'response') and e.response is not None:
-                raise RIAConnectionError(f"Failed to get session info: {e.response.status_code}")
-            raise RIAConnectionError(f"Failed to get session info: {str(e)}")
+                self.bearer_token = None
 
-    def initialize_calculator(self) -> dict:
-        """
-        Initialize calculator and handle any new token from response.
-        
-        Returns:
-            Dict containing calculator initialization data.
-            
-        Raises:
-            RIAConnectionError: If connection to API fails
-            RIAError: For other RIA-specific errors
-        """
+        except requests.RequestException as e:
+            self.logger.error("Session init failed: %s", e, exc_info=True)
+            raise RIAConnectionError("Failed to initialize RIA session") from e
+
+    def _calculator_init(self) -> None:
         try:
-            response = self._session.get(
-                f"{self.BASE_URL}/Calculator/Initialize",
-                timeout=self.timeout
-            )
-            response.raise_for_status()
-            
-            self.logger.debug("Initialize calculator headers: %s", dict(response.headers))
-            
-            init_data = response.json()
-            
-            # Store calculator data for future use
-            self.calculator_data = init_data
-            
-            # Check for updated bearer token
-            if 'bearer' in response.headers:
-                new_token = response.headers['bearer']
-                if new_token != self.bearer_token:
-                    self.bearer_token = new_token
-                    self._session.headers['Authorization'] = f'Bearer {new_token}'
-                    self.logger.info("Updated bearer token from calculator init response")
-                    
-                    if 'expiresIn' in response.headers:
-                        expires_in = int(response.headers['expiresIn'])
-                        self.token_expiry = time.time() + expires_in
-            
-            self.logger.debug("Calculator initialized successfully")
-            return init_data
-            
+            url = f"{self.BASE_URL}/Calculator/Initialize"
+            self.logger.debug("GET calculator init from %s", url)
+            resp = self.session.get(url, timeout=self.timeout)
+            resp.raise_for_status()
+
+            self.calculator_data = resp.json()
+            if "bearer" in resp.headers:
+                new_bearer = resp.headers["bearer"]
+                if new_bearer != self.bearer_token:
+                    self.bearer_token = new_bearer
+                    self.session.headers["Authorization"] = f"Bearer {self.bearer_token}"
+                if "expiresIn" in resp.headers:
+                    expires_in = int(resp.headers["expiresIn"])
+                    self.token_expiry = time.time() + expires_in
+
+            self.logger.debug("RIA calculator init successful")
+
         except requests.RequestException as e:
-            self.logger.error("Calculator init failed: %s", str(e), exc_info=True)
-            if hasattr(e, 'response') and e.response is not None:
-                raise RIAConnectionError(f"Failed to initialize calculator: {e.response.status_code}")
-            raise RIAConnectionError(f"Failed to initialize calculator: {str(e)}")
+            self.logger.error("Calculator init failed: %s", e, exc_info=True)
+            raise RIAConnectionError("Failed to initialize RIA calculator") from e
 
-    def _ensure_valid_token(self):
-        """
-        Check token expiry and refresh if needed.
-        
-        Raises:
-            RIAAuthenticationError: If no bearer token is available
-        """
+    def _ensure_token_valid(self):
         if not self.bearer_token:
-            self.logger.error("No bearer token available")
-            raise RIAAuthenticationError("No bearer token available")
-            
+            raise RIAAuthenticationError("RIA bearer token missing")
         if self.token_expiry and time.time() > (self.token_expiry - 60):
-            self.logger.debug("Token expired or about to expire; refreshing session")
-            self.get_session_info()
+            self.logger.debug("Token near expiry, re-initializing session")
+            self._session_init()
+            self._calculator_init()
 
-    def calculate_rate(self, send_amount: float, send_currency: str, receive_country: str,
-                      payment_method: str = "DebitCard", delivery_method: str = "BankDeposit",
-                      send_country: str = "US") -> dict:
+    def _calculate_rate(
+        self,
+        send_amount: float,
+        send_currency: str,
+        receive_country: str,
+        payment_method: str,
+        delivery_method: str,
+        send_country: str
+    ) -> Optional[Dict[str, Any]]:
+        self._ensure_token_valid()
+
+        body = {
+            "selections": {
+                "countryTo": receive_country.upper(),
+                "amountFrom": float(send_amount),
+                "amountTo": None,
+                "currencyFrom": send_currency.upper(),
+                "currencyTo": None,
+                "paymentMethod": payment_method,
+                "deliveryMethod": delivery_method,
+                "shouldCalcAmountFrom": False,
+                "shouldCalcVariableRates": True,
+                "countryFrom": send_country.upper(),
+                "promoCode": None,
+                "promoId": 0
+            }
+        }
+
+        url = f"{self.BASE_URL}/MoneyTransferCalculator/Calculate"
+        correlation_id = str(uuid.uuid4())
+
+        for attempt in range(3):
+            try:
+                resp = self.session.post(url, json=body, headers={"CorrelationId": correlation_id}, timeout=self.timeout)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    return data
+                if resp.status_code >= 500:
+                    time.sleep(1.5 * (attempt + 1))
+                    continue
+                self.logger.error("RIA calc error: status=%s, body=%s", resp.status_code, resp.text[:500])
+                return None
+            except requests.RequestException as e:
+                self.logger.warning("Calc attempt %d failed: %s", attempt + 1, e, exc_info=True)
+                time.sleep(1.5 * (attempt + 1))
+
+        return None
+
+    def get_quote(
+        self,
+        amount: Decimal,
+        source_currency: str,
+        dest_currency: str,
+        source_country: str,
+        dest_country: str,
+        payment_method: str = None,
+        delivery_method: str = None,
+        **kwargs
+    ) -> Dict[str, Any]:
         """
-        Calculate exchange rate via POST /MoneyTransferCalculator/Calculate.
+        Aggregator-standard method: returns the quote as a dictionary.
+        No fallback. If fails, success=False + error message.
         
         Args:
-            send_amount: Amount to send
-            send_currency: Currency code to send (e.g., USD)
-            receive_country: Country code to receive money (e.g., MX)
-            payment_method: Payment method (DebitCard, CreditCard, BankAccount)
-            delivery_method: Delivery method (BankDeposit, CashPickup, etc.)
-            send_country: Source country code (default: US)
-            
-        Returns:
-            Dictionary with rate details or None if calculation failed
+            amount: Decimal, the send amount
+            source_currency: e.g. "USD"
+            dest_currency: We let RIA pick automatically if not needed. But aggregator calls might pass it. 
+            source_country: e.g. "US"
+            dest_country: e.g. "MX"
+            payment_method: "debitCard", "bankAccount", ...
+            delivery_method: "bankDeposit", "cashPickup", ...
         """
-        try:
-            self._ensure_valid_token()
+        # Use defaults if not provided
+        if payment_method is None:
+            payment_method = self.DEFAULT_PAYMENT_METHOD
+        if delivery_method is None:
+            delivery_method = self.DEFAULT_DELIVERY_METHOD
             
-            payload = {
-                "selections": {
-                    "countryTo": receive_country.upper(),
-                    "amountFrom": float(send_amount),
-                    "amountTo": None,
-                    "currencyFrom": send_currency.upper(),
-                    "currencyTo": None,
-                    "paymentMethod": payment_method,
-                    "deliveryMethod": delivery_method,
-                    "shouldCalcAmountFrom": False,
-                    "shouldCalcVariableRates": True,
-                    "state": None,
-                    "agentToId": None,
-                    "stateTo": None,
-                    "agentToLocationId": None,
-                    "promoCode": None,
-                    "promoId": 0,
-                    "transferReason": None,
-                    "countryFrom": send_country.upper()
-                }
-            }
+        # Enable debug mode from kwargs
+        debug_mode = kwargs.get("debug_mode", False)
+        
+        # We'll unify everything in one standard result
+        base_result = {
+            "success": False,
+            "error_message": None,
+            "send_amount": float(amount),
+            "source_currency": source_currency,
+            "destination_currency": dest_currency,  # RIA might override
+            "payment_method": payment_method,
+            "delivery_method": delivery_method
+        }
 
-            # Get full response to inspect
-            full_response = self._do_calculate(payload, return_full=True)
-            
-            if full_response is None:
-                return None
+        try:
+            # Call the rate calculator
+            raw_calc = self._calculate_rate(
+                send_amount=float(amount),
+                send_currency=source_currency,
+                receive_country=dest_country,
+                payment_method=payment_method,
+                delivery_method=delivery_method,
+                send_country=source_country
+            )
+            if not raw_calc:
+                base_result["error_message"] = "RIA calculator returned no data (None)."
+                return self.standardize_response(base_result)
                 
-            # For debugging - log the complete response structure
-            if self.debug_mode:
-                self.logger.debug(f"Full calculate response: {json.dumps(full_response, indent=2)}")
+            # Debug raw structure
+            if debug_mode:
+                # Save the raw response to a file for inspection
+                debug_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "debug")
+                os.makedirs(debug_dir, exist_ok=True)
+                debug_file = os.path.join(debug_dir, f"ria_response_{dest_country}.json")
+                with open(debug_file, 'w') as f:
+                    json.dump(raw_calc, f, indent=2)
+                self.logger.info(f"Saved raw response to {debug_file}")
                 
-            # Check if there's an error
-            if "errorResponse" in full_response and full_response["errorResponse"]:
-                # Check if the error response actually has content
-                if full_response["errorResponse"].get("errors") and len(full_response["errorResponse"]["errors"]) > 0:
-                    self.logger.warning(f"Error in calculate response: {full_response['errorResponse']}")
-                    return None
-                else:
-                    # Empty error array might not actually indicate a failure
-                    self.logger.debug("Empty error response received, continuing processing")
+                # Log the path to delivery methods
+                self.logger.info("Raw response keys: %s", list(raw_calc.keys()))
+                if "model" in raw_calc:
+                    model = raw_calc["model"]
+                    self.logger.info("Model keys: %s", list(model.keys()))
+                    if "transferDetails" in model:
+                        td = model["transferDetails"]
+                        self.logger.info("TransferDetails keys: %s", list(td.keys()))
+                        if "transferOptions" in td:
+                            to = td["transferOptions"]
+                            self.logger.info("TransferOptions keys: %s", list(to.keys()))
+                            if "deliveryMethods" in to:
+                                dm = to["deliveryMethods"]
+                                self.logger.info("Found %d delivery methods", len(dm))
+                                for i, method in enumerate(dm):
+                                    self.logger.info("  Method %d: %s", i+1, method)
+
+            # Possibly the data is inside raw_calc["model"]["calculations"] or raw_calc["calculations"]
+            calculations = self._extract_calculations(raw_calc)
+            if not calculations:
+                # If we can't extract, consider failure
+                base_result["error_message"] = "No valid calculations in RIA response"
+                base_result["raw_response"] = raw_calc
+                return self.standardize_response(base_result, provider_specific_data=True)
+
+            # Extract available delivery and payment methods
+            available_delivery_methods = self._extract_delivery_methods(raw_calc)
+            available_payment_methods = self._extract_payment_methods(raw_calc)
+            
+            # Log extraction results
+            self.logger.debug(f"Extracted {len(available_delivery_methods)} delivery methods and {len(available_payment_methods)} payment methods")
+            if available_delivery_methods:
+                for i, m in enumerate(available_delivery_methods):
+                    self.logger.debug(f"  Delivery method {i+1}: {m}")
+
+            # Retrieve core fields
+            exchange_rate = calculations.get("exchangeRate")
+            transfer_fee = calculations.get("transferFee", 0.0)
+            amount_to = calculations.get("amountTo", 0.0)
+            currency_to = calculations.get("currencyTo")
+            total_fee = calculations.get("totalFeesAndTaxes", 0.0)
+
+            if not exchange_rate:
+                base_result["error_message"] = "Missing exchangeRate in RIA calculations"
+                base_result["raw_response"] = raw_calc
+                return self.standardize_response(base_result, provider_specific_data=True)
+
+            # If RIA decided a different currency for the receiving side
+            if currency_to and currency_to != dest_currency:
+                base_result["destination_currency"] = currency_to
+
+            # Mark success and add additional data
+            base_result.update({
+                "success": True,
+                "destination_amount": amount_to,
+                "exchange_rate": exchange_rate,
+                "fee": total_fee,
+                "raw_response": raw_calc
+            })
+            
+            # Add delivery and payment methods if available
+            if available_delivery_methods:
+                self.logger.info(f"Adding {len(available_delivery_methods)} delivery methods to response")
+                base_result["available_delivery_methods"] = available_delivery_methods
                 
-            # Extract fields from the correct model.calculations path
-            model_calcs = {}
-            direct_calcs = {}
+            if available_payment_methods:
+                self.logger.info(f"Adding {len(available_payment_methods)} payment methods to response")
+                base_result["available_payment_methods"] = available_payment_methods
+
+            # Create the standardized response, passing any extracted methods
+            response = self.standardize_response(base_result, provider_specific_data=True)
             
-            # Check multiple possible locations for calculation data
-            if "model" in full_response:
-                model = full_response["model"]
-                # Check for calculations directly in model
-                if "calculations" in model:
-                    model_calcs = model["calculations"]
-                # Check for calculations in transferDetails
-                elif "transferDetails" in model and "calculations" in model["transferDetails"]:
-                    model_calcs = model["transferDetails"]["calculations"]
+            # Double-check that standardized method preserves our delivery methods
+            if available_delivery_methods and "available_delivery_methods" not in response:
+                self.logger.warning("Delivery methods lost in standardization! Adding them back.")
+                response["available_delivery_methods"] = available_delivery_methods
+                
+            return response
+
+        except (RIAConnectionError, RIAAuthenticationError) as ce:
+            base_result["error_message"] = f"RIA connection/auth error: {str(ce)}"
+            return self.standardize_response(base_result)
+        except Exception as exc:
+            self.logger.error("RIA get_quote unexpected error: %s", exc, exc_info=True)
+            base_result["error_message"] = f"Unexpected RIA error: {str(exc)}"
+            return self.standardize_response(base_result)
+
+    def get_exchange_rate(
+        self,
+        send_amount: Decimal,
+        send_country: str,
+        send_currency: str,
+        receive_currency: str,
+        **kwargs
+    ) -> Dict[str, Any]:
+        dest_country = kwargs.get("dest_country", "")
+        payment_method = kwargs.get("payment_method", self.DEFAULT_PAYMENT_METHOD)
+        delivery_method = kwargs.get("delivery_method", self.DEFAULT_DELIVERY_METHOD)
+
+        return self.get_quote(
+            amount=send_amount,
+            source_currency=send_currency,
+            dest_currency=receive_currency,
+            source_country=send_country,
+            dest_country=dest_country,
+            payment_method=payment_method,
+            delivery_method=delivery_method
+        )
+
+    def _extract_calculations(self, full_response: Dict[str, Any]) -> Dict[str, Any]:
+        if "calculations" in full_response:
+            return full_response["calculations"]
+
+        model = full_response.get("model", {})
+        if "calculations" in model:
+            return model["calculations"]
+
+        transfer_details = model.get("transferDetails", {})
+        if "calculations" in transfer_details:
+            return transfer_details["calculations"]
+
+        return {}
+
+    def _extract_delivery_methods(self, raw_response: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Extract available delivery methods and their rates from the response.
+        
+        Returns a list of delivery method objects with standardized names and rates.
+        """
+        # Simple, direct approach to extract delivery methods
+        result = []
+        
+        try:
+            # Get transfer details
+            model = raw_response.get("model", {})
+            transfer_details = model.get("transferDetails", {})
+            transfer_options = transfer_details.get("transferOptions", {})
+            delivery_methods = transfer_options.get("deliveryMethods", [])
             
-            # Check for direct calculations in response
-            if "calculations" in full_response:
-                direct_calcs = full_response["calculations"]
+            # Get rates if available
+            calculations = transfer_details.get("calculations", {})
+            variable_rates = calculations.get("variableRates", [])
             
-            # Try both possible locations for calculation data
-            calculations = model_calcs if model_calcs.get("exchangeRate") is not None else direct_calcs
+            # Create rate map
+            rate_map = {}
+            for rate in variable_rates:
+                if isinstance(rate, dict) and "value" in rate and "exchangeRate" in rate:
+                    rate_map[rate["value"]] = {
+                        "exchange_rate": rate["exchangeRate"],
+                        "is_best_rate": rate.get("isBestRate", False)
+                    }
             
-            # If we still don't have exchange rate, try a different approach
-            if calculations.get("exchangeRate") is None:
-                self.logger.debug("No exchange rate found in standard locations, checking alternative paths")
-                # Try to find exchange rate in any nested structure
-                if "model" in full_response and "transferOptions" in full_response["model"]:
-                    for option in full_response["model"]["transferOptions"]:
-                        if "exchangeRate" in option:
-                            calculations["exchangeRate"] = option["exchangeRate"]
-                            break
+            # Log basic info
+            self.logger.debug(f"Found {len(delivery_methods)} delivery methods and {len(rate_map)} rate entries")
             
-            # Return structured response
-            result = {
-                "provider": "RIA",
-                "timestamp": datetime.now().isoformat(),
-                "send_amount": send_amount,
-                "send_currency": send_currency.upper(),
-                "receive_country": receive_country.upper(),
-                "exchange_rate": calculations.get("exchangeRate"),
-                "transfer_fee": calculations.get("transferFee"),
-                "receive_amount": calculations.get("amountTo"),
-                "payment_method": payment_method,
-                "delivery_method": delivery_method,
-                "payment_type": payment_method,  # For compatibility with tests
-                "delivery_time": "24-48 hours",  # For compatibility with tests
-                "total_fee": calculations.get("totalFeesAndTaxes", 0),
-                "promo_discount": calculations.get("promoAmount", 0),
-                "currency_to": calculations.get("currencyTo"),
-                "status_message": full_response.get("statusMessage"),
-                "raw_response": full_response if self.debug_mode else None
-            }
+            # Simply iterate and add to result
+            for i, method in enumerate(delivery_methods):
+                if not isinstance(method, dict):
+                    self.logger.warning(f"Delivery method at index {i} is not a dictionary: {method}")
+                    continue
+                
+                if "value" not in method or "text" not in method:
+                    self.logger.warning(f"Delivery method at index {i} missing required keys: {method}")
+                    continue
+                
+                code = method["value"]
+                name = method["text"]
+                standardized_name = self.DELIVERY_METHOD_MAP.get(code, code.lower())
+                
+                method_info = {
+                    "method_code": code,
+                    "method_name": name,
+                    "standardized_name": standardized_name
+                }
+                
+                # Add rate if available
+                if code in rate_map:
+                    method_info["exchange_rate"] = rate_map[code]["exchange_rate"]
+                    method_info["is_best_rate"] = rate_map[code]["is_best_rate"]
+                
+                result.append(method_info)
+                self.logger.debug(f"Added delivery method: {method_info}")
+            
+            # Final check and fallback if extraction failed
+            if not result and delivery_methods:
+                self.logger.warning(f"Extraction failed despite finding methods. Using direct extraction.")
+                # Last resort: directly add methods without transformation
+                for method in delivery_methods:
+                    if isinstance(method, dict) and "value" in method and "text" in method:
+                        result.append({
+                            "method_code": method["value"],
+                            "method_name": method["text"],
+                            "standardized_name": self.DELIVERY_METHOD_MAP.get(method["value"], method["value"].lower())
+                        })
             
             return result
-
-        except RIAAuthenticationError:
-            raise
-        except (requests.RequestException, ValueError, KeyError) as e:
-            self.logger.error(f"Calculation failed: {str(e)}", exc_info=True)
-            return None
-
-    def _do_calculate(self, payload: dict, return_full: bool = True) -> dict:
-        """
-        Execute calculation request.
-        
-        Args:
-            payload: Request payload
-            return_full: If True, return full response instead of just calculations (Default: True)
+        except Exception as e:
+            self.logger.error(f"Error extracting delivery methods: {str(e)}", exc_info=True)
+            return []
             
-        Returns:
-            Full response JSON or just calculations based on return_full (or None if request fails)
+    def _extract_payment_methods(self, raw_response: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
-        correlation_id = str(uuid.uuid4())
+        Extract available payment methods from the response.
+        
+        Returns a list of payment method objects with standardized names.
+        """
+        result = []
         
         try:
-            # Add retry mechanism for this specific API endpoint
-            retries = 3
-            backoff_factor = 0.5
+            # Get payment methods in a simple, direct way
+            model = raw_response.get("model", {})
+            transfer_details = model.get("transferDetails", {})
+            transfer_options = transfer_details.get("transferOptions", {})
+            payment_methods = transfer_options.get("paymentMethods", [])
             
-            for attempt in range(retries):
-                try:
-                    response = self._session.post(
-                        f"{self.BASE_URL}/MoneyTransferCalculator/Calculate",
-                        json=payload,
-                        headers={
-                            'CorrelationId': correlation_id
-                        },
-                        timeout=self.timeout
-                    )
-                    
-                    self.logger.debug(f"HTTP Response Status: {response.status_code}")
-                    
-                    # Break the retry loop on success
-                    if response.status_code == 200:
-                        break
-                    
-                    # If we get a non-200 response but not a server error, don't retry
-                    if response.status_code < 500:
-                        break
-                        
-                    # Only retry on 5xx server errors
-                    self.logger.warning(f"Received {response.status_code} from RIA API, retrying (attempt {attempt+1}/{retries})")
-                    time.sleep(backoff_factor * (2 ** attempt))
-                    
-                except (requests.ConnectionError, requests.Timeout) as e:
-                    # Only retry on connection errors
-                    if attempt < retries - 1:
-                        self.logger.warning(f"Connection error: {str(e)}, retrying (attempt {attempt+1}/{retries})")
-                        time.sleep(backoff_factor * (2 ** attempt))
-                    else:
-                        raise
-            
-            # Check response status outside the retry loop
-            if response.status_code != 200:
-                self.logger.error(f"Failed API call: status={response.status_code}, body={response.text[:1000]}")
-                return None
-            
-            self.logger.debug(f"HTTP Response Headers: {dict(response.headers)}")
-            
-            # Check for token updates here too
-            if 'bearer' in response.headers:
-                new_token = response.headers['bearer']
-                if new_token != self.bearer_token:
-                    self.bearer_token = new_token
-                    self._session.headers['Authorization'] = f'Bearer {new_token}'
-                    self.logger.debug("Updated bearer token from calculate response")
-            
-            # Inspect Session-Analytics and other headers
-            if 'Session-Analytics' in response.headers:
-                self.logger.debug(f"Session Analytics: {response.headers['Session-Analytics']}")
-            
-            # Parse and return response
-            try:
-                result = response.json()
-            except json.JSONDecodeError as e:
-                self.logger.error(f"Failed to parse JSON response: {str(e)}")
-                self.logger.error(f"Response body: {response.text[:1000]}")
-                return None
-            
-            if return_full:
-                return result
-            else:
-                # Check both possible locations for calculation data
-                model_calcs = {}
-                direct_calcs = {}
+            # Simply iterate and add to result
+            for i, method in enumerate(payment_methods):
+                if not isinstance(method, dict):
+                    self.logger.warning(f"Payment method at index {i} is not a dictionary: {method}")
+                    continue
                 
-                # Check multiple possible locations for calculation data
-                if "model" in result:
-                    model = result["model"]
-                    # Check for calculations directly in model
-                    if "calculations" in model:
-                        model_calcs = model["calculations"]
-                    # Check for calculations in transferDetails
-                    elif "transferDetails" in model and "calculations" in model["transferDetails"]:
-                        model_calcs = model["transferDetails"]["calculations"]
+                if "value" not in method or "text" not in method:
+                    self.logger.warning(f"Payment method at index {i} missing required keys: {method}")
+                    continue
                 
-                # Check for direct calculations in response
-                if "calculations" in result:
-                    direct_calcs = result["calculations"]
+                code = method["value"]
+                name = method["text"]
+                standardized_name = self.PAYMENT_METHOD_MAP.get(code, code.lower())
                 
-                # Return whichever has actual data
-                if model_calcs.get("exchangeRate") is not None:
-                    return model_calcs
-                else:
-                    return direct_calcs
-                    
-        except requests.RequestException as e:
-            self.logger.error(f"Calculate request failed: {str(e)}", exc_info=True)
-            if hasattr(e, 'response') and e.response is not None:
-                self.logger.error(f"Response status: {e.response.status_code}")
-                self.logger.error(f"Response body: {e.response.text[:1000]}")
-            return None
+                method_info = {
+                    "method_code": code,
+                    "method_name": name,
+                    "standardized_name": standardized_name
+                }
+                
+                result.append(method_info)
+                self.logger.debug(f"Added payment method: {method_info}")
+            
+            return result
+        except Exception as e:
+            self.logger.error(f"Error extracting payment methods: {str(e)}", exc_info=True)
+            return []
+
+    def close(self):
+        if self.session:
+            self.session.close()
+            self.session = None
 
     def __enter__(self):
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self._session.close()
+        self.close()
