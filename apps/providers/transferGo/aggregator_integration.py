@@ -196,11 +196,26 @@ class TransferGoProvider(RemittanceProvider):
             resp = self.session.get(endpoint, params=params, timeout=self.timeout)
             if resp.status_code >= 400:
                 try:
-                    error_data = resp.json()
-                    err_msg = error_data.get("error", {}).get("message", "Unknown error")
+                    # Try to parse error as JSON
+                    try:
+                        error_data = resp.json()
+                        # Handle different error formats
+                        if isinstance(error_data, dict):
+                            # Standard JSON error format
+                            err_msg = error_data.get("error", {}).get("message", "Unknown error")
+                        elif isinstance(error_data, str):
+                            # String error message
+                            err_msg = error_data
+                        else:
+                            # Fallback for other formats
+                            err_msg = f"Unknown error format: {error_data}"
+                    except json.JSONDecodeError:
+                        # Not valid JSON, use text response
+                        err_msg = resp.text
+                    
                     raise TransferGoError(f"TransferGo API error (HTTP {resp.status_code}): {err_msg}")
-                except (ValueError, KeyError):
-                    # JSON parse error or missing fields
+                except Exception as e:
+                    # Catch-all for any other errors
                     raise TransferGoError(f"TransferGo request failed with status={resp.status_code}, body={resp.text}")
 
             data = resp.json()
