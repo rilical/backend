@@ -14,7 +14,6 @@ CURRENCY_NAMES = {
     'CNY': 'Chinese Yuan',
     'MXN': 'Mexican Peso',
     'BRL': 'Brazilian Real',
-    # Add more as needed
 }
 
 # ISO 3166-1 alpha-2 country codes mapped to their common names
@@ -29,7 +28,6 @@ COUNTRY_NAMES = {
     'MX': 'Mexico',
     'BR': 'Brazil',
     'DE': 'Germany',
-    # Add more as needed
 }
 
 # Common currency codes for each country
@@ -44,7 +42,6 @@ COUNTRY_CURRENCIES = {
     'MX': ['MXN'],
     'BR': ['BRL'],
     'DE': ['EUR'],
-    # Add more as needed
 }
 
 def get_currency_name(currency_code: str) -> str:

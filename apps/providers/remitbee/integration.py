@@ -10,11 +10,13 @@ for international money transfers.
 
 import json
 import logging
-from decimal import Decimal
-from typing import Dict, List, Any, Optional
-from pathlib import Path
 import os
 import random
+import datetime
+import time
+from decimal import Decimal
+from pathlib import Path
+from typing import Dict, List, Any, Optional, Tuple
 
 import requests
 from bs4 import BeautifulSoup
@@ -33,360 +35,609 @@ logger = logging.getLogger(__name__)
 
 class RemitbeeProvider(RemittanceProvider):
     """
-    Integration with Remitbee's public quote API.
+    Aggregator-ready Remitbee Provider Integration WITHOUT any mock-data fallback.
     
-    This class implements a client for Remitbee's API to retrieve
-    exchange rates and fees for international money transfers.
-    
-    Example usage:
-        provider = RemitbeeProvider()
-        result = provider.get_exchange_rate(
-            send_amount=Decimal("1000.00"),
-            send_currency="CAD",
-            receive_country="IN"
-        )
+    Provides methods to fetch exchange rates and quotes from Remitbee's API.
+    If a corridor is unsupported or an error occurs, returns an error.
     """
     
     BASE_URL = "https://api.remitbee.com"
     QUOTE_ENDPOINT = "/public-services/calculate-money-transfer"
-    
-    # Path to the countries data file (relative to this file)
+    RATES_ENDPOINT = "/public-services/online-rates-multi-currency"
     COUNTRIES_DATA_FILE = "countries_data.json"
     
-    # Common user agents to rotate and appear more like a browser
+    # Default payment/delivery methods and estimated delivery time (minutes)
+    DEFAULT_PAYMENT_METHOD = "bank"
+    DEFAULT_DELIVERY_METHOD = "bank"
+    DEFAULT_DELIVERY_TIME = 1440  # 24 hours in minutes
+    
+    # Cache validity period in seconds (24 hours)
+    CACHE_VALIDITY_SECONDS = 86400
+    
+    # A small pool of user-agents to mimic browser usage
     USER_AGENTS = [
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.1 Safari/605.1.15",
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:108.0) Gecko/20100101 Firefox/108.0"
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
     ]
     
-    def __init__(self, countries_html_file: Optional[str] = None):
+    def __init__(self, name="remitbee", countries_html_file: Optional[str] = None, **kwargs):
         """
-        Initialize the RemitbeeProvider.
+        Initialize the Remitbee provider.
         
         Args:
-            countries_html_file: Optional path to an HTML file containing Remitbee country data.
-                                 If not provided, will use a cached JSON file if available.
+            name: Provider identifier
+            countries_html_file: Optional path to HTML file with countries data
+            **kwargs: Additional parameters
         """
-        super().__init__(name="Remitbee", base_url=self.BASE_URL)
+        super().__init__(name=name, base_url=self.BASE_URL)
+        self.country_data: Dict[str, Dict[str, Any]] = {}
+        self.rates_cache: Dict[str, Dict[str, Any]] = {}
+        self.rates_cache_timestamp: float = 0
         
-        # Dictionary to map country codes to country IDs
-        self.country_data = {}
-        
-        # Load country data
+        # Load or parse country data (only static info, not rates)
         if countries_html_file and os.path.exists(countries_html_file):
-            # Parse from HTML file
-            self.country_data = self._load_from_html(countries_html_file)
-            # Cache the data for future use
+            self.country_data = self._parse_countries_html(countries_html_file)
             self._save_country_data()
         else:
-            # Try to load from cached JSON
             self._load_country_data()
-            
-        # Create a session for persistent connections and cookies
-        self.session = requests.Session()
-        # Set a random user agent
-        self.session.headers.update({
-            'User-Agent': random.choice(self.USER_AGENTS)
-        })
-    
-    def _load_from_html(self, html_file: str) -> Dict[str, Dict]:
-        """
-        Parse the Remitbee HTML to extract country and currency information.
-        
-        Args:
-            html_file: Path to HTML file containing Remitbee country dropdown data.
-        
-        Returns:
-            Dictionary mapping country codes to country data dictionaries.
-        """
-        logger.info(f"Parsing Remitbee HTML from: {html_file}")
-        country_data = {}
-        
-        try:
-            with open(html_file, "r", encoding="utf-8") as f:
-                html = f.read()
 
-            soup = BeautifulSoup(html, "html.parser")
-            
-            # Find all <li> elements with data-item attribute
-            li_tags = soup.find_all("li", attrs={"data-item": True})
-            
-            for li in li_tags:
-                data_item_str = li["data-item"]  # raw JSON in attribute
-                try:
-                    item_json = json.loads(data_item_str)
-                except json.JSONDecodeError:
-                    continue  # skip if invalid
-                
-                # Extract relevant fields
-                country_id = item_json.get("country_id")
-                country_name = item_json.get("country_to")
-                currency_name = item_json.get("currency_name")
-                currency_code = item_json.get("currency_code")
-                rate = item_json.get("rate")
-                iso2 = item_json.get("iso2")
-                iso3 = item_json.get("iso3")
-                special_rate = item_json.get("special_rate")
-                
-                if not (country_id and iso2 and currency_code):
-                    continue  # Skip entries missing required fields
-                
-                # Store in our data structure
-                # We'll use ISO2 country code as the key
-                country_data[iso2] = {
-                    "country_id": country_id,
-                    "country_name": country_name,
-                    "currency_name": currency_name,
-                    "currency_code": currency_code,
-                    "rate": rate,
-                    "iso2": iso2,
-                    "iso3": iso3,
-                    "special_rate": special_rate
-                }
-            
-            logger.info(f"Extracted {len(country_data)} countries from Remitbee HTML")
-            
-        except Exception as e:
-            logger.error(f"Error parsing Remitbee HTML: {str(e)}")
-            raise RemitbeeError(f"Failed to parse Remitbee HTML: {str(e)}")
+        self.session = requests.Session()
+        self.session.headers.update({
+            "User-Agent": random.choice(self.USER_AGENTS)
+        })
         
+        self.logger = logging.getLogger(f"providers.{name}")
+        
+        # Initial rates fetch
+        self._ensure_rates_are_current()
+    
+    def standardize_response(
+        self,
+        raw_result: Dict[str, Any],
+        provider_specific_data: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Standardize the response shape for aggregator consumption.
+        
+        Follows the structure defined in RemittanceProvider base class
+        to ensure consistent response format across all providers.
+        """
+        # Ensure required keys exist with proper formatting
+        output = {
+            "provider_id": self.name,
+            "success": raw_result.get("success", False),
+            "error_message": raw_result.get("error_message"),
+            "send_amount": raw_result.get("send_amount", 0.0),
+            "source_currency": raw_result.get("source_currency", "").upper(),
+            "destination_amount": raw_result.get("destination_amount", 0.0),
+            "destination_currency": raw_result.get("destination_currency", "").upper(),
+            "exchange_rate": raw_result.get("exchange_rate"),
+            "fee": raw_result.get("fee", 0.0),
+            "payment_method": raw_result.get("payment_method", self.DEFAULT_PAYMENT_METHOD),
+            "delivery_method": raw_result.get("delivery_method", self.DEFAULT_DELIVERY_METHOD),
+            "delivery_time_minutes": raw_result.get("delivery_time_minutes", self.DEFAULT_DELIVERY_TIME),
+            "timestamp": raw_result.get("timestamp", datetime.datetime.now().isoformat()),
+        }
+
+        if provider_specific_data and "raw_response" in raw_result:
+            output["raw_response"] = raw_result["raw_response"]
+
+        return output
+    
+    def _parse_countries_html(self, html_file: str) -> Dict[str, Dict[str, Any]]:
+        """
+        Parse HTML file containing country data.
+        
+        Only extracts static country information, not rates.
+        """
+        country_data = {}
+        with open(html_file, "r", encoding="utf-8") as f:
+            soup = BeautifulSoup(f.read(), "html.parser")
+        li_tags = soup.find_all("li", attrs={"data-item": True})
+        for li in li_tags:
+            data_str = li["data-item"]
+            try:
+                item = json.loads(data_str)
+                cid = item.get("country_id")
+                iso2 = item.get("iso2")
+                ccode = item.get("currency_code")
+                if cid and iso2 and ccode:
+                    country_data[iso2.upper()] = {
+                        "country_id": cid,
+                        "country_name": item.get("country_to"),
+                        "currency_name": item.get("currency_name"),
+                        "currency_code": ccode.upper(),
+                        "iso2": iso2.upper(),
+                        "iso3": item.get("iso3")
+                    }
+            except json.JSONDecodeError:
+                pass
         return country_data
     
-    def _save_country_data(self):
-        """Save country data to a JSON file for future use."""
+    def _save_country_data(self) -> None:
+        """Save country data to JSON file."""
         try:
             data_file = Path(__file__).parent / self.COUNTRIES_DATA_FILE
             with open(data_file, "w", encoding="utf-8") as f:
                 json.dump(self.country_data, f, indent=2)
-            logger.info(f"Saved Remitbee country data to {data_file}")
-        except Exception as e:
-            logger.warning(f"Could not save Remitbee country data: {str(e)}")
+        except Exception as exc:
+            logger.warning(f"Could not save Remitbee country data: {exc}")
     
-    def _load_country_data(self):
-        """Load country data from a JSON file."""
+    def _load_country_data(self) -> None:
+        """Load country data from JSON file."""
+        data_file = Path(__file__).parent / self.COUNTRIES_DATA_FILE
+        if data_file.exists():
+            with open(data_file, "r", encoding="utf-8") as f:
+                self.country_data = json.load(f)
+        else:
+            logger.warning(f"Countries data file not found: {data_file}")
+            # Try to fetch countries from the API as a fallback
+            self._fetch_countries_and_rates()
+    
+    def _ensure_rates_are_current(self) -> None:
+        """
+        Check if cached rates are still valid, fetch new ones if needed.
+        
+        Rates are considered valid for CACHE_VALIDITY_SECONDS (default: 24 hours).
+        """
+        current_time = time.time()
+        
+        # Check if cache is expired or empty
+        if (current_time - self.rates_cache_timestamp > self.CACHE_VALIDITY_SECONDS or
+            not self.rates_cache):
+            logger.info("Rates cache expired or empty, fetching fresh rates")
+            self._fetch_countries_and_rates()
+    
+    def _fetch_countries_and_rates(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Fetch all supported countries and rates from Remitbee API.
+        
+        Updates both country_data (static info) and rates_cache (volatile info).
+        Sets the timestamp for cache validity tracking.
+        
+        Returns:
+            Combined dictionary with both country data and rates
+        """
+        url = f"{self.BASE_URL}{self.RATES_ENDPOINT}"
+        headers = {
+            "Accept": "*/*",
+            "Origin": "https://www.remitbee.com",
+            "Pragma": "no-cache",
+            "Cache-Control": "no-cache",
+            "User-Agent": random.choice(self.USER_AGENTS)
+        }
+        
         try:
-            data_file = Path(__file__).parent / self.COUNTRIES_DATA_FILE
-            if data_file.exists():
-                with open(data_file, "r", encoding="utf-8") as f:
-                    self.country_data = json.load(f)
-                logger.info(f"Loaded {len(self.country_data)} Remitbee countries from {data_file}")
-            else:
-                logger.warning(f"Remitbee country data file {data_file} not found")
+            # First visit the home page to get cookies
+            self.session.get("https://www.remitbee.com/", timeout=20)
+            
+            # Fetch all rates
+            response = self.session.get(url, headers=headers, timeout=20)
+            response.raise_for_status()
+            
+            data = response.json()
+            rates = data.get("rates", [])
+            
+            # Process rates into our separate caches
+            rates_data = {}
+            
+            for rate in rates:
+                iso2 = rate.get("iso2")
+                currency_code = rate.get("currency_code")
+                
+                # Skip USD entries for countries other than US (they're duplicates)
+                if currency_code == "USD" and iso2 != "US":
+                    continue
+                
+                if iso2 and currency_code:
+                    iso2 = iso2.upper()
+                    
+                    # Update static country data if not already present
+                    if iso2 not in self.country_data:
+                        self.country_data[iso2] = {
+                            "country_id": rate.get("country_id"),
+                            "country_name": rate.get("country_to"),
+                            "currency_name": rate.get("currency_name"),
+                            "currency_code": currency_code.upper(),
+                            "iso2": iso2,
+                            "iso3": rate.get("iso3")
+                        }
+                    
+                    # Store rate data in the volatile cache
+                    rates_data[iso2] = {
+                        "rate": rate.get("rate"),
+                        "special_rate": rate.get("special_rate"),
+                        "special_rate_adjustment": rate.get("special_rate_adjustment"),
+                        "special_rate_transfer_amount_limit": rate.get("special_rate_transfer_amount_limit")
+                    }
+            
+            # Update caches and timestamp
+            self.rates_cache = rates_data
+            self.rates_cache_timestamp = time.time()
+            
+            # Save just the country data (not rates) to file
+            self._save_country_data()
+            
+            logger.info(f"Successfully fetched rates for {len(rates_data)} countries")
+            return self.country_data
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to fetch Remitbee countries and rates: {e}")
+            return {}
         except Exception as e:
-            logger.warning(f"Could not load Remitbee country data: {str(e)}")
+            logger.error(f"Error processing Remitbee countries and rates: {e}")
+            return {}
     
-    def get_quote(
-        self, 
+    def _get_rate_for_country(self, country_code: str) -> Tuple[float, bool]:
+        """
+        Get the current exchange rate for a country, ensuring rates are up-to-date.
+        
+        Args:
+            country_code: ISO-3166 alpha-2 country code
+            
+        Returns:
+            Tuple of (rate, is_special_rate)
+            - rate: The exchange rate as a float
+            - is_special_rate: Boolean indicating if special rate is being used
+        """
+        # Make sure rates are current
+        self._ensure_rates_are_current()
+        
+        country_code = country_code.upper()
+        rate_info = self.rates_cache.get(country_code, {})
+        
+        # Check if special rate is available and parse rates
+        special_rate = rate_info.get("special_rate")
+        standard_rate = rate_info.get("rate")
+        
+        # Parse rates as floats, handling various formats
+        try:
+            if special_rate and special_rate not in ("null", "false", ""):
+                return float(special_rate), True
+        except (ValueError, TypeError):
+            pass
+            
+        try:
+            if standard_rate and standard_rate not in ("null", "false", ""):
+                return float(standard_rate), False
+        except (ValueError, TypeError):
+            pass
+            
+        # No valid rate found
+        return 0.0, False
+    
+    def _request_quote(
+        self,
         country_id: int,
         currency_code: str,
         amount: Decimal,
-        is_special_rate: bool = False,
-        include_timeline: bool = True
+        is_special_rate: bool
     ) -> Dict[str, Any]:
         """
-        Call Remitbee's calculate-money-transfer API to get a quote.
+        Request a quote from Remitbee API.
         
         Args:
-            country_id: Destination country ID (from Remitbee's country list)
-            currency_code: Destination currency code
-            amount: Amount to send (in CAD, as Remitbee is Canada-based)
-            is_special_rate: Whether to use special rate (if available)
-            include_timeline: Whether to include delivery timeline in response
+            country_id: Remitbee's internal country ID
+            currency_code: ISO currency code for destination
+            amount: Amount to send
+            is_special_rate: Whether to use special rate
             
         Returns:
-            Dictionary with exchange rate, fees, and other details
-        
+            API response as dictionary
+            
         Raises:
-            RemitbeeConnectionError: If connection to API fails
-            RemitbeeApiError: If API returns an error
+            RemitbeeConnectionError: On connection issues
+            RemitbeeApiError: On API errors
         """
         url = f"{self.BASE_URL}{self.QUOTE_ENDPOINT}"
-        
-        # Enhanced browser-like headers to avoid 403 errors
         headers = {
             "Content-Type": "application/json",
             "Accept": "application/json, text/plain, */*",
             "Origin": "https://www.remitbee.com",
             "Referer": "https://www.remitbee.com/send-money",
-            "Sec-Fetch-Site": "same-site",
-            "Sec-Fetch-Mode": "cors",
-            "Sec-Fetch-Dest": "empty",
-            "Accept-Language": "en-US,en;q=0.9",
             "Cache-Control": "no-cache",
             "Pragma": "no-cache",
             "X-Requested-With": "XMLHttpRequest"
         }
-        
-        # Updated payload format based on the example script
         payload = {
             "transfer_amount": f"{amount:.2f}",
             "country_id": country_id,
             "currency_code": currency_code,
-            "include_timeline": include_timeline,
+            "include_timeline": True,
             "is_special_rate": is_special_rate,
-            # Additional fields observed from browser requests
             "source_currency": "CAD",
             "source_country": "CA"
         }
-        
-        logger.debug(f"Requesting Remitbee quote: {payload}")
-        
         try:
-            # First visit the Remitbee homepage to get cookies
+            # First do a GET to set initial cookies
             self.session.get("https://www.remitbee.com/", timeout=20)
+            resp = self.session.post(url, headers=headers, json=payload, timeout=20)
+            if resp.status_code == 403:
+                raise RemitbeeApiError("403 Forbidden from Remitbee API.")
+            resp.raise_for_status()
+            return resp.json()
+        except requests.exceptions.RequestException as e:
+            raise RemitbeeConnectionError(f"Connection error: {e}")
+        except ValueError as e:
+            raise RemitbeeApiError(f"Invalid JSON response: {e}")
+    
+    def get_quote(
+        self,
+        amount: Decimal,
+        source_currency: str,
+        dest_currency: str,
+        source_country: str,
+        dest_country: str,
+        payment_method: Optional[str] = None,
+        delivery_method: Optional[str] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Get a standardized quote for money transfer between currencies.
+        
+        This implements the abstract method from RemittanceProvider.
+        """
+        # Remitbee only supports CAD as source currency
+        if source_currency.upper() != "CAD" or source_country.upper() != "CA":
+            return self.standardize_response({
+                "success": False,
+                "error_message": "Remitbee only supports CAD (Canada) as source currency/country",
+                "send_amount": float(amount),
+                "source_currency": source_currency.upper(),
+                "destination_currency": dest_currency.upper()
+            })
+        
+        # Process quote for supported destination
+        dest_country = dest_country.upper()
+        cdata = self.country_data.get(dest_country)
+        if not cdata:
+            # Try to fetch country data from API if not in our cache
+            logger.info(f"Country {dest_country} not found in cache, fetching from API")
+            self._fetch_countries_and_rates()
+            cdata = self.country_data.get(dest_country)
+            if not cdata:
+                return self.standardize_response({
+                    "success": False,
+                    "error_message": f"Unsupported destination country: {dest_country}",
+                    "send_amount": float(amount),
+                    "source_currency": source_currency.upper(),
+                    "destination_currency": dest_currency.upper(),
+                    "payment_method": payment_method or self.DEFAULT_PAYMENT_METHOD,
+                    "delivery_method": delivery_method or self.DEFAULT_DELIVERY_METHOD
+                })
+        
+        # Check if destination currency matches country's currency
+        if dest_currency.upper() != cdata["currency_code"]:
+            return self.standardize_response({
+                "success": False,
+                "error_message": f"Invalid currency {dest_currency} for country {dest_country}. Expected: {cdata['currency_code']}",
+                "send_amount": float(amount),
+                "source_currency": source_currency.upper(),
+                "destination_currency": dest_currency.upper(),
+                "payment_method": payment_method or self.DEFAULT_PAYMENT_METHOD,
+                "delivery_method": delivery_method or self.DEFAULT_DELIVERY_METHOD
+            })
+        
+        # Attempt to get quote from API
+        try:
+            country_id = cdata["country_id"]
+            currency_code = cdata["currency_code"]
             
-            # Now make the API request using the session
-            response = self.session.post(url, headers=headers, json=payload, timeout=20)
+            # Get rate from cache
+            rate, is_special_rate = self._get_rate_for_country(dest_country)
             
-            # Log response headers for debugging
-            logger.debug(f"Response status: {response.status_code}")
-            logger.debug(f"Response headers: {dict(response.headers)}")
+            # For small amounts, we can calculate based on cached rates
+            # If specific amount is small enough and we have the rate, we can avoid API call
+            if float(amount) <= 200 and rate > 0:
+                # Simple calculation for small amounts
+                receive_amount = float(amount) * rate
+                
+                return self.standardize_response({
+                    "success": True,
+                    "error_message": None,
+                    "send_amount": float(amount),
+                    "source_currency": source_currency.upper(),
+                    "destination_currency": currency_code,
+                    "destination_amount": receive_amount,
+                    "exchange_rate": rate,
+                    "fee": 2.99,  # Default fee for small amounts
+                    "payment_method": payment_method or self.DEFAULT_PAYMENT_METHOD,
+                    "delivery_method": delivery_method or self.DEFAULT_DELIVERY_METHOD,
+                    "delivery_time_minutes": self.DEFAULT_DELIVERY_TIME,
+                    "timestamp": datetime.datetime.now().isoformat()
+                })
             
-            if response.status_code == 403:
-                logger.warning("Received 403 Forbidden from Remitbee API. The API may require additional authentication.")
-                # Try to get the response content for debugging
-                try:
-                    error_content = response.text
-                    logger.debug(f"403 Response content: {error_content}")
-                except:
-                    pass
-                raise RemitbeeApiError("Access forbidden by Remitbee API. The API may require browser authentication.")
-            
-            response.raise_for_status()  # Raise for other 4XX/5XX status codes
-            
+            # For larger amounts or if we don't have a rate, call the API
             try:
-                data = response.json()
-                logger.debug(f"Remitbee quote response: {json.dumps(data, indent=2)}")
-                return data
-            except json.JSONDecodeError:
-                # If not JSON, try to return the text content for debugging
-                logger.error(f"Response was not valid JSON: {response.text[:200]}...")
-                raise RemitbeeApiError(f"Invalid JSON response from Remitbee API")
+                quote_data = self._request_quote(country_id, currency_code, amount, is_special_rate)
+            except (RemitbeeConnectionError, RemitbeeApiError) as e:
+                if "Unable to find requested country rate" in str(e) or "country rate" in str(e).lower():
+                    # Try to refresh countries and rates
+                    logger.info(f"Failed to get rate for {dest_country}, refreshing country data")
+                    self._fetch_countries_and_rates()
+                    cdata = self.country_data.get(dest_country)
+                    if not cdata:
+                        raise RemitbeeApiError(f"Country {dest_country} not supported after refresh")
+                    
+                    # Try again with fresh data
+                    country_id = cdata["country_id"]
+                    rate, is_special_rate = self._get_rate_for_country(dest_country)
+                    quote_data = self._request_quote(country_id, currency_code, amount, is_special_rate)
+                else:
+                    raise
             
-        except requests.exceptions.ConnectionError as e:
-            logger.error(f"Connection error while getting Remitbee quote: {str(e)}")
-            raise RemitbeeConnectionError(f"Failed to connect to Remitbee API: {str(e)}")
-        except requests.exceptions.Timeout as e:
-            logger.error(f"Timeout while getting Remitbee quote: {str(e)}")
-            raise RemitbeeConnectionError(f"Remitbee API request timed out: {str(e)}")
-        except requests.exceptions.HTTPError as e:
-            logger.error(f"HTTP error while getting Remitbee quote: {str(e)}")
-            raise RemitbeeApiError(f"Remitbee API returned error: {str(e)}")
+            # Check for API error message
+            if "message" in quote_data and "unable to find" in quote_data["message"].lower():
+                # Force refresh rates and try one more time
+                self._fetch_countries_and_rates()
+                country_id = self.country_data.get(dest_country, {}).get("country_id")
+                if not country_id:
+                    return self.standardize_response({
+                        "success": False,
+                        "error_message": quote_data["message"],
+                        "send_amount": float(amount),
+                        "source_currency": source_currency.upper(),
+                        "destination_currency": currency_code,
+                        "payment_method": payment_method or self.DEFAULT_PAYMENT_METHOD,
+                        "delivery_method": delivery_method or self.DEFAULT_DELIVERY_METHOD
+                    })
+                
+                # Try one more time with fresh data
+                rate, is_special_rate = self._get_rate_for_country(dest_country)
+                quote_data = self._request_quote(country_id, currency_code, amount, is_special_rate)
+                
+                # If still has error message, give up
+                if "message" in quote_data and "unable to find" in quote_data["message"].lower():
+                    return self.standardize_response({
+                        "success": False,
+                        "error_message": quote_data["message"],
+                        "send_amount": float(amount),
+                        "source_currency": source_currency.upper(),
+                        "destination_currency": currency_code,
+                        "payment_method": payment_method or self.DEFAULT_PAYMENT_METHOD,
+                        "delivery_method": delivery_method or self.DEFAULT_DELIVERY_METHOD
+                    })
+            
+            # Parse response data
+            api_rate = quote_data.get("rate", 0.0)
+            if api_rate > 0:
+                # Update our rate cache with the latest value from API
+                if dest_country in self.rates_cache:
+                    self.rates_cache[dest_country]["rate"] = api_rate
+            
+            rec_amount_str = quote_data.get("receiving_amount", "0").replace(",", "")
+            rec_amount = float(rec_amount_str) if rec_amount_str else 0.0
+            fee_val = 0.0
+            delivery_minutes = self.DEFAULT_DELIVERY_TIME
+            
+            # Extract payment details if available
+            payment_types = quote_data.get("payment_types", [])
+            actual_payment_method = payment_method or self.DEFAULT_PAYMENT_METHOD
+            actual_delivery_method = delivery_method or self.DEFAULT_DELIVERY_METHOD
+            
+            if payment_types:
+                # Get first payment type's fee
+                fee_str = payment_types[0].get("fees", "0.00")
+                fee_val = float(fee_str) if fee_str else 0.0
+                
+                # Get delivery time if available
+                if "timeline" in payment_types[0] and "settlement_timeline" in payment_types[0]["timeline"]:
+                    mins = payment_types[0]["timeline"]["settlement_timeline"].get("predicted_minutes", 0)
+                    delivery_minutes = mins if mins > 0 else self.DEFAULT_DELIVERY_TIME
+                
+                # Try to get actual payment and delivery methods
+                if "type" in payment_types[0]:
+                    payment_type = payment_types[0]["type"].lower()
+                    if "bank" in payment_type:
+                        actual_payment_method = "bank"
+                    elif "card" in payment_type or "credit" in payment_type:
+                        actual_payment_method = "card"
+            
+            # Build success response
+            return self.standardize_response({
+                "success": True,
+                "error_message": None,
+                "send_amount": float(amount),
+                "source_currency": source_currency.upper(),
+                "destination_currency": currency_code,
+                "destination_amount": rec_amount,
+                "exchange_rate": float(api_rate or rate),  # Prefer API rate, fallback to cached
+                "fee": fee_val,
+                "payment_method": actual_payment_method,
+                "delivery_method": actual_delivery_method,
+                "delivery_time_minutes": delivery_minutes,
+                "timestamp": datetime.datetime.now().isoformat()
+            })
+            
+        except (RemitbeeConnectionError, RemitbeeApiError) as e:
+            return self.standardize_response({
+                "success": False,
+                "error_message": str(e),
+                "send_amount": float(amount),
+                "source_currency": source_currency.upper(),
+                "destination_currency": dest_currency.upper(),
+                "payment_method": payment_method or self.DEFAULT_PAYMENT_METHOD,
+                "delivery_method": delivery_method or self.DEFAULT_DELIVERY_METHOD
+            })
         except Exception as e:
-            logger.error(f"Unexpected error while getting Remitbee quote: {str(e)}")
-            raise RemitbeeError(f"Error getting Remitbee quote: {str(e)}")
+            logger.error(f"Unexpected error: {e}")
+            return self.standardize_response({
+                "success": False,
+                "error_message": f"Unexpected error: {str(e)}",
+                "send_amount": float(amount),
+                "source_currency": source_currency.upper(),
+                "destination_currency": dest_currency.upper(),
+                "payment_method": payment_method or self.DEFAULT_PAYMENT_METHOD,
+                "delivery_method": delivery_method or self.DEFAULT_DELIVERY_METHOD
+            })
     
     def get_exchange_rate(
-        self, 
-        send_amount: Decimal, 
-        send_currency: str, 
-        receive_country: str
-    ) -> Optional[Dict]:
+        self,
+        send_amount: Decimal,
+        send_currency: str,
+        target_currency: str,
+        **kwargs
+    ) -> Dict[str, Any]:
         """
-        Get exchange rate and fees for a money transfer.
+        Legacy method for getting exchange rate.
         
-        Args:
-            send_amount: Amount to send (in CAD, as Remitbee is primarily Canadian)
-            send_currency: Source currency code (typically 'CAD')
-            receive_country: Destination country code (e.g. 'IN')
-            
-        Returns:
-            Dictionary containing rate information or None if failed
+        This method is maintained for backward compatibility.
+        For new code, use get_quote instead.
         """
-        # Validate input
-        if not isinstance(send_amount, Decimal):
-            raise RemitbeeValidationError("send_amount must be a Decimal")
+        # Extract country code from kwargs or try to derive it
+        receive_country = kwargs.get("receive_country")
+        if not receive_country:
+            # Try to find country for the target currency
+            for country_code, data in self.country_data.items():
+                if data.get("currency_code") == target_currency.upper():
+                    receive_country = country_code
+                    break
         
-        if send_currency != "CAD":
-            logger.warning(f"Remitbee primarily supports CAD as source currency, not {send_currency}")
-        
-        # Convert country code to uppercase
-        receive_country = receive_country.upper()
-        
-        # Get country details from our country data
-        country_data = self.country_data.get(receive_country)
-        if not country_data:
-            logger.error(f"Country code {receive_country} not found in Remitbee data")
-            return None
-        
-        country_id = country_data["country_id"]
-        currency_code = country_data["currency_code"]
-        
-        try:
-            # Call the Remitbee API to get a quote
-            quote_data = self.get_quote(
-                country_id=country_id,
-                currency_code=currency_code,
-                amount=send_amount,
-                is_special_rate=False  # Set to True if you want to use special rates
-            )
-            
-            # Check if there's an error message in the response
-            if "message" in quote_data and "unable to find" in quote_data["message"].lower():
-                logger.warning(f"Remitbee does not support this corridor: {quote_data['message']}")
-                return {
-                    "provider": self.name,
-                    "send_amount": float(send_amount),
-                    "send_currency": send_currency,
-                    "receive_currency": currency_code,
-                    "receive_country": receive_country,
-                    "receive_country_name": country_data["country_name"],
-                    "error": quote_data["message"],
-                    "supported": False,
-                    "raw_json": quote_data
-                }
-            
-            # Parse the response based on the observed structure
-            # Remitbee response structure:
-            # - rate: exchange rate (float)
-            # - receiving_amount: amount recipient gets (string with commas)
-            # - transfer_amount: amount being sent (string with commas)
-            # - payment_types: array of payment methods, each with fees
-            
-            # Get the first payment type with lowest fee for default
-            fee = "0.00"
-            delivery_hours = 0
-            if "payment_types" in quote_data and quote_data["payment_types"]:
-                payment_type = quote_data["payment_types"][0]  # Default to first payment type
-                fee = payment_type.get("fees", "0.00")
-                
-                # Get delivery time from timeline if available
-                if "timeline" in payment_type and "settlement_timeline" in payment_type["timeline"]:
-                    delivery_hours = payment_type["timeline"]["settlement_timeline"].get("predicted_minutes", 0) / 60
-            
-            # Clean the receiving amount (remove commas)
-            receive_amount_str = quote_data.get("receiving_amount", "0.00").replace(",", "")
-            
-            # Parse the response into our standard format
-            result = {
-                "provider": self.name,
+        if not receive_country:
+            return self.standardize_response({
+                "success": False,
+                "error_message": f"Cannot determine country for currency: {target_currency}",
                 "send_amount": float(send_amount),
-                "send_currency": send_currency,
-                "receive_currency": currency_code,
-                "receive_country": receive_country,
-                "receive_country_name": country_data["country_name"],
-                "exchange_rate": quote_data.get("rate"),
-                "receive_amount": float(receive_amount_str) if receive_amount_str else None,
-                "fee": float(fee) if fee else 0.0,
-                "delivery_time": delivery_hours,
-                "supported": True,
-                "raw_json": quote_data
-            }
-            
-            return result
-            
-        except Exception as e:
-            logger.error(f"Error getting Remitbee exchange rate: {str(e)}")
-            return None
-    
-    def get_supported_countries(self) -> List[Dict]:
-        """
-        Get a list of countries supported by Remitbee.
+                "source_currency": send_currency.upper(),
+                "destination_currency": target_currency.upper()
+            })
         
-        Returns:
-            List of dictionaries containing country information
-        """
-        return list(self.country_data.values()) 
+        # Call standardized get_quote method
+        return self.get_quote(
+            amount=send_amount,
+            source_currency=send_currency,
+            dest_currency=target_currency,
+            source_country="CA",  # Remitbee only supports CAD from Canada
+            dest_country=receive_country,
+            payment_method=kwargs.get("payment_method"),
+            delivery_method=kwargs.get("delivery_method")
+        )
+    
+    def get_supported_countries(self) -> List[str]:
+        """Return list of supported destination countries in ISO alpha-2 format."""
+        # Ensure rates are current before returning the list
+        self._ensure_rates_are_current()
+        return sorted(list(self.country_data.keys()))
+    
+    def get_supported_currencies(self) -> List[str]:
+        """Return list of supported destination currencies in ISO format."""
+        # Ensure rates are current before returning the list
+        self._ensure_rates_are_current()
+        currencies = ["CAD"]  # Source currency
+        for data in self.country_data.values():
+            if "currency_code" in data:
+                currencies.append(data["currency_code"])
+        return sorted(list(set(currencies)))
+    
+    def close(self):
+        """Close the session if it's open."""
+        if self.session:
+            self.session.close()
+            self.session = None
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close() 
