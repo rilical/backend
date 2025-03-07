@@ -8,8 +8,9 @@ exchange rates and fees.
 import logging
 import requests
 import re
+import time
 from decimal import Decimal
-from typing import Any, Dict, Optional, List, Union
+from typing import Any, Dict, Optional, List
 
 from apps.providers.base.provider import RemittanceProvider
 from .exceptions import (
@@ -18,41 +19,34 @@ from .exceptions import (
     PlacidApiError,
     PlacidResponseError,
     PlacidCorridorUnsupportedError,
-    PlacidCloudflareError,
 )
 
 logger = logging.getLogger(__name__)
 
 class PlacidProvider(RemittanceProvider):
     """
-    Example of adding Placid integration for retrieving rates or quotes.
-
-    Observed usage from logs:
-      POST /conf/sqls/pstRqstNS.php?TaskType=ChgContIndx&Val1=PAK&Val2=NIL&Val3=NIL&Val4=NIL&Val5=NIL&Val6=NIL
-      body: rndval=1740963881748
-
-    The response might contain HTML or text with lines like:
-      PAK|//|Pakistan|//|PKR|//|ADP|//|Bank Deposit ...
-      279.25 PKR
-    ... which we'd parse to get the final exchange rate or corridor info.
+    Aggregator-ready Placid Provider Integration WITHOUT any mock-data fallback.
+    
+    Provides methods to fetch exchange rates and quotes from Placid's internal 
+    corridors. If a corridor is unsupported or an error occurs, returns an error.
     """
 
     BASE_URL = "https://www.placid.net"
     ENDPOINT = "/conf/sqls/pstRqstNS.php"
     
-    # Mapping of country codes to corridor values
+    # Corridor mappings: corridor code -> { currency, name }
     CORRIDOR_MAPPING = {
-        'PAK': {'currency': 'PKR', 'name': 'Pakistan'},      # Pakistan - Pakistani Rupee
-        'IND': {'currency': 'INR', 'name': 'India'},         # India - Indian Rupee
-        'BGD': {'currency': 'BDT', 'name': 'Bangladesh'},    # Bangladesh - Bangladesh Taka
-        'PHL': {'currency': 'PHP', 'name': 'Philippines'},   # Philippines - Philippine Peso
-        'NPL': {'currency': 'NPR', 'name': 'Nepal'},         # Nepal - Nepalese Rupee
-        'LKA': {'currency': 'LKR', 'name': 'Sri Lanka'},     # Sri Lanka - Sri Lankan Rupee
-        'IDN': {'currency': 'IDR', 'name': 'Indonesia'},     # Indonesia - Indonesian Rupiah
-        'VNM': {'currency': 'VND', 'name': 'Vietnam'},       # Vietnam - Vietnamese Dong
+        'PAK': {'currency': 'PKR', 'name': 'Pakistan'},
+        'IND': {'currency': 'INR', 'name': 'India'},
+        'BGD': {'currency': 'BDT', 'name': 'Bangladesh'},
+        'PHL': {'currency': 'PHP', 'name': 'Philippines'},
+        'NPL': {'currency': 'NPR', 'name': 'Nepal'},
+        'LKA': {'currency': 'LKR', 'name': 'Sri Lanka'},
+        'IDN': {'currency': 'IDR', 'name': 'Indonesia'},
+        'VNM': {'currency': 'VND', 'name': 'Vietnam'},
     }
     
-    # Reverse mapping from currency to corridor
+    # Reverse mapping: currency -> corridor code
     CURRENCY_TO_CORRIDOR = {
         'PKR': 'PAK',
         'INR': 'IND',
@@ -67,188 +61,136 @@ class PlacidProvider(RemittanceProvider):
     def __init__(self, name="placid", **kwargs):
         """
         Initialize the Placid provider.
-
-        Args:
-            name: Internal provider name (defaults to 'placid')
-            kwargs: Additional config / session parameters
         """
-        super().__init__(name=name, base_url=self.BASE_URL, **kwargs)
+        super().__init__(name=name, base_url=self.BASE_URL)
         self.session = requests.Session()
 
-        # Example default headers matching your logs
+        # Default headers to mimic typical browser traffic
         self.session.headers.update({
-            "User-Agent": ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                           "AppleWebKit/605.1.15 (KHTML, like Gecko) "
-                           "Version/18.3 Safari/605.1.15"),
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/605.1.15 (KHTML, like Gecko) "
+                "Version/18.3 Safari/605.1.15"
+            ),
             "Accept": "*/*",
             "Content-Type": "application/x-www-form-urlencoded",
             "Cache-Control": "no-cache",
             "Pragma": "no-cache",
         })
         
-        # Initialize logger
         self.logger = logging.getLogger(f"providers.{name}")
 
-    def get_exchange_rate(
+    def standardize_response(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Convert local result dictionary into aggregator-friendly keys.
+        """
+        final_exchange_rate = raw_data.get("exchange_rate", 0.0)
+        final_rate = raw_data.get("rate", final_exchange_rate)
+        final_target_currency = raw_data.get("destination_currency") or raw_data.get("target_currency")
+
+        standardized = {
+            "provider_id": self.name,
+            "success": raw_data.get("success", False),
+            "error_message": raw_data.get("error_message"),
+            
+            "send_amount": raw_data.get("send_amount", 0.0),
+            "source_currency": raw_data.get("source_currency", "").upper(),
+            
+            "destination_amount": raw_data.get("receive_amount", 0.0),
+            "destination_currency": (raw_data.get("target_currency") or raw_data.get("destination_currency") or "").upper(),
+            
+            "exchange_rate": final_exchange_rate,
+            "fee": raw_data.get("fee", 0.0),
+            "timestamp": raw_data.get("timestamp"),
+            "rate": final_rate,
+            "target_currency": (final_target_currency or "").upper(),
+        }
+        return standardized
+
+    def get_exchange_rate_for_corridor(
         self,
-        source_country: str,
-        corridor_val: str = "PAK",
-        rndval: str = "1740963881748",
-        **kwargs
+        corridor_val: str,
+        rndval: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Get exchange rate from Placid for a given corridor.
-        
-        Args:
-            source_country: Source country code (e.g., "US")
-            corridor_val: Corridor value (e.g., "PAK" for Pakistan)
-            rndval: Random value for request
-            
-        Returns:
-            Dictionary with exchange rate data
+        Internal method that calls Placid's POST endpoint to fetch the corridor info.
         """
-        # Validate inputs to prevent unnecessary API calls
         if not corridor_val:
             return {
-                "provider": self.name,
                 "success": False,
-                "source_country": source_country,
                 "corridor_val": corridor_val,
                 "rate": 0.0,
-                "error_message": "Corridor value cannot be empty"
+                "error_message": "No corridor specified"
             }
-            
-        if not source_country:
-            return {
-                "provider": self.name,
-                "success": False,
-                "source_country": source_country,
-                "corridor_val": corridor_val,
-                "rate": 0.0,
-                "error_message": "Source country cannot be empty"
-            }
-            
-        if not isinstance(rndval, str) or not rndval.isdigit():
-            return {
-                "provider": self.name,
-                "success": False,
-                "source_country": source_country,
-                "corridor_val": corridor_val,
-                "rate": 0.0,
-                "error_message": "Invalid rndval parameter"
-            }
-            
-        # Normalize inputs
+        
         corridor_val = corridor_val.strip().upper()
-        source_country = source_country.strip().upper()
-        
-        # Check if source country is valid
-        valid_source_countries = ["US", "GB", "EU", "CA", "AU"]
-        if source_country not in valid_source_countries:
-            self.logger.warning(f"Unknown source country: {source_country}, this may affect rate accuracy")
-            return {
-                "provider": self.name,
-                "success": False,
-                "source_country": source_country,
-                "corridor_val": corridor_val,
-                "rate": 0.0,
-                "error_message": f"Invalid source country. Supported countries: {', '.join(valid_source_countries)}"
-            }
-        
+        # If no rndval given, use a timestamp
+        if not rndval:
+            rndval = str(int(time.time() * 1000))
+
+        # Prepare query params
+        query_params = {
+            "TaskType": "ChgContIndx",
+            "Val1": corridor_val,
+            "Val2": "NIL",
+            "Val3": "NIL",
+            "Val4": "NIL",
+            "Val5": "NIL",
+            "Val6": "NIL",
+        }
+        data = {"rndval": rndval}
+
+        url = f"{self.BASE_URL}{self.ENDPOINT}"
         try:
-            # Get a current timestamp for rndval if not provided
-            if not rndval:
-                rndval = str(int(time.time() * 1000))
-                
-            # Build the query params
-            query_params = {
-                "TaskType": "ChgContIndx",
-                "Val1": corridor_val,
-                "Val2": "NIL",
-                "Val3": "NIL",
-                "Val4": "NIL",
-                "Val5": "NIL",
-                "Val6": "NIL",
-            }
-            
-            # Build the POST data
-            data = {
-                "rndval": rndval,
-            }
-            
-            # Make the request
-            url = f"{self.BASE_URL}{self.ENDPOINT}"
-            response = self.session.post(url, params=query_params, data=data, timeout=15)
-            
-            # Check for HTTP errors
-            response.raise_for_status()
-            
-            # Parse the response
-            content = response.text
-            
-            # Check if the response contains the corridor
+            resp = self.session.post(url, params=query_params, data=data, timeout=15)
+            resp.raise_for_status()
+            content = resp.text
+
+            # Check corridor presence
             if corridor_val not in content:
-                # For empty corridor, we might still get a response but not with the corridor
-                # Look for standard pattern of data being returned
-                if '|//|' in content:
-                    # Generic response without specific corridor data
-                    self.logger.warning(f"Response does not contain specific data for corridor {corridor_val}")
+                # Might be an unsupported corridor or changed internal logic
+                if "|//|" in content:
+                    # Possibly a generic response with no specific corridor info
                     return {
-                        "provider": self.name,
                         "success": True,
-                        "source_country": source_country,
                         "corridor_val": corridor_val,
                         "rate": 0.0,
                         "raw_data": content,
-                        "error_message": None
+                        "error_message": f"No specific corridor data for {corridor_val}"
                     }
                 else:
-                    self.logger.error(f"Corridor {corridor_val} not found in response")
-                    raise PlacidCorridorUnsupportedError(f"Corridor {corridor_val} not supported")
-            
-            # Extract the currency code
-            # If it's in our mapping, use that, otherwise use the provided corridor value
+                    raise PlacidCorridorUnsupportedError(f"Corridor {corridor_val} not found in response")
+
+            # corridor -> currency
             if corridor_val in self.CORRIDOR_MAPPING:
                 currency_code = self.CORRIDOR_MAPPING[corridor_val]["currency"]
             else:
-                self.logger.warning(f"Unknown corridor value: {corridor_val}, using it as currency code")
+                # If corridor is not recognized, treat corridor_val as currency
                 currency_code = corridor_val
-            
-            # Try to extract the exchange rate
+
+            # Attempt to parse an exchange rate
             pattern = rf"(\d+[\.,]?\d*)\s*{currency_code}"
             match = re.search(pattern, content)
-            
             if match:
-                # Parse the rate and remove commas (used as thousands separators)
                 rate_str = match.group(1).replace(",", "")
                 rate = float(rate_str)
-                
                 return {
-                    "provider": self.name,
                     "success": True,
-                    "source_country": source_country,
                     "corridor_val": corridor_val,
                     "rate": rate,
-                    "raw_data": content,
-                    "error_message": None
+                    "raw_data": content
                 }
             else:
-                # Response doesn't have an exchange rate
-                self.logger.error(f"Could not find exchange rate for {currency_code} in Placid response.")
-                raise PlacidResponseError(f"Could not find exchange rate for {currency_code} in Placid response.")
-            
-        except (requests.RequestException, ConnectionError) as e:
-            self.logger.error(f"Connection error to Placid API: {str(e)}")
-            raise PlacidConnectionError(f"Failed to connect to Placid API: {str(e)}")
-        
+                raise PlacidResponseError(f"Exchange rate for {currency_code} not found in response")
+
+        except requests.RequestException as e:
+            raise PlacidConnectionError(f"Connection error to Placid: {str(e)}")
         except PlacidError:
-            # Just re-raise Placid-specific errors
+            # re-raise known Placid exceptions
             raise
-        
         except Exception as e:
-            self.logger.error(f"Unexpected error processing Placid exchange rate: {str(e)}")
-            raise PlacidApiError(f"Error processing Placid response: {str(e)}")
-        
+            raise PlacidApiError(f"Unexpected Placid error: {str(e)}")
+
     def get_quote(
         self,
         amount: Decimal,
@@ -257,144 +199,110 @@ class PlacidProvider(RemittanceProvider):
         **kwargs
     ) -> Dict[str, Any]:
         """
-        Get a quote for converting an amount from source to target currency.
-        
-        Args:
-            amount: Amount to convert
-            source_currency: Source currency code (e.g., "USD")
-            target_currency: Target currency code (e.g., "PKR")
-            
-        Optional kwargs:
-            source_country: Source country code (defaults based on currency)
-            
-        Returns:
-            Dictionary with quote data
+        Attempt to get a quote from Placid for amount in source_currency -> target_currency.
         """
-        # Validate inputs
-        if not source_currency or not target_currency:
-            return {
-                "provider": self.name,
-                "success": False,
-                "source_currency": source_currency,
-                "target_currency": target_currency,
-                "send_amount": float(amount) if amount else 0.0,
-                "exchange_rate": 0.0,
-                "error_message": "Source or target currency cannot be empty",
-                "receive_amount": 0.0
-            }
+        local_res = {
+            "success": False,
+            "source_currency": source_currency.upper(),
+            "target_currency": target_currency.upper(),
+            "send_amount": float(amount),
+            "exchange_rate": 0.0,
+            "receive_amount": 0.0,
+            "error_message": None
+        }
+
+        # Basic validations
+        if amount <= 0:
+            local_res["error_message"] = "Invalid amount: must be > 0"
+            return local_res
         
-        # Validate amount
-        try:
-            amount_value = float(amount)
-            if amount_value <= 0:
-                return {
-                    "provider": self.name,
-                    "success": False,
-                    "source_currency": source_currency,
-                    "target_currency": target_currency,
-                    "send_amount": float(amount),
-                    "exchange_rate": 0.0,
-                    "error_message": "Amount must be positive",
-                    "receive_amount": 0.0
-                }
-        except (ValueError, TypeError):
-            return {
-                "provider": self.name,
-                "success": False,
-                "source_currency": source_currency,
-                "target_currency": target_currency,
-                "send_amount": 0.0,
-                "exchange_rate": 0.0,
-                "error_message": "Invalid amount",
-                "receive_amount": 0.0
-            }
-            
-        # Normalize inputs
-        source_currency = source_currency.strip().upper()
-        target_currency = target_currency.strip().upper()
-        
-        # Get source country from kwargs or default mapping
-        source_country = kwargs.get("source_country", None)
-        if not source_country:
-            # Map currency to default country code
-            currency_to_country = {
-                "USD": "US",
-                "GBP": "GB",
-                "EUR": "EU",
-                "CAD": "CA",
-                "AUD": "AU"
-            }
-            source_country = currency_to_country.get(source_currency, "US")
-            self.logger.info(f"Source country not provided, defaulting to {source_country} for {source_currency}")
-        
-        # Find corridor value for target currency
-        corridor_val = self.CURRENCY_TO_CORRIDOR.get(target_currency)
-        
-        if not corridor_val:
-            self.logger.warning(f"No corridor mapping found for currency {target_currency}, using as-is")
-            corridor_val = target_currency
-            
-        # Validate the source currency
         valid_source_currencies = ["USD", "GBP", "EUR", "CAD", "AUD"]
-        if source_currency not in valid_source_currencies:
-            return {
-                "provider": self.name,
-                "success": False,
-                "source_country": source_country,
-                "source_currency": source_currency,
-                "target_currency": target_currency,
-                "send_amount": float(amount),
-                "exchange_rate": 0.0,
-                "error_message": f"Invalid source currency. Supported currencies: {', '.join(valid_source_currencies)}",
-                "receive_amount": 0.0
-            }
-        
-        try:
-            # Get exchange rate
-            rate_result = self.get_exchange_rate(
-                source_country=source_country,
-                corridor_val=corridor_val
+        if local_res["source_currency"] not in valid_source_currencies:
+            local_res["error_message"] = (
+                f"Unsupported source currency: {local_res['source_currency']}. "
+                f"Supported are: {', '.join(valid_source_currencies)}"
             )
+            return local_res
+
+        # Derive corridor from target_currency if known
+        corridor_val = self.CURRENCY_TO_CORRIDOR.get(local_res["target_currency"])
+        if not corridor_val:
+            # Not recognized
+            local_res["error_message"] = f"Unsupported target currency {local_res['target_currency']} for Placid"
+            return local_res
+
+        # Get rate
+        try:
+            corridor_res = self.get_exchange_rate_for_corridor(corridor_val=corridor_val)
+            if not corridor_res["success"]:
+                local_res["error_message"] = corridor_res.get("error_message", "Unknown corridor error")
+                return local_res
             
-            # Calculate receive amount
-            exchange_rate = rate_result.get("rate", 0.0)
-            receive_amount = float(amount) * exchange_rate
-            
-            return {
-                "provider": self.name,
-                "success": True,
-                "source_country": source_country,
-                "source_currency": source_currency,
-                "target_currency": target_currency,
-                "send_amount": float(amount),
-                "exchange_rate": exchange_rate,
-                "error_message": None,
-                "receive_amount": receive_amount
-            }
-            
+            rate = corridor_res.get("rate", 0.0)
+            if rate <= 0:
+                local_res["error_message"] = corridor_res.get("error_message", "No positive rate found")
+                return local_res
+
+            # Success
+            local_res["exchange_rate"] = rate
+            local_res["receive_amount"] = float(amount) * rate
+            local_res["success"] = True
+            return local_res
+
         except PlacidError as e:
-            return {
-                "provider": self.name,
-                "success": False,
-                "source_country": source_country,
-                "source_currency": source_currency,
-                "target_currency": target_currency,
-                "send_amount": float(amount),
-                "exchange_rate": 0.0,
-                "error_message": str(e),
-                "receive_amount": 0.0
-            }
-        
+            local_res["error_message"] = str(e)
+            return local_res
         except Exception as e:
-            self.logger.error(f"Error getting quote from Placid: {str(e)}")
-            return {
-                "provider": self.name,
-                "success": False,
-                "source_country": source_country if source_country else "unknown",
-                "source_currency": source_currency,
-                "target_currency": target_currency,
-                "send_amount": float(amount),
-                "exchange_rate": 0.0,
-                "error_message": f"Unexpected error: {str(e)}",
-                "receive_amount": 0.0
-            } 
+            logger.error(f"Unexpected error in get_quote: {e}")
+            local_res["error_message"] = f"Unexpected error: {str(e)}"
+            return local_res
+
+    def get_exchange_rate(
+        self,
+        send_amount: Decimal,
+        send_currency: str,
+        target_currency: str,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Get exchange rate for the specified amount, currencies and countries.
+        """
+        # get a local quote
+        local_quote = self.get_quote(
+            amount=send_amount,
+            source_currency=send_currency,
+            target_currency=target_currency,
+            **kwargs
+        )
+        # Convert local dict to aggregator standard
+        aggregator_res = self.standardize_response({
+            "success": local_quote["success"],
+            "error_message": local_quote["error_message"],
+            "source_currency": local_quote["source_currency"],
+            "target_currency": local_quote["target_currency"],
+            "send_amount": local_quote["send_amount"],
+            "exchange_rate": local_quote["exchange_rate"],
+            "receive_amount": local_quote["receive_amount"],
+            "timestamp": kwargs.get("timestamp"),
+        })
+        return aggregator_res
+
+    def get_supported_countries(self) -> List[str]:
+        """Return list of supported countries."""
+        return ["US", "GB", "EU", "CA", "AU"]
+
+    def get_supported_currencies(self) -> List[str]:
+        """Return list of supported currencies."""
+        return list(self.CURRENCY_TO_CORRIDOR.keys()) + ["USD", "GBP", "EUR", "CAD", "AUD"]
+
+    def close(self):
+        """Close the session if it's open."""
+        if self.session:
+            self.session.close()
+            self.session = None
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close() 
