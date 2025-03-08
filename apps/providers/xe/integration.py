@@ -368,12 +368,46 @@ class XEAggregatorProvider(RemittanceProvider):
         # Return aggregator success
         return self.standardize_response(local_ok)
     
-    def get_quote(self, amount: Decimal, source_currency: str, target_country: str, **kwargs) -> Dict[str, Any]:
-        """Alias to get_exchange_rate with aggregator shape."""
+    def get_quote(self, amount=None, source_currency=None, dest_currency=None, source_country=None, 
+                dest_country=None, target_country=None, send_amount=None, send_currency=None, 
+                receive_country=None, **kwargs) -> Dict[str, Any]:
+        """
+        Alias to get_exchange_rate with aggregator shape.
+        
+        Accepts multiple parameter naming conventions for maximum compatibility:
+        - Standard parameters: amount, source_currency, dest_country
+        - Alias parameters: send_amount, send_currency, receive_country/target_country
+        """
+        # Use amount if provided, otherwise send_amount
+        final_amount = amount if amount is not None else send_amount
+        if final_amount is None:
+            raise ValueError("Amount is required. Provide 'amount' or 'send_amount'.")
+            
+        # Use source_currency if provided, otherwise send_currency
+        final_source_currency = source_currency if source_currency is not None else send_currency
+        if final_source_currency is None:
+            raise ValueError("Source currency is required. Provide 'source_currency' or 'send_currency'.")
+            
+        # Use target_country if provided, otherwise dest_country, otherwise receive_country
+        final_target_country = target_country
+        if final_target_country is None:
+            final_target_country = dest_country
+        if final_target_country is None:
+            final_target_country = receive_country
+        if final_target_country is None:
+            raise ValueError("Target country is required. Provide 'target_country', 'dest_country', or 'receive_country'.")
+        
+        # Use logging module directly instead of self.logger
+        logging.getLogger('apps.providers.xe.integration').info(
+            f"get_quote called with normalized parameters: amount={final_amount}, "
+            f"source_currency={final_source_currency}, target_country={final_target_country}"
+        )
+        
+        # Call get_exchange_rate with the properly mapped parameters
         return self.get_exchange_rate(
-            send_amount=amount,
-            send_currency=source_currency,
-            receive_country=target_country,
+            send_amount=final_amount,
+            send_currency=final_source_currency,
+            receive_country=final_target_country,
             **kwargs
         )
     

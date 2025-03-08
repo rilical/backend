@@ -1,49 +1,46 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """
-Xoom Money Transfer Integration (PayPal Service)
+Xoom Money Transfer Integration
+===============================
 
-This module implements the integration with Xoom, a PayPal service for international
-money transfers. Xoom supports various payment and delivery methods:
+This module implements an integration with Xoom (a PayPal service) for international money transfers.
 
-PAYMENT METHODS:
----------------------------------
-- CRYPTO_PYUSD: PayPal USD stablecoin
-- PAYPAL_BALANCE: PayPal balance
-- ACH: Bank account transfer
-- DEBIT_CARD: Debit card payment
-- CREDIT_CARD: Credit card payment
+Payment Methods:
+- PayPal balance
+- Bank account
+- Debit card
+- Credit card
 
-DELIVERY METHODS:
----------------------------------
-- DEPOSIT: Bank deposit
-- MOBILE_WALLET: Mobile wallet transfer (e.g., Mercado Pago)
-- CARD_DEPOSIT: Direct to debit card
-- PICKUP: Cash pickup at locations like Walmart, OXXO, etc.
+Delivery Methods:
+- Bank deposit
+- Cash pickup
+- Mobile wallet
+- Home delivery (in some countries)
 
-Important API notes:
-1. Xoom's API requires simulating a web session to get proper authentication
-2. Each corridor has different combinations of payment and delivery methods
-3. Fees vary significantly based on payment method, delivery method, and amount
-4. Exchange rates are typically competitive but vary by corridor
-5. Some payment methods (like PayPal balance) often have zero fees
+API Notes:
+- Xoom does not offer a public API, this integration uses their web interface
+- Rate queries are done through their fee calculator endpoint
+- Authentication is cookie-based
 """
 
-import json
-import logging
 import os
-import random
 import re
-import time
+import json
 import uuid
+import time
 import html
-from datetime import datetime, timezone
-from decimal import Decimal
-from typing import Dict, Optional, Any, List, Union, Tuple
-from urllib.parse import urljoin, quote_plus
-
+import logging
 import requests
+import urllib.parse
+from datetime import datetime, timezone
+from typing import Dict, List, Any, Optional, Tuple
+from decimal import Decimal
 from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
+from urllib.parse import urljoin, quote_plus
 
 from apps.providers.base.provider import RemittanceProvider
 from apps.providers.xoom.exceptions import (
@@ -53,37 +50,39 @@ from apps.providers.xoom.exceptions import (
     XoomValidationError,
     XoomRateLimitError
 )
+from apps.providers.utils.country_currency_standards import ISO_COUNTRY_NAMES
+from apps.providers.utils.currency_mapping import COUNTRY_NAMES, CURRENCY_NAMES, get_country_name, get_currency_name, get_country_currencies
 
-# Setup logging
-logger = logging.getLogger(__name__)
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 
 def log_request_details(method: str, url: str, headers: Dict, params: Dict = None, data: Dict = None):
-    """Log the details of an HTTP request for debugging purposes."""
-    logger.debug(f"Request: {method} {url}")
-    logger.debug(f"Headers: {json.dumps({k: v for k, v in headers.items() if k.lower() != 'cookie'}, indent=2)}")
+    """Log API request details for debugging."""
+    logger = logging.getLogger('xoom_provider')
+    logger.debug(f"REQUEST: {method} {url}")
     
     if params:
-        logger.debug(f"Params: {json.dumps(params, indent=2)}")
+        logger.debug(f"PARAMS: {json.dumps(params, indent=2)}")
     
     if data:
-        logger.debug(f"Data: {json.dumps(data, indent=2)}")
+        logger.debug(f"DATA: {json.dumps(data, indent=2)}")
+        
+    logger.debug(f"HEADERS: {json.dumps(dict(headers), indent=2)}")
 
 def log_response_details(response):
-    """Log the details of an HTTP response for debugging purposes."""
-    logger.debug(f"Response Status: {response.status_code}")
-    logger.debug(f"Response Headers: {json.dumps(dict(response.headers), indent=2)}")
+    """Log API response details for debugging."""
+    logger = logging.getLogger('xoom_provider')
+    logger.debug(f"RESPONSE: {response.status_code} {response.reason}")
     
     try:
-        # Try to parse as JSON
-        json_data = response.json()
-        logger.debug(f"Response JSON: {json.dumps(json_data, indent=2)}")
-    except:
-        # Log a truncated version of text response
-        content = response.text[:500] + "..." if len(response.text) > 500 else response.text
-        logger.debug(f"Response Text: {content}")
+        logger.debug(f"RESPONSE BODY: {json.dumps(response.json(), indent=2)}")
+    except Exception:
+        logger.debug(f"RESPONSE BODY (text): {response.text[:500]}...")
+        
+    logger.debug(f"RESPONSE HEADERS: {json.dumps(dict(response.headers), indent=2)}")
 
 class ExchangeRateResult:
-    """Class to store exchange rate information in a standardized format."""
+    """Standardized exchange rate result."""
     
     def __init__(
         self,
@@ -109,12 +108,12 @@ class ExchangeRateResult:
         self.fee = fee
         self.delivery_method = delivery_method
         self.delivery_time_minutes = delivery_time_minutes
-        self.corridor = corridor
+        self.corridor = corridor or f"{source_currency}->{destination_currency}"
         self.payment_method = payment_method
         self.details = details or {}
-    
+        
     def to_dict(self) -> Dict:
-        """Convert the result to a dictionary."""
+        """Convert to dictionary representation."""
         return {
             "provider_id": self.provider_id,
             "source_currency": self.source_currency,
@@ -151,8 +150,11 @@ class XoomProvider(RemittanceProvider):
     DELIVERY_METHODS = {
         "DEPOSIT": "Bank Deposit",
         "MOBILE_WALLET": "Mobile Wallet",
-        "CARD_DEPOSIT": "Debit Card Deposit",
-        "PICKUP": "Cash Pickup"
+        "CARD_DEPOSIT": "Card Deposit",
+        "PICKUP": "Cash Pickup",
+        "HOME_DELIVERY": "Cash Home Delivery",
+        "UPI": "UPI",
+        "CASH": "Cash Pickup"
     }
     
     # Mapping of country codes to common country names
@@ -169,24 +171,31 @@ class XoomProvider(RemittanceProvider):
         "EC": "Ecuador"
     }
     
-    def __init__(self, timeout: int = 30, user_agent: Optional[str] = None):
+    def __init__(self, name="xoom", base_url=None):
         """
-        Initialize the Xoom provider.
+        Initialize Xoom provider.
         
         Args:
-            timeout: Request timeout in seconds
-            user_agent: Custom user agent string (or None to use default)
+            name: Provider name (default: "xoom")
+            base_url: Base URL for API (default: None, uses class BASE_URL)
         """
-        super().__init__(name="Xoom", base_url=self.BASE_URL)
-        self.timeout = timeout
-        self.user_agent = user_agent or (
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/605.1.15 (KHTML, like Gecko) "
-            "Version/18.3 Safari/605.1.15"
+        super().__init__(name=name, base_url=base_url or self.BASE_URL)
+        self.session = requests.Session()
+        
+        # Initialize logger
+        self.logger = logging.getLogger("xoom_provider")
+        
+        # Configure session with retries and timeouts
+        retry = Retry(
+            total=3,
+            backoff_factor=0.5,
+            status_forcelist=[500, 502, 503, 504]
         )
         
-        # Initialize session and cookies
-        self.session = requests.Session()
+        self.session.mount('https://', HTTPAdapter(max_retries=retry))
+        self.timeout = 30  # Default timeout in seconds
+        
+        # Initialize session
         self._initialize_session()
         
         # Random request ID for tracing
@@ -195,180 +204,125 @@ class XoomProvider(RemittanceProvider):
         # Cache for supported countries and corridors
         self._countries_cache = None
         self._corridors_cache = {}
-        
-        # Set up logger
-        self.logger = logging.getLogger('xoom_provider')
     
     def _initialize_session(self) -> None:
-        """Initialize the HTTP session with headers and retry logic."""
-        # Define default headers that match real browser requests
+        """Initialize the session by visiting home page and setting up cookies."""
+        self.timeout = 30  # Default timeout in seconds
+        
+        # Set user agent and common headers
         self.session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9",
-            "Connection": "keep-alive",
-            "Origin": "https://www.xoom.com",
-            "Referer": "https://www.xoom.com/",
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "same-origin",
-            "Sec-Fetch-User": "?1",
-            "Host": "www.xoom.com"
+            "Connection": "keep-alive"
         })
         
-        # Setup retry logic with backoff
-        retry_strategy = Retry(
-            total=3,
-            backoff_factor=0.5,
-            status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["GET", "POST"]
-        )
-        adapter = HTTPAdapter(max_retries=retry_strategy)
-        self.session.mount("http://", adapter)
-        self.session.mount("https://", adapter)
-        
-        # Set initial cookies
-        self.session.cookies.set("visitor_id", str(uuid.uuid4()), domain=".xoom.com")
-        self.session.cookies.set("session_id", str(uuid.uuid4()), domain=".xoom.com")
-        
-        # Visit the home page to get more cookies and tokens
+        # Visit home page to set cookies and initialize session
         self._visit_home_page()
 
     def _visit_home_page(self) -> None:
         """
-        Visit the Xoom homepage to get necessary cookies and session data.
-        This is required before making API calls.
+        Visit the Xoom homepage to initialize the session with cookies.
         """
         try:
-            logger.info("Visiting Xoom homepage to initialize session")
+            self.logger.info("Visiting Xoom homepage to initialize session")
             
-            # First, visit the main homepage to get initial cookies
-            main_url = f"{self.BASE_URL}/"
-            main_response = self.session.get(
-                url=main_url,
-                timeout=self.timeout,
-                allow_redirects=True
-            )
-            
-            if main_response.status_code != 200:
-                logger.warning(f"Failed to load main homepage, status code: {main_response.status_code}")
-            
-            # Short delay to simulate real user behavior
-            time.sleep(0.5)
-            
-            # Now visit the send money page which is most relevant for our API calls
-            homepage_url = f"{self.BASE_URL}/en-us/send-money"
-            
-            # Visit the homepage
+            # First visit the main site
             response = self.session.get(
-                url=homepage_url,
+                self.base_url,
                 timeout=self.timeout,
                 allow_redirects=True
             )
             
             if response.status_code != 200:
-                logger.warning(f"Failed to load homepage, status code: {response.status_code}")
-                return
+                self.logger.warning(f"Home page returned status code {response.status_code}")
             
-            # Check if we're redirected to sign-in page
-            if '/sign-in' in response.url:
-                logger.warning("Redirected to sign-in page. Using anonymous mode.")
-                # Try to access public exchange rate API which should work without login
-                
-                # Visit a specific country page to get cookies
-                country_url = f"{self.BASE_URL}/en-us/send-money/us/mx"
-                country_response = self.session.get(
-                    url=country_url,
-                    timeout=self.timeout,
-                    allow_redirects=True
-                )
-                
-                if country_response.status_code != 200:
-                    logger.warning(f"Failed to load country page, status code: {country_response.status_code}")
+            # Then try to visit the send money page
+            send_money_url = f"{self.base_url}/en-us/send-money"
+            response = self.session.get(
+                send_money_url,
+                timeout=self.timeout,
+                allow_redirects=True
+            )
             
-            # Parse the HTML
-            soup = BeautifulSoup(response.text, "html.parser")
+            # Check if we were redirected to sign-in
+            if "/sign-in" in response.url:
+                self.logger.warning("Redirected to sign-in page. Using anonymous mode.")
             
-            # Multiple strategies to find CSRF token
-            csrf_token = None
+            # Try visiting a specific corridor
+            corridor_url = f"{self.base_url}/en-us/send-money/us/mx"
+            response = self.session.get(
+                corridor_url,
+                timeout=self.timeout,
+                allow_redirects=True
+            )
             
-            # Strategy 1: Look for CSRF token in meta tags
-            meta_tag = soup.find("meta", attrs={"name": "csrf-token"})
-            if meta_tag and "content" in meta_tag.attrs:
-                csrf_token = meta_tag["content"]
-                self.session.headers["X-CSRF-Token"] = csrf_token
-                logger.info("Found CSRF token in meta tag")
+            # Check for CSRF token
+            csrf_token = self._get_csrf_token()
+            if csrf_token:
+                self.session.headers.update({"X-CSRF-Token": csrf_token})
             
-            # Strategy 2: Look in script tags for CSRF token
-            if not csrf_token:
-                script_tags = soup.find_all("script")
-                for script in script_tags:
-                    if script.string and "csrf" in script.string.lower():
-                        csrf_match = re.search(r'csrf[\'"]*\s*:\s*[\'"]([^\'"]*)[\'"]*', script.string)
-                        if csrf_match:
-                            csrf_token = csrf_match.group(1)
-                            self.session.headers["X-CSRF-Token"] = csrf_token
-                            logger.info("Found CSRF token in script tag")
-                            break
+            # Fetch segment settings
+            self.session.get(f"{self.base_url}/segment/settings.json", timeout=self.timeout)
             
-            # Strategy 3: Look for nonce attributes in script tags (fallback token)
-            if not csrf_token:
-                nonce_script = soup.find("script", attrs={"nonce": True})
-                if nonce_script and "nonce" in nonce_script.attrs:
-                    nonce = nonce_script["nonce"]
-                    # Use nonce as a fallback CSRF token
-                    self.session.headers["X-CSRF-Token"] = nonce
-                    csrf_token = nonce
-                    logger.info("Using script nonce as fallback CSRF token")
-            
-            if not csrf_token:
-                logger.warning("Could not find CSRF token")
-            
-            # Make additional initialization requests to ensure cookies are properly set
-            
-            # 1. Visit segment settings
-            try:
-                analytics_url = f"{self.BASE_URL}/segment/settings.json"
-                self.session.get(
-                    url=analytics_url,
-                    timeout=self.timeout
-                )
-            except Exception as e:
-                logger.debug(f"Error loading analytics settings: {e}")
-            
-            # 2. Handle GDPR/cookie consent
-            try:
-                cookie_url = f"{self.BASE_URL}/pa/gdpr"
-                self.session.get(
-                    url=cookie_url,
-                    timeout=self.timeout
-                )
-            except Exception as e:
-                logger.debug(f"Error handling cookie consent: {e}")
-            
-            # Add random visitor ID if not present
-            if not self.session.cookies.get("visitor_id"):
-                self.session.cookies.set("visitor_id", str(uuid.uuid4()), domain=".xoom.com")
+            # GET GDPR status
+            self.session.get(f"{self.base_url}/pa/gdpr", timeout=self.timeout)
             
         except Exception as e:
-            logger.error(f"Error visiting homepage: {e}")
+            self.logger.error(f"Error visiting homepage: {e}")
+            # Continue even if homepage visit fails
     
     def _get_csrf_token(self) -> Optional[str]:
         """
-        Get the CSRF token from the current session.
+        Get CSRF token from the current page.
         
         Returns:
-            CSRF token string or None if not found
+            CSRF token if found, None otherwise
         """
-        # Check if it's already in the headers
-        if "X-CSRF-Token" in self.session.headers:
-            return self.session.headers["X-CSRF-Token"]
-        
-        # If not, try to get it by visiting the homepage
-        self._visit_home_page()
-        
-        # Check again after visiting the homepage
-        return self.session.headers.get("X-CSRF-Token")
+        try:
+            # Get the current page content
+            response = self.session.get(
+                self.base_url,
+                timeout=self.timeout
+            )
+            
+            if response.status_code != 200:
+                self.logger.warning(f"Failed to get page for CSRF token, status: {response.status_code}")
+                return None
+            
+            # Parse HTML
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Look for meta tag with csrf-token
+            meta_tag = soup.find('meta', attrs={'name': 'csrf-token'})
+            if meta_tag and 'content' in meta_tag.attrs:
+                token = meta_tag['content']
+                self.logger.info("Found CSRF token in meta tag")
+                return token
+            
+            # Look in script tags for CSRF token
+            script_tags = soup.find_all('script')
+            for script in script_tags:
+                if script.string and 'csrf' in script.string.lower():
+                    csrf_match = re.search(r'csrf[\'"]*\s*:\s*[\'"]([^\'"]*)[\'"]*', script.string)
+                    if csrf_match:
+                        token = csrf_match.group(1)
+                        self.logger.info("Found CSRF token in script tag")
+                        return token
+            
+            # Look for nonce attributes as fallback
+            nonce_script = soup.find('script', attrs={'nonce': True})
+            if nonce_script and 'nonce' in nonce_script.attrs:
+                nonce = nonce_script['nonce']
+                self.logger.info("Using script nonce as fallback CSRF token")
+                return nonce
+            
+            self.logger.warning("Could not find CSRF token")
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Error getting CSRF token: {e}")
+            return None
     
     def _make_api_request(
         self,
@@ -436,12 +390,12 @@ class XoomProvider(RemittanceProvider):
                 # Handle redirects manually to capture authentication issues
                 if response.status_code in (301, 302, 303, 307, 308):
                     redirect_url = response.headers.get('Location')
-                    logger.debug(f"Redirected to: {redirect_url}")
+                    self.logger.debug(f"Redirected to: {redirect_url}")
                     
                     # Check if redirected to sign-in page
                     if redirect_url and '/sign-in' in redirect_url:
                         if retry_auth and retry_count < max_retries:
-                            logger.warning(f"Redirected to sign-in page, refreshing session (attempt {retry_count + 1}/{max_retries})")
+                            self.logger.warning(f"Redirected to sign-in page, refreshing session (attempt {retry_count + 1}/{max_retries})")
                             self._initialize_session()
                             time.sleep(1)  # Add delay between retries
                             retry_count += 1
@@ -465,7 +419,7 @@ class XoomProvider(RemittanceProvider):
                 # Check for common error status codes
                 if response.status_code in (401, 403):
                     if retry_auth and retry_count < max_retries:
-                        logger.warning(f"Authentication failed, refreshing session and retrying (attempt {retry_count + 1}/{max_retries})")
+                        self.logger.warning(f"Authentication failed, refreshing session and retrying (attempt {retry_count + 1}/{max_retries})")
                         self._initialize_session()
                         time.sleep(1)  # Add delay between retries
                         retry_count += 1
@@ -476,7 +430,7 @@ class XoomProvider(RemittanceProvider):
                     # With rate limits, we should wait longer before retrying
                     if retry_count < max_retries:
                         wait_time = 5 * (retry_count + 1)  # Progressive backoff
-                        logger.warning(f"Rate limit exceeded, waiting {wait_time} seconds before retry")
+                        self.logger.warning(f"Rate limit exceeded, waiting {wait_time} seconds before retry")
                         time.sleep(wait_time)
                         retry_count += 1
                         continue
@@ -494,7 +448,7 @@ class XoomProvider(RemittanceProvider):
                 content_type = response.headers.get('Content-Type', '')
                 if 'json' in current_headers.get('Accept', '') and 'html' in content_type.lower():
                     if retry_auth and retry_count < max_retries:
-                        logger.warning(f"Received HTML when expecting JSON, session may be invalid. Refreshing (attempt {retry_count + 1}/{max_retries})")
+                        self.logger.warning(f"Received HTML when expecting JSON, session may be invalid. Refreshing (attempt {retry_count + 1}/{max_retries})")
                         self._initialize_session()
                         time.sleep(1)
                         retry_count += 1
@@ -511,11 +465,11 @@ class XoomProvider(RemittanceProvider):
                     raise XoomError("Invalid JSON response from API")
                     
             except requests.RequestException as e:
-                logger.error(f"Request failed: {e}")
+                self.logger.error(f"Request failed: {e}")
                 
                 # Retry network errors
                 if retry_count < max_retries:
-                    logger.warning(f"Connection error, retrying (attempt {retry_count + 1}/{max_retries})")
+                    self.logger.warning(f"Connection error, retrying (attempt {retry_count + 1}/{max_retries})")
                     time.sleep(2)
                     retry_count += 1
                     continue
@@ -527,43 +481,182 @@ class XoomProvider(RemittanceProvider):
     
     def standardize_response(self, local_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Convert local_data into aggregator-standard JSON.
+        Standardize API response to common format.
         
-        If local_data["success"] is False, return aggregator error shape:
-          {
-            "provider_id": "Xoom",
-            "success": false,
-            "error_message": ...
-          }
-
-        If success, return aggregator success shape.
+        Args:
+            local_data: Raw response data from Xoom
+            
+        Returns:
+            Standardized response dictionary
         """
-        if not local_data.get("success", False):
-            return {
-                "provider_id": "Xoom",
-                "success": False,
-                "error_message": local_data.get("error_message") or "Unknown Xoom error"
-            }
-
-        # success path
-        now_iso = datetime.now(timezone.utc).isoformat()
-
-        return {
-            "provider_id": "Xoom",
-            "success": True,
-            "error_message": None,
-            "send_amount": local_data.get("send_amount", 0.0),
-            "source_currency": local_data.get("send_currency", "").upper(),
-            "destination_amount": local_data.get("receive_amount", 0.0),
-            "destination_currency": local_data.get("receive_currency", "").upper(),
+        # Initialize standardized result with default values
+        standardized = {
+            "provider_id": self.name,
+            "provider_name": "Xoom",
+            "success": local_data.get("success", True),
+            "source_country": local_data.get("source_country", "US"),
+            "destination_country": local_data.get("destination_country", ""),
+            "source_currency": local_data.get("source_currency", "USD"),
+            "destination_currency": local_data.get("destination_currency", ""),
+            "source_amount": local_data.get("source_amount", 0.0),
+            "destination_amount": local_data.get("destination_amount", 0.0),
             "exchange_rate": local_data.get("exchange_rate", 0.0),
             "fee": local_data.get("fee", 0.0),
-            "payment_method": local_data.get("payment_method", "Unknown"),
-            "delivery_method": local_data.get("delivery_method", "bank deposit"),
-            "delivery_time_minutes": local_data.get("delivery_time_minutes", 1440),
-            "timestamp": now_iso,
-            "raw_response": local_data.get("raw_response", {})
+            "delivery_method": local_data.get("delivery_method", ""),
+            "payment_method": local_data.get("payment_method", ""),
+            "delivery_time_minutes": local_data.get("delivery_time_minutes", 0)
         }
+        
+        # Add source and destination country names
+        source_code = standardized["source_country"]
+        dest_code = standardized["destination_country"]
+        
+        standardized["source_country_name"] = get_country_name(source_code) or ISO_COUNTRY_NAMES.get(source_code, source_code)
+        standardized["destination_country_name"] = get_country_name(dest_code) or ISO_COUNTRY_NAMES.get(dest_code, dest_code)
+        
+        # Add currency names
+        source_currency = standardized["source_currency"]
+        dest_currency = standardized["destination_currency"]
+        
+        standardized["source_currency_name"] = get_currency_name(source_currency) or source_currency
+        standardized["destination_currency_name"] = get_currency_name(dest_currency) or dest_currency
+        
+        # Add details from original response
+        if "details" in local_data:
+            standardized["details"] = local_data["details"]
+        else:
+            standardized["details"] = {
+                "provider": "Xoom",
+                "url": f"https://www.xoom.com/"
+            }
+            
+            # Add destination country to URL if available
+            if dest_code:
+                standardized["details"]["url"] = f"https://www.xoom.com/{dest_code.lower()}/send-money"
+        
+        return standardized
+    
+    def get_quote(
+        self,
+        amount: Decimal,
+        source_currency: str,
+        dest_currency: str,
+        source_country: str,
+        dest_country: str,
+        payment_method: Optional[str] = None,
+        delivery_method: Optional[str] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Get a quote for sending money from source to destination.
+        
+        Args:
+            amount: Amount to send
+            source_currency: Currency to send (e.g., USD)
+            dest_currency: Currency to receive (e.g., MXN)
+            source_country: Country sending from (e.g., US)
+            dest_country: Country sending to (e.g., MX)
+            payment_method: Payment method (optional)
+            delivery_method: Delivery method (optional)
+            
+        Returns:
+            Quote information
+        """
+        self.logger.info(f"Getting quote for {amount} {source_currency} to {dest_country} ({dest_currency})")
+        
+        # Convert amount to Decimal if it's not already
+        float_amount = float(amount)
+
+        try:
+            # First try the fee table API as it doesn't require auth
+            exchange_rate_result = self._get_exchange_rate_via_fee_table(
+                send_amount=amount,
+                send_currency=source_currency,
+                receive_country=dest_country,
+                receive_currency=dest_currency
+            )
+            
+            # If successful, return the result
+            if exchange_rate_result and "exchange_rate" in exchange_rate_result:
+                self.logger.info(f"Successfully got quote via fee table API: {exchange_rate_result}")
+                return exchange_rate_result
+        except Exception as e:
+            self.logger.error(f"Error getting quote via fee table API: {str(e)}")
+        
+        # If fee table API failed, try the exchange rate endpoint
+        self.logger.info("Fee table API failed, trying exchange rate endpoint")
+        try:
+            exchange_rate_result = self.get_exchange_rate(
+                send_amount=amount,
+                send_currency=source_currency,
+                receive_country=dest_country,
+                receive_currency=dest_currency,
+                delivery_method=delivery_method,
+                payment_method=payment_method
+            )
+            
+            if exchange_rate_result and "exchange_rate" in exchange_rate_result:
+                self.logger.info(f"Successfully got quote via exchange rate endpoint: {exchange_rate_result}")
+                return exchange_rate_result
+        except Exception as e:
+            self.logger.error(f"Error getting quote via exchange rate endpoint: {str(e)}")
+        
+        # If all else fails, use a fallback with estimated values
+        self.logger.warning("All API methods failed, using fallback with estimated values")
+        
+        # Estimate exchange rate based on corridor
+        estimated_rates = {
+            "USD-MXN": 17.0,
+            "USD-INR": 83.0,
+            "USD-PHP": 56.0,
+            "USD-BDT": 110.0,
+            "USD-PKR": 279.0,
+            "USD-BHD": 0.376,
+            "USD-EUR": 0.92,
+            "USD-GBP": 0.78
+        }
+        
+        corridor = f"{source_currency}-{dest_currency}"
+        exchange_rate = estimated_rates.get(corridor, 1.0)
+        recipient_gets = float_amount * exchange_rate
+        
+        # Use default fee structure
+        if float_amount < 1000:
+            fee = 2.99
+        else:
+            fee = 4.99
+            
+        # Adjust fee based on payment method
+        if payment_method:
+            if "credit" in payment_method.lower() or "debit" in payment_method.lower():
+                fee = 5.99
+            elif "pyusd" in payment_method.lower():
+                fee = 0.00
+        
+        exchange_rate_result = {
+            "provider_id": "xoom",
+            "provider_name": "Xoom",
+            "source_country": source_country,
+            "destination_country": dest_country,
+            "source_currency": source_currency,
+            "destination_currency": dest_currency,
+            "source_amount": float_amount,
+            "destination_amount": recipient_gets,
+            "exchange_rate": exchange_rate,
+            "fee": fee,
+            "delivery_time_minutes": 1440,  # 24 hours is typical
+            "payment_method": payment_method or "PayPal balance",
+            "delivery_method": delivery_method or "bank deposit",
+            "fixed_delivery_time": "Within 24 hours",  # Typical delivery time
+            "details": {
+                "provider": "Xoom",
+                "url": f"https://www.xoom.com/{dest_country.lower()}/send-money",
+                "fallback": True  # Indicate this is a fallback response
+            }
+        }
+        
+        # Return standardized result
+        return exchange_rate_result
     
     def get_exchange_rate(
         self,
@@ -593,6 +686,10 @@ class XoomProvider(RemittanceProvider):
             
         # First try to get exchange rate via fee table API (doesn't require auth)
         try:
+            # If receive_currency is not provided, try to get the default currency for the country
+            if not receive_currency:
+                receive_currency = self._get_currency_for_country(receive_country)
+                
             result = self._get_exchange_rate_via_fee_table(
                 send_amount=send_amount,
                 send_currency=send_currency,
@@ -602,10 +699,29 @@ class XoomProvider(RemittanceProvider):
             
             # If fee table API successful, return the result
             if result and "exchange_rate" in result and result["exchange_rate"] > 0:
+                # If payment or delivery method preferences were provided, try to match them
+                if payment_method or delivery_method:
+                    if payment_method and 'available_payment_methods' in result:
+                        matched_payment = False
+                        for method in result['available_payment_methods']:
+                            if payment_method.lower() in method['name'].lower():
+                                result['payment_method'] = method['name']
+                                result['fee'] = method['fee']
+                                matched_payment = True
+                                break
+                        
+                        if not matched_payment:
+                            self.logger.warning(f"Could not find matching payment method: {payment_method}")
+                    
+                    if delivery_method:
+                        result['delivery_method'] = self._normalize_delivery_method(delivery_method)
+                
                 self.logger.info(f"Successfully got exchange rate via fee table: {result['exchange_rate']}")
                 return result
-        except Exception as e:
+        except XoomError as e:
             self.logger.error(f"Fee table API failed: {str(e)}")
+        except Exception as e:
+            self.logger.error(f"Unexpected error with fee table API: {str(e)}")
             
         # If fee table API failed, try the regular quote API
         self.logger.info("Fee table API failed, trying regular quote API")
@@ -620,152 +736,92 @@ class XoomProvider(RemittanceProvider):
             
             # Prepare the remittance request payload
             payload = {
-                "data": {
-                    "remittance": {
-                        "sourceCurrency": send_currency,
-                        "destinationCountry": receive_country,
-                        "destinationCurrency": receive_currency,
-                        "sendAmount": {
-                            "amount": str(send_amount_float),
-                            "currency": send_currency
-                        }
-                    }
-                }
+                "sendAmount": send_amount_float,
+                "sendCurrency": send_currency,
+                "receiveCurrency": receive_currency,
+                "receiveCountry": receive_country,
+                "paymentType": payment_method or "PAYPAL_BALANCE",
+                "receiveMethod": delivery_method or "DEPOSIT"
             }
             
-            # Make the API request
+            # Make the API request to get quote
             response = self._make_api_request(
-                "POST",
-                f"{self.base_url}/wapi/send-money-app/remittance-engine/remittance",
+                method="POST",
+                url=f"{self.API_URL}/options",
                 data=payload
             )
             
-            # Process the response to extract exchange rate info
-            if not response or "data" not in response:
-                raise XoomError("Failed to get exchange rate data")
+            # Process and return the result
+            if response and "pricingOptions" in response:
+                pricing_options = response["pricingOptions"]
                 
-            # Extract remittance data
-            remittance_data = response["data"].get("remittance", {})
-            if not remittance_data:
-                raise XoomError("No remittance data available")
+                # Filter the pricing options based on preferences
+                filtered_options = self._filter_pricing_options(
+                    pricing_options,
+                    preferred_delivery_method=delivery_method,
+                    preferred_payment_method=payment_method
+                )
                 
-            # Extract quote information
-            quote = remittance_data.get("quote", {})
-            if not quote:
-                raise XoomError("No quote information available")
+                # Find the best option
+                best_option = self._find_best_pricing_option(
+                    filtered_options,
+                    preferred_delivery_method=delivery_method,
+                    preferred_payment_method=payment_method
+                )
                 
-            # Get pricing options
-            pricing_options = quote.get("pricing", [])
-            if not pricing_options:
-                raise XoomError("No pricing options available")
-                
-            # Find the best pricing option
-            best_option = self._find_best_pricing_option(pricing_options)
-            if not best_option:
-                raise XoomError("No valid pricing options found")
-                
-            # Extract key details
-            disbursement_type = best_option.get("disbursementType", "")
-            payment_type = best_option.get("paymentType", {}).get("type", "")
+                if best_option:
+                    exchange_rate = best_option.get("fxRate", 0)
+                    fee = best_option.get("sendFee", 0)
+                    receive_amount = best_option.get("receiveAmount", 0)
+                    
+                    # Normalize delivery method
+                    delivery_method_type = best_option.get("receiveMethodType", "DEPOSIT")
+                    delivery_method_normalized = self._normalize_delivery_method(delivery_method_type)
+                    
+                    # Get payment method
+                    payment_method_type = best_option.get("paymentType", "PAYPAL_BALANCE")
+                    payment_method_normalized = self.PAYMENT_METHODS.get(payment_method_type, payment_method_type)
+                    
+                    # Extract delivery time
+                    delivery_time_minutes = 1440  # Default 24 hours
+                    delivery_time_text = None
+                    
+                    if "content" in best_option and "contentFields" in best_option["content"]:
+                        content = self._process_content_fields(best_option["content"]["contentFields"])
+                        delivery_time_text = content.get("deliveryTime", "Within 24 hours")
+                        delivery_time_minutes = self._parse_delivery_time(delivery_time_text) or 1440
+                    
+                    # Create and return the result
+                    result = {
+                        "provider_id": "xoom",
+                        "provider_name": "Xoom",
+                        "source_country": "US",  # Default source country
+                        "destination_country": receive_country,
+                        "source_currency": send_currency,
+                        "destination_currency": receive_currency,
+                        "source_amount": send_amount_float,
+                        "destination_amount": receive_amount,
+                        "exchange_rate": exchange_rate,
+                        "fee": fee,
+                        "payment_method": payment_method_normalized,
+                        "delivery_method": delivery_method_normalized,
+                        "delivery_time_minutes": delivery_time_minutes,
+                        "fixed_delivery_time": delivery_time_text,
+                        "details": {
+                            "provider": "Xoom",
+                            "url": f"https://www.xoom.com/{receive_country.lower()}/send-money"
+                        }
+                    }
+                    
+                    return result
             
-            # Extract amounts
-            send_amount_data = best_option.get("sendAmount", {})
-            receive_amount_data = best_option.get("receiveAmount", {})
-            fee_amount_data = best_option.get("feeAmount", {})
-            
-            # Extract rate data
-            fx_rate_data = best_option.get("fxRate", {})
-            fx_rate = self._extract_exchange_rate(fx_rate_data.get("comparisonString", ""))
-            
-            # Extract content fields for additional info
-            content_fields = best_option.get("content", [])
-            content_data = self._process_content_fields(content_fields)
-            
-            # Determine delivery time
-            delivery_time = content_data.get("paymentTypeHeader", "")
-            delivery_time_minutes = self._parse_delivery_time(delivery_time)
-            
-            # Build the result
-            result = {
-                "provider": "Xoom",
-                "send_currency": send_currency,
-                "send_amount": float(send_amount_data.get("rawValue", send_amount_float)),
-                "receive_currency": receive_currency,
-                "receive_amount": float(receive_amount_data.get("rawValue", 0)),
-                "exchange_rate": fx_rate,
-                "fee": float(fee_amount_data.get("rawValue", 0)),
-                "delivery_method": self._normalize_delivery_method(disbursement_type),
-                "payment_method": content_data.get("paymentType", payment_type),
-                "estimated_delivery_time": delivery_time,
-                "estimated_delivery_minutes": delivery_time_minutes
-            }
-            
-            # Add success flag for standardization
-            result["success"] = True
-            
-            # Return standardized response
-            return self.standardize_response(result)
+            # If we couldn't process the response, return error
+            self.logger.error("Failed to process quote API response")
+            raise XoomError("Failed to get exchange rate from quote API")
             
         except Exception as e:
-            self.logger.error(f"Regular API failed: {str(e)}")
-        
-        # As a last resort, return mock/estimated exchange rates with clean JSON
-        self.logger.warning("All API methods failed, using mock exchange rates")
-        
-        # Get mock data based on corridor and amount 
-        mock_rates = {
-            "MXN": 20.15,
-            "PHP": 55.75,
-            "INR": 83.20,
-            "COP": 3950.0,
-            "ARS": 1150.0,
-            "BRL": 5.20,
-            "GTQ": 7.80,
-            "CNY": 7.25,
-            "USD": 1.0,
-            "EUR": 0.92
-        }
-        
-        # Get rate for this currency or use a default
-        if not receive_currency:
-            receive_currency = self._get_currency_for_country(receive_country)
-        
-        exchange_rate = mock_rates.get(receive_currency, 10.0)
-        
-        # Calculate receive amount
-        send_amount_float = float(send_amount)
-        receive_amount = send_amount_float * exchange_rate
-        
-        # Define standard fees based on amount
-        fee = 0.0
-        if send_amount_float >= 1000:
-            fee = 9.99
-        elif send_amount_float >= 500:
-            fee = 4.99
-        elif send_amount_float >= 100:
-            fee = 2.99
-        
-        # Build mock result
-        result = {
-            "provider": "Xoom",
-            "send_currency": send_currency,
-            "send_amount": send_amount_float,
-            "receive_currency": receive_currency,
-            "receive_amount": receive_amount,
-            "exchange_rate": exchange_rate,
-            "fee": fee,
-            "delivery_method": "bank deposit",
-            "payment_method": "PayPal balance",
-            "estimated_delivery_time": "Typically available within hours",
-            "estimated_delivery_minutes": 180,
-            "is_mock": True  # Flag to indicate this is mock data
-        }
-        
-        # Add success flag for standardization
-        result["success"] = True
-        
-        # Return standardized response
-        return self.standardize_response(result)
+            self.logger.error(f"Error getting exchange rate via quote API: {str(e)}")
+            raise XoomError(f"Failed to get exchange rate: {str(e)}")
     
     def _get_exchange_rate_via_fee_table(
         self,
@@ -780,67 +836,107 @@ class XoomProvider(RemittanceProvider):
         """
         self.logger.info(f"Getting exchange rate via fee table for {send_amount} {send_currency} to {receive_country} ({receive_currency})")
         
-        # Generate random request ID and timestamp
-        request_id = str(uuid.uuid4())
-        timestamp = int(time.time() * 1000)
-        
         # Convert send amount to float with 2 decimal places
         send_amount_float = float(send_amount)
         
-        # Setup query parameters
-        params = {
-            "sourceCountryCode": "US",
-            "sourceCurrencyCode": send_currency,
-            "destinationCountryCode": receive_country,
-            "destinationCurrencyCode": receive_currency,
-            "sendAmount": send_amount_float,
-            "paymentType": "PAYPAL_BALANCE",
-            "requestId": request_id,
-            "_": timestamp
-        }
+        # Maximum number of retries for API requests
+        max_retries = 3
+        retry_count = 0
+        backoff_factor = 1.5
         
-        # Set required cookie values for the session
-        self.session.cookies.set("visitor_id", str(uuid.uuid4()), domain=".xoom.com")
-        self.session.cookies.set("optimizelyEndUserId", str(uuid.uuid4()), domain=".xoom.com")
+        while retry_count < max_retries:
+            try:
+                # Generate random request ID and timestamp
+                request_id = str(uuid.uuid4())
+                timestamp = int(time.time() * 1000)
+                
+                # Setup query parameters based on the provided curl example
+                params = {
+                    "sourceCountryCode": "US",  # Default source country
+                    "sourceCurrencyCode": send_currency,
+                    "destinationCountryCode": receive_country,
+                    "destinationCurrencyCode": receive_currency,
+                    "sendAmount": send_amount_float,
+                    "receiveAmount": 0,  # Will be calculated by Xoom
+                    "localCurrency": "true",
+                    "serviceType": "",
+                    "serviceSlug": "",
+                    "receiveAmountEntered": "false",
+                    "oldSourceCurrencyCode": send_currency,
+                    "oldDestinationCurrencyCode": receive_currency,
+                    "remittanceResourceID": request_id,
+                    "_": timestamp
+                }
+                
+                # Set required headers to simulate browser request
+                headers = {
+                    "Pragma": "no-cache",
+                    "Accept": "*/*",
+                    "Sec-Fetch-Site": "same-origin",
+                    "Accept-Language": "en-US,en;q=0.9",
+                    "Cache-Control": "no-cache",
+                    "Sec-Fetch-Mode": "cors",
+                    "Accept-Encoding": "gzip, deflate, br",
+                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+                    "Referer": f"https://www.xoom.com/{receive_country.lower()}/send-money",
+                    "Sec-Fetch-Dest": "empty",
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Priority": "u=3, i"
+                }
+                
+                # Ensure session cookies are set
+                if not self.session.cookies:
+                    self._visit_home_page()
+                
+                # Make GET request to fee table endpoint
+                response = self.session.get(
+                    f"{self.BASE_URL}/calculate-fee-table",
+                    params=params,
+                    headers=headers,
+                    timeout=self.timeout
+                )
+                
+                # Check if response is successful
+                if response.status_code != 200:
+                    self.logger.error(f"Fee table API returned status code {response.status_code}")
+                    retry_count += 1
+                    time.sleep(backoff_factor ** retry_count)
+                    continue
+                
+                # Parse the HTML response to extract exchange rate and fee information
+                result = self._parse_fee_table_response(
+                    response.text,
+                    send_amount_float,
+                    send_currency,
+                    receive_country,
+                    receive_currency
+                )
+                
+                # If exchange rate extraction was successful, return the result
+                if result and "exchange_rate" in result and result["exchange_rate"] > 0:
+                    self.logger.info(f"Successfully extracted exchange rate: {result['exchange_rate']}")
+                    return result
+                
+                # If we got a response but couldn't extract the data, retry
+                self.logger.warning("Failed to extract exchange rate from response")
+                retry_count += 1
+                time.sleep(backoff_factor ** retry_count)
+                
+            except (requests.RequestException, ConnectionError) as e:
+                self.logger.error(f"Request error during attempt {retry_count + 1}: {str(e)}")
+                retry_count += 1
+                if retry_count >= max_retries:
+                    raise XoomConnectionError(f"Failed to connect to Xoom API after {max_retries} attempts: {str(e)}")
+                time.sleep(backoff_factor ** retry_count)
+            
+            except Exception as e:
+                self.logger.error(f"Unexpected error during attempt {retry_count + 1}: {str(e)}")
+                retry_count += 1
+                if retry_count >= max_retries:
+                    raise XoomError(f"Unexpected error when fetching exchange rate: {str(e)}")
+                time.sleep(backoff_factor ** retry_count)
         
-        # Setup headers to simulate browser request
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Referer": "https://www.xoom.com/send-money",
-            "Connection": "keep-alive"
-        }
-        
-        try:
-            # Make GET request to fee table endpoint
-            response = self.session.get(
-                f"{self.base_url}/calculate-fee-table",
-                params=params,
-                headers=headers,
-                timeout=self.timeout
-            )
-            
-            # Check if response is successful
-            if response.status_code != 200:
-                self.logger.error(f"Fee table API returned status code {response.status_code}")
-                return {}
-            
-            # Parse the response to extract rate information
-            return self._parse_fee_table_response(
-                response.text,
-                send_amount_float,
-                send_currency,
-                receive_country,
-                receive_currency
-            )
-            
-        except requests.Timeout:
-            self.logger.error("Request to fee table API timed out")
-            return {}
-        except Exception as e:
-            self.logger.error(f"Error getting exchange rate via fee table: {str(e)}")
-            return {}
+        raise XoomError(f"Failed to get exchange rate after {max_retries} attempts")
     
     def _parse_fee_table_response(
         self,
@@ -851,140 +947,141 @@ class XoomProvider(RemittanceProvider):
         receive_currency: str
     ) -> Dict:
         """
-        Parse HTML response from fee table endpoint to extract exchange rate information.
-        Returns a clean JSON structure regardless of HTML input complexity.
+        Parse the HTML response from the fee table API to extract exchange rate and fee information.
+        
+        Args:
+            html_response: HTML response from the fee table API
+            send_amount: Amount being sent
+            send_currency: Source currency code
+            receive_country: Destination country code
+            receive_currency: Destination currency code
+            
+        Returns:
+            Dictionary with exchange rate information
         """
+        self.logger.info("Parsing fee table response")
+        
+        # Initialize result values
+        exchange_rate = 0.0
+        receive_amount = 0.0
+        fees = {}
+        selected_payment_method = "PayPal balance"  # Default payment method
+        delivery_method = "Bank Deposit"  # Default delivery method
+        
         try:
-            # Use BeautifulSoup to parse the HTML
-            soup = BeautifulSoup(html_response, "html.parser")
+            soup = BeautifulSoup(html_response, 'html.parser')
             
-            # Find the JSON data embedded in the HTML
-            json_data_element = soup.find("data", id="jsonData")
-            
-            # Initialize default values
-            exchange_rate = 0.0
-            receive_amount = 0.0
-            fee = 0.0
-            delivery_method = "bank deposit"  # Default
-            payment_method = "PayPal balance"  # Default
-            delivery_time_minutes = 60  # Default: 1 hour
-            delivery_time_text = "Typically available within an hour"
-            
-            # If JSON data is found in the HTML, parse it
-            if json_data_element and json_data_element.string:
-                # Extract and parse the JSON data
-                json_data_str = json_data_element.string
-                
-                # Fix any HTML encoding in the JSON string
-                json_data_str = html.unescape(json_data_str)
-                
-                # Try multiple parsing approaches
-                try:
-                    # Standard JSON parsing
-                    json_data = json.loads(json_data_str)
-                except json.JSONDecodeError:
-                    # Try cleaning the string further
-                    json_data_str = json_data_str.replace("&quot;", '"').replace("\\'", "'")
+            # First try to extract data from the embedded JSON data
+            json_data_element = soup.select_one('data#jsonData')
+            if json_data_element:
+                # Extract and clean the JSON string (replace HTML entities)
+                json_str = json_data_element.string
+                if json_str:
+                    json_str = json_str.replace('&quot;', '"')
                     
-                    # Try to extract a valid JSON substring
-                    match = re.search(r'(\{.*\})', json_data_str)
-                    if match:
-                        try:
-                            json_data = json.loads(match.group(1))
-                        except:
-                            self.logger.warning("Failed to parse JSON data even after extraction")
-                            json_data = {}
-                    else:
-                        self.logger.warning("Could not extract valid JSON from string")
-                        json_data = {}
-                
-                # Extract exchange rate and fees if JSON parsing succeeded
-                if json_data and isinstance(json_data, dict) and "data" in json_data:
-                    data = json_data["data"]
-                    
-                    # Extract exchange rate
-                    if "fxRate" in data and data["fxRate"]:
-                        try:
-                            exchange_rate = float(data["fxRate"])
-                        except (ValueError, TypeError):
-                            self.logger.warning("Could not convert fxRate to float")
-                    
-                    # Extract receive amount
-                    if "receiveAmount" in data and data["receiveAmount"]:
-                        try:
-                            receive_amount = float(data["receiveAmount"])
-                        except (ValueError, TypeError):
-                            self.logger.warning("Could not convert receiveAmount to float")
+                    try:
+                        # Parse the JSON data
+                        data_json = json.loads(json_str)
+                        if "data" in data_json:
+                            data = data_json["data"]
+                            
+                            # Extract exchange rate
+                            if "fxRate" in data and data["fxRate"]:
+                                try:
+                                    exchange_rate = float(data["fxRate"])
+                                    self.logger.info(f"Extracted fxRate from JSON: {exchange_rate}")
+                                except (ValueError, TypeError):
+                                    self.logger.warning("Could not convert fxRate to float")
+                            
+                            # Extract receive amount
+                            if "receiveAmount" in data and data["receiveAmount"]:
+                                try:
+                                    receive_amount = float(data["receiveAmount"])
+                                    self.logger.info(f"Extracted receiveAmount from JSON: {receive_amount}")
+                                except (ValueError, TypeError):
+                                    self.logger.warning("Could not convert receiveAmount to float")
+                    except json.JSONDecodeError as e:
+                        self.logger.warning(f"Failed to parse JSON: {str(e)}")
             
             # Extract fee information from tables in HTML
-            fee_tables = soup.select("div.xvx-table-container")
-            if fee_tables:
-                for table_container in fee_tables:
-                    # Extract delivery method from heading
-                    heading = table_container.select_one("p.xvx-table-container__heading")
-                    if heading and "fee for" in heading.text.lower():
-                        delivery_method_text = heading.text.lower().replace("fee for", "").strip()
-                        if delivery_method_text:
-                            delivery_method = delivery_method_text
+            fee_rows = soup.select("tr.xvx-table--fee__body-tr")
+            if fee_rows:
+                self.logger.info(f"Found {len(fee_rows)} fee options in the table")
+                for row in fee_rows:
+                    payment_cell = row.select_one("td.xvx-table--fee__body-td:not(.fee-value)")
+                    fee_cell = row.select_one("td.xvx-table--fee__body-td.fee-value")
                     
-                    # Extract fee information from table
-                    fee_rows = table_container.select("tr.xvx-table--fee__body-tr")
-                    for row in fee_rows:
-                        payment_cell = row.select_one("td.xvx-table--fee__body-td:first-child")
-                        fee_cell = row.select_one("td.xvx-table--fee__body-td.fee-value")
+                    if payment_cell and fee_cell:
+                        payment_option = payment_cell.text.strip()
+                        fee_value_text = fee_cell.text.strip().replace("$", "").replace(",", "")
                         
-                        if payment_cell and fee_cell:
-                            payment_option = payment_cell.text.strip()
-                            fee_value = fee_cell.text.strip().replace("$", "").replace(",", "")
+                        try:
+                            fee_value = float(fee_value_text)
+                            payment_method_key = payment_option.strip()
                             
-                            try:
-                                fee_float = float(fee_value)
-                                # If PayPal balance, use this as our default option
-                                if "paypal balance" in payment_option.lower():
-                                    payment_method = payment_option
-                                    fee = fee_float
-                            except ValueError:
-                                continue
+                            # Store fee for this payment method
+                            fees[payment_method_key] = fee_value
+                            
+                            # Prefer PYUSD if it has zero fee
+                            if "pyusd" in payment_option.lower() and fee_value == 0.0:
+                                selected_payment_method = payment_option
+                            # Otherwise use PayPal balance as a fallback
+                            elif "paypal balance" in payment_option.lower():
+                                selected_payment_method = payment_option
+                            
+                            self.logger.info(f"Extracted fee for {payment_method_key}: {fee_value}")
+                        except (ValueError, TypeError):
+                            self.logger.warning(f"Could not convert fee value to float: {fee_value_text}")
             
-            # Ensure we have a valid result even if parsing failed
-            if exchange_rate <= 0 and receive_amount > 0 and send_amount > 0:
-                # Calculate exchange rate from amounts
+            # If we couldn't extract fees from the table, use default fee structure
+            if not fees:
+                self.logger.warning("Could not extract fees from HTML, using default fee structure")
+                fees = {
+                    "PayPal USD (PYUSD)": 0.00,
+                    "PayPal balance": 4.99 if send_amount >= 1000 else 2.99,
+                    "Bank account": 4.99 if send_amount >= 1000 else 2.99,
+                    "Debit card": 5.99,
+                    "Credit card": 5.99
+                }
+            
+            # If we still don't have an exchange rate, try to calculate from the URL or amounts
+            if exchange_rate == 0 and receive_amount > 0 and send_amount > 0:
                 exchange_rate = receive_amount / send_amount
+                self.logger.info(f"Calculated exchange rate from amounts: {exchange_rate}")
             
-            # Construct clean JSON response regardless of parsing success
+            # Build and return the result
             result = {
-                "success": True,  # Add success flag for standardization
-                "send_currency": send_currency,
-                "send_amount": send_amount,
-                "receive_currency": receive_currency,
-                "receive_amount": receive_amount,
+                "provider_id": "xoom",
+                "provider_name": "Xoom",
+                "source_country": "US",  # Default source country
+                "destination_country": receive_country,
+                "source_currency": send_currency,
+                "destination_currency": receive_currency,
+                "source_amount": send_amount,
+                "destination_amount": receive_amount,
                 "exchange_rate": exchange_rate,
-                "fee": fee,
+                "fee": fees.get(selected_payment_method, 4.99),  # Use fee for selected payment method
+                "payment_method": selected_payment_method,
                 "delivery_method": delivery_method,
-                "payment_method": payment_method,
-                "estimated_delivery_time": delivery_time_text,
-                "delivery_time_minutes": delivery_time_minutes  # Rename to match standard
+                "delivery_time_minutes": 1440,  # 24 hours is typical for Xoom
+                "fixed_delivery_time": "Within 24 hours",
+                "available_payment_methods": [
+                    {"id": key, "name": key, "fee": value} 
+                    for key, value in fees.items()
+                ],
+                "details": {
+                    "provider": "Xoom",
+                    "url": f"https://www.xoom.com/{receive_country.lower()}/send-money"
+                }
             }
             
-            # Log result for debugging
-            self.logger.info(f"Parsed exchange rate: {exchange_rate}, receive amount: {receive_amount}, fee: {fee}")
+            self.logger.info(f"Parsed result: exchange_rate={exchange_rate}, fee={result['fee']}, payment_method={selected_payment_method}")
+            return result
             
-            # Return standardized result
-            return self.standardize_response(result)
-        
         except Exception as e:
             self.logger.error(f"Error parsing fee table response: {str(e)}")
-            # Create error response
-            error_result = {
-                "success": False,
-                "error_message": f"Error parsing fee table response: {str(e)}",
-                "send_currency": send_currency,
-                "send_amount": send_amount,
-                "receive_currency": receive_currency
-            }
-            
-            # Return standardized error response
-            return self.standardize_response(error_result)
+            # Return empty dictionary in case of errors
+            return {}
     
     def _filter_pricing_options(
         self, 
@@ -1086,156 +1183,134 @@ class XoomProvider(RemittanceProvider):
     
     def _get_default_currency_for_country(self, country_code: str) -> Optional[str]:
         """
-        Get the default currency for a country.
+        Get the default currency for a given country.
         
         Args:
-            country_code: Two-letter country code
+            country_code: ISO-3166-1 alpha-2 country code
             
         Returns:
-            Currency code or None if not found
+            Default currency code for the country
         """
-        # Common currency mappings
-        country_to_currency = {
-            "US": "USD",
+        # Use the utility function to get country currencies
+        currencies = get_country_currencies(country_code)
+        if currencies:
+            return currencies[0]
+            
+        # Fallback mapping for countries not in standard mapping
+        country_currency_map = {
             "MX": "MXN",
             "PH": "PHP",
-            "CO": "COP",
             "IN": "INR",
+            "CO": "COP",
             "GT": "GTQ",
             "SV": "USD",
             "DO": "DOP",
             "HN": "HNL",
             "PE": "PEN",
             "EC": "USD",
-            "BR": "BRL",
-            "NI": "NIO",
-            "JM": "JMD",
-            "CN": "CNY",
-            "LK": "LKR"
+            "AU": "AUD",
+            "CA": "CAD",
+            "GB": "GBP",
+            "US": "USD",
+            "BH": "BHD",
+            "NG": "NGN",
+            "BD": "BDT",
+            "PK": "PKR"
         }
         
-        return country_to_currency.get(country_code)
-    
+        return country_currency_map.get(country_code.upper())
+
     def _get_currency_for_country(self, country_code: str) -> str:
         """
-        Get the currency code for a country.
+        Get the currency for a country, handling fallbacks.
         
         Args:
-            country_code: Two-letter country code
+            country_code: ISO-3166-1 alpha-2 country code
             
         Returns:
             Currency code for the country
         """
-        # Use the default currency mapping
-        return self._get_default_currency_for_country(country_code) or "USD"
+        currency = self._get_default_currency_for_country(country_code)
+        
+        if not currency:
+            self.logger.warning(f"No currency found for country code {country_code}, defaulting to USD")
+            currency = "USD"
+            
+        return currency
     
     def get_supported_countries(self) -> List[Dict]:
         """
-        Get a list of supported destination countries.
+        Get a list of countries supported by Xoom.
         
         Returns:
-            A list of country objects with code, name, and currency
+            List of dictionaries with country information
         """
-        # Use cached results if available
-        if self._countries_cache:
-            return self._countries_cache
+        self.logger.info("Getting supported countries")
         
         try:
-            # Visit the send money page to extract countries
-            url = f"{self.BASE_URL}/en-us/send-money"
-            logger.info(f"Getting supported countries from: {url}")
-            
-            response = self.session.get(
-                url=url,
-                timeout=self.timeout,
-                allow_redirects=True
+            # First try to get from API
+            if not self.session.cookies:
+                self._initialize_session()
+                
+            response = self._make_api_request(
+                method="GET",
+                url=f"{self.BASE_URL}/xoom/api/country/receiving",
+                retry_auth=False
             )
             
-            if response.status_code != 200:
-                logger.warning(f"Failed to get countries, status: {response.status_code}")
-                return self._get_static_country_list()
-            
-            # Parse HTML
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            # Look for country dropdown or list
-            countries = []
-            
-            # Parse the script containing country data
-            country_data_script = soup.find("script", string=re.compile(r'window\.__INITIAL_STATE__'))
-            
-            if country_data_script:
-                # Extract JSON data
-                match = re.search(r'window\.__INITIAL_STATE__\s*=\s*({.*?});', country_data_script.string, re.DOTALL)
-                if match:
-                    try:
-                        data = json.loads(match.group(1))
-                        countries_data = data.get('data', {}).get('countries', [])
-                        
-                        for country in countries_data:
-                            if 'code' in country and 'name' in country:
-                                currency_code = country.get('currency') or self._get_currency_for_country(country['code'])
-                                
-                                countries.append({
-                                    "country_code": country['code'],
-                                    "country_name": country['name'],
-                                    "currency_code": currency_code
-                                })
-                    except (json.JSONDecodeError, KeyError) as e:
-                        logger.error(f"Error parsing country data: {e}")
-            
-            # If no countries found this way, try looking for country links
-            if not countries:
-                country_links = soup.select("a[href*='countryCode=']")
+            if response and "countries" in response:
+                countries = []
                 
-                for link in country_links:
-                    href = link.get('href', '')
-                    country_match = re.search(r'countryCode=([A-Z]{2})', href)
+                for country_data in response["countries"]:
+                    code = country_data.get("code")
+                    name = country_data.get("displayName") or get_country_name(code) or code
                     
-                    if country_match:
-                        country_code = country_match.group(1)
-                        country_name = self.COUNTRY_CODES.get(country_code, country_code)
-                        currency_code = self._get_currency_for_country(country_code)
-                        
-                        # Avoid duplicates
-                        if not any(c['country_code'] == country_code for c in countries):
-                            countries.append({
-                                "country_code": country_code,
-                                "country_name": country_name,
-                                "currency_code": currency_code
-                            })
-            
-            # Cache the results
-            if countries:
-                self._countries_cache = countries
+                    # Get currency for the country
+                    currency = self._get_currency_for_country(code)
+                    
+                    countries.append({
+                        "code": code,
+                        "name": name,
+                        "currency": currency
+                    })
+                
                 return countries
-            
-            # Fall back to static list if web scraping failed
-            return self._get_static_country_list()
-            
+            else:
+                self.logger.warning("Failed to get countries from API, using static list")
         except Exception as e:
-            logger.error(f"Error getting supported countries: {e}")
-            return self._get_static_country_list()
+            self.logger.error(f"Error getting supported countries: {str(e)}")
+            
+        # Fall back to static list
+        return self._get_static_country_list()
     
     def _get_static_country_list(self) -> List[Dict]:
-        """Return a static list of countries supported by Xoom."""
-        return [
-            {"country_code": "MX", "country_name": "Mexico", "currency_code": "MXN"},
-            {"country_code": "PH", "country_name": "Philippines", "currency_code": "PHP"},
-            {"country_code": "IN", "country_name": "India", "currency_code": "INR"},
-            {"country_code": "CO", "country_name": "Colombia", "currency_code": "COP"},
-            {"country_code": "GT", "country_name": "Guatemala", "currency_code": "GTQ"},
-            {"country_code": "SV", "country_name": "El Salvador", "currency_code": "USD"},
-            {"country_code": "DO", "country_name": "Dominican Republic", "currency_code": "DOP"},
-            {"country_code": "HN", "country_name": "Honduras", "currency_code": "HNL"},
-            {"country_code": "PE", "country_name": "Peru", "currency_code": "PEN"},
-            {"country_code": "EC", "country_name": "Ecuador", "currency_code": "USD"},
-            {"country_code": "BR", "country_name": "Brazil", "currency_code": "BRL"},
-            {"country_code": "NI", "country_name": "Nicaragua", "currency_code": "NIO"},
-            {"country_code": "JM", "country_name": "Jamaica", "currency_code": "JMD"},
-            {"country_code": "CN", "country_name": "China", "currency_code": "CNY"},
-            {"country_code": "LK", "country_name": "Sri Lanka", "currency_code": "LKR"}
+        """
+        Get a static list of countries supported by Xoom.
+        Used as a fallback when the API call fails.
+        
+        Returns:
+            List of dictionaries with country information
+        """
+        # Common countries supported by Xoom
+        country_codes = [
+            "MX", "PH", "IN", "CO", "GT", "SV", "DO", "HN", "PE", "EC", 
+            "BR", "JM", "NI", "PY", "UY", "CL", "VN", "CN", "BD", "PK", 
+            "LK", "BH", "NG", "GH", "KE", "FR", "DE", "IT", "ES", "PT", "AU"
         ]
+        
+        countries = []
+        for code in country_codes:
+            # Use the utility functions to get country names
+            name = get_country_name(code) or ISO_COUNTRY_NAMES.get(code, code)
+            currency = self._get_currency_for_country(code)
+            
+            countries.append({
+                "code": code,
+                "name": name,
+                "currency": currency
+            })
+            
+        return countries
     
     def get_payment_methods(self, source_country: str = "US", target_country: str = "MX") -> List[Dict]:
         """

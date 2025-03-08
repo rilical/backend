@@ -165,51 +165,73 @@ class TransferGoProvider(RemittanceProvider):
         business: int = 0
     ) -> Dict[str, Any]:
         """
-        Internal method to request quotes from TransferGo's /api/booking/quotes endpoint.
-
+        Request quotes from TransferGo API.
+        
         Args:
-            from_country: The sending country code (e.g., "DE")
-            to_country: The receiving country code (e.g., "UA")
-            from_currency: The sending currency (e.g., "EUR")
-            to_currency: The receiving currency (e.g., "UAH")
-            amount: The numerical amount
-            calc_base: "sendAmount" or "receiveAmount"
-            business: 0 = personal, 1 = business
-
+            from_country: Source country code (ISO-2)
+            to_country: Destination country code (ISO-2)
+            from_currency: Source currency code (ISO-3)
+            to_currency: Destination currency code (ISO-3)
+            amount: Amount to transfer
+            calc_base: Calculation base ('sendAmount' or 'receiveAmount')
+            business: Business account flag (0 or 1)
+            
         Returns:
-            The parsed JSON from TransferGo on success, or raises an exception on error.
+            API response as Dict
         """
-        endpoint = f"{self.base_url}/api/booking/quotes"
+        url = f"{self.BASE_URL}/api/booking/quotes"
         params = {
-            "fromCurrencyCode": from_currency.upper(),
-            "toCurrencyCode": to_currency.upper(),
+            "fromCurrencyCode": from_currency,
+            "toCurrencyCode": to_currency,
             "fromCountryCode": from_country,
             "toCountryCode": to_country,
-            "amount": str(amount),
+            "amount": f"{amount:.2f}",
             "calculationBase": calc_base,
-            "business": str(business)
+            "business": business
         }
-
-        logger.debug(f"Requesting TransferGo quotes with {params}")
-
+        
         try:
-            resp = self.session.get(endpoint, params=params, timeout=self.timeout)
-            if resp.status_code >= 400:
+            response = self.session.get(url, params=params)
+            
+            # Handle non-2xx responses
+            if not response.ok:
                 try:
-                    error_data = resp.json()
-                    err_msg = error_data.get("error", {}).get("message", "Unknown error")
-                    raise TransferGoError(f"TransferGo API error (HTTP {resp.status_code}): {err_msg}")
-                except (ValueError, KeyError):
-                    # JSON parse error or missing fields
-                    raise TransferGoError(f"TransferGo request failed with status={resp.status_code}, body={resp.text}")
-
-            data = resp.json()
-            logger.debug(f"TransferGo API response: {json.dumps(data)[:200]}...")
+                    error_data = response.json()
+                    if isinstance(error_data, dict):
+                        err_msg = error_data.get("error", {}).get("message", "Unknown error")
+                    else:
+                        err_msg = str(error_data)
+                except (ValueError, AttributeError):
+                    # Handle case where response is not valid JSON
+                    err_msg = f"Invalid response: {response.text[:100]}..."
+                
+                # Handle specific error types
+                if response.status_code == 401:
+                    raise TransferGoAuthenticationError(f"Authentication error: {err_msg}")
+                elif response.status_code == 429:
+                    raise TransferGoRateLimitError("Rate limit exceeded")
+                elif response.status_code == 422:
+                    return {
+                        "success": False,
+                        "error_message": f"Validation error: Corridor not supported or invalid parameters"
+                    }
+                else:
+                    raise TransferGoError(f"API error ({response.status_code}): {err_msg}")
+            
+            # Parse successful response
+            data = response.json()
             return data
-
+            
         except requests.RequestException as e:
-            logger.error(f"TransferGo connection error: {str(e)}", exc_info=True)
             raise TransferGoConnectionError(f"Connection error: {str(e)}")
+        except ValueError as e:
+            raise TransferGoError(f"Invalid JSON response: {str(e)}")
+        except Exception as e:
+            logger.error(f"Unexpected TransferGo error: {str(e)}", exc_info=True)
+            return {
+                "success": False,
+                "error_message": f"Unexpected error: {str(e)}"
+            }
 
     def validate_corridor(
         self,
