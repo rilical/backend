@@ -2,7 +2,7 @@
 XE Provider Package
 """
 
-from apps.providers.xe.integration import XEProvider
+from apps.providers.xe.integration import XEProvider, XEAggregatorProvider
 from apps.providers.xe.exceptions import (
     XEError,
     XEConnectionError,
@@ -17,6 +17,7 @@ from apps.providers.xe.exceptions import (
 
 __all__ = [
     'XEProvider',
+    'XEAggregatorProvider',
     'XEError',
     'XEConnectionError',
     'XEApiError',
