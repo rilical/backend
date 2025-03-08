@@ -95,14 +95,16 @@ class XEAggregatorProvider(RemittanceProvider):
         now_iso = datetime.now(timezone.utc).isoformat()
 
         if not local_result.get("success", False):
+            # For errors, return a standardized error response
+            # Note: For error responses, we only include minimal fields required by the aggregator
             return {
                 "provider_id": "XE",
                 "success": False,
                 "error_message": local_result.get("error_message") or "Unknown XE error"
             }
         
-        # Otherwise, success path
-        return {
+        # For success responses, return a fully standardized response with all aggregator fields
+        standard_response = {
             "provider_id": "XE",
             "success": True,
             "error_message": None,
@@ -116,8 +118,22 @@ class XEAggregatorProvider(RemittanceProvider):
             "delivery_method": local_result.get("delivery_method", "BANK_TRANSFER"),
             "delivery_time_minutes": self._parse_delivery_time(local_result.get("delivery_time")),
             "timestamp": now_iso,
-            "raw_response": local_result.get("raw_data")
         }
+        
+        # If we have rate info (for exchange_rate responses), include it
+        # Some aggregator implementations need both "rate" and "exchange_rate"
+        if local_result.get("exchange_rate") is not None:
+            standard_response["rate"] = local_result.get("exchange_rate")
+            
+        # For get_exchange_rate compatibility, also include target_currency
+        if local_result.get("receive_currency"):
+            standard_response["target_currency"] = str(local_result.get("receive_currency", "")).upper()
+            
+        # Include the raw response data if available
+        if local_result.get("raw_data"):
+            standard_response["raw_response"] = local_result.get("raw_data")
+            
+        return standard_response
 
     def _parse_delivery_time(self, time_str: Optional[str]) -> int:
         """
@@ -188,7 +204,16 @@ class XEAggregatorProvider(RemittanceProvider):
         Aggregator method: get an XE quote with no fallback or mock data.
         
         If any error occurs, returns aggregator shape with success=false.
-        Otherwise returns aggregator success data.
+        Otherwise returns aggregator success data with all required fields.
+        
+        Args:
+            send_amount: Amount to send in source currency
+            send_currency: Source currency code (e.g., "USD")
+            receive_country: Destination country code (e.g., "MX")
+            **kwargs: Additional parameters including user_country
+            
+        Returns:
+            Standardized response dictionary with all aggregator fields
         """
         logger.info(f"Getting XE exchange rate for {send_currency} to {receive_country} (Amount: {send_amount})")
         
@@ -241,11 +266,6 @@ class XEAggregatorProvider(RemittanceProvider):
             if resp.status_code != 200:
                 logger.error(f"XE API returned non-200 status: {resp.status_code}, response: {resp.text[:200]}...")
                 local_fail["error_message"] = f"XE API error: {resp.status_code} response"
-                # Include response text in debug data
-                local_fail["debug_data"] = {
-                    "status_code": resp.status_code,
-                    "response_text": resp.text[:500]
-                }
                 return self.standardize_response(local_fail)
             
             data = resp.json()
@@ -263,6 +283,18 @@ class XEAggregatorProvider(RemittanceProvider):
         if not quote_obj:
             logger.error(f"No 'quote' in XE response: {data}")
             local_fail["error_message"] = "Invalid XE response, missing 'quote'"
+            return self.standardize_response(local_fail)
+        
+        # Check for quote status and error messages
+        quote_status = quote_obj.get("quoteStatus")
+        if quote_status and quote_status != "Quoted":
+            error_msgs = quote_obj.get("errorMessages", {})
+            if error_msgs:
+                # Format all error messages into a single string
+                error_txt = "; ".join([f"{k}: {v}" for k, v in error_msgs.items()])
+                local_fail["error_message"] = f"XE quote failed with status {quote_status}: {error_txt}"
+            else:
+                local_fail["error_message"] = f"XE quote failed with status {quote_status}"
             return self.standardize_response(local_fail)
         
         indiv_quotes = quote_obj.get("individualQuotes", [])
