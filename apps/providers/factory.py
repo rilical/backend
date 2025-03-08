@@ -16,6 +16,7 @@ from .alansari.integration import AlAnsariProvider
 from .placid.integration import PlacidProvider
 from .orbitremit.integration import OrbitRemitProvider
 from .wirebarley.integration import WireBarleyProvider
+from .paysend.integration import PaysendProvider
 
 class ProviderFactory:
     """Factory for creating and managing remittance provider instances."""
@@ -33,6 +34,7 @@ class ProviderFactory:
         'placid': PlacidProvider,
         'orbitremit': OrbitRemitProvider,
         'wirebarley': WireBarleyProvider,
+        'paysend': PaysendProvider,
         # Add more providers as they are implemented and confirmed
     }
 
@@ -77,3 +79,13 @@ class ProviderFactory:
             Dictionary mapping provider names to provider classes
         """
         return dict(cls._providers)
+
+    @classmethod
+    def list_providers(cls) -> list:
+        """
+        Get a list of all available provider names.
+
+        Returns:
+            List of provider names
+        """
+        return list(cls._providers.keys())

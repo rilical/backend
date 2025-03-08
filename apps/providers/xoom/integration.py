@@ -35,7 +35,7 @@ import re
 import time
 import uuid
 import html
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Dict, Optional, Any, List, Union, Tuple
 from urllib.parse import urljoin, quote_plus
@@ -525,6 +525,46 @@ class XoomProvider(RemittanceProvider):
         # This should not be reached, but just in case
         raise XoomError("Maximum retries exceeded")
     
+    def standardize_response(self, local_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Convert local_data into aggregator-standard JSON.
+        
+        If local_data["success"] is False, return aggregator error shape:
+          {
+            "provider_id": "Xoom",
+            "success": false,
+            "error_message": ...
+          }
+
+        If success, return aggregator success shape.
+        """
+        if not local_data.get("success", False):
+            return {
+                "provider_id": "Xoom",
+                "success": False,
+                "error_message": local_data.get("error_message") or "Unknown Xoom error"
+            }
+
+        # success path
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        return {
+            "provider_id": "Xoom",
+            "success": True,
+            "error_message": None,
+            "send_amount": local_data.get("send_amount", 0.0),
+            "source_currency": local_data.get("send_currency", "").upper(),
+            "destination_amount": local_data.get("receive_amount", 0.0),
+            "destination_currency": local_data.get("receive_currency", "").upper(),
+            "exchange_rate": local_data.get("exchange_rate", 0.0),
+            "fee": local_data.get("fee", 0.0),
+            "payment_method": local_data.get("payment_method", "Unknown"),
+            "delivery_method": local_data.get("delivery_method", "bank deposit"),
+            "delivery_time_minutes": local_data.get("delivery_time_minutes", 1440),
+            "timestamp": now_iso,
+            "raw_response": local_data.get("raw_response", {})
+        }
+    
     def get_exchange_rate(
         self,
         send_amount: Decimal,
@@ -660,7 +700,11 @@ class XoomProvider(RemittanceProvider):
                 "estimated_delivery_minutes": delivery_time_minutes
             }
             
-            return result
+            # Add success flag for standardization
+            result["success"] = True
+            
+            # Return standardized response
+            return self.standardize_response(result)
             
         except Exception as e:
             self.logger.error(f"Regular API failed: {str(e)}")
@@ -702,7 +746,7 @@ class XoomProvider(RemittanceProvider):
             fee = 2.99
         
         # Build mock result
-        return {
+        result = {
             "provider": "Xoom",
             "send_currency": send_currency,
             "send_amount": send_amount_float,
@@ -716,6 +760,12 @@ class XoomProvider(RemittanceProvider):
             "estimated_delivery_minutes": 180,
             "is_mock": True  # Flag to indicate this is mock data
         }
+        
+        # Add success flag for standardization
+        result["success"] = True
+        
+        # Return standardized response
+        return self.standardize_response(result)
     
     def _get_exchange_rate_via_fee_table(
         self,
@@ -903,7 +953,7 @@ class XoomProvider(RemittanceProvider):
             
             # Construct clean JSON response regardless of parsing success
             result = {
-                "provider": "Xoom",
+                "success": True,  # Add success flag for standardization
                 "send_currency": send_currency,
                 "send_amount": send_amount,
                 "receive_currency": receive_currency,
@@ -913,31 +963,28 @@ class XoomProvider(RemittanceProvider):
                 "delivery_method": delivery_method,
                 "payment_method": payment_method,
                 "estimated_delivery_time": delivery_time_text,
-                "estimated_delivery_minutes": delivery_time_minutes
+                "delivery_time_minutes": delivery_time_minutes  # Rename to match standard
             }
             
             # Log result for debugging
             self.logger.info(f"Parsed exchange rate: {exchange_rate}, receive amount: {receive_amount}, fee: {fee}")
             
-            return result
+            # Return standardized result
+            return self.standardize_response(result)
         
         except Exception as e:
             self.logger.error(f"Error parsing fee table response: {str(e)}")
-            # Return default structure even on error
-            return {
-                "provider": "Xoom",
+            # Create error response
+            error_result = {
+                "success": False,
+                "error_message": f"Error parsing fee table response: {str(e)}",
                 "send_currency": send_currency,
                 "send_amount": send_amount,
-                "receive_currency": receive_currency,
-                "receive_amount": 0.0,
-                "exchange_rate": 0.0,
-                "fee": 0.0,
-                "delivery_method": "bank deposit",
-                "payment_method": "PayPal balance",
-                "estimated_delivery_time": "Unknown",
-                "estimated_delivery_minutes": None,
-                "error": str(e)
+                "receive_currency": receive_currency
             }
+            
+            # Return standardized error response
+            return self.standardize_response(error_result)
     
     def _filter_pricing_options(
         self, 

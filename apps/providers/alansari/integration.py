@@ -315,6 +315,47 @@ class AlAnsariProvider(RemittanceProvider):
                 f"Unexpected error fetching security token: {str(e)}"
             ) from e
 
+    def standardize_response(
+        self,
+        raw_result: Dict[str, Any],
+        provider_specific_data: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Standardize the response shape for aggregator consumption.
+        
+        Follows the structure defined in RemittanceProvider base class
+        to ensure consistent response format across all providers.
+        
+        Args:
+            raw_result: Provider-specific response dictionary
+            provider_specific_data: Whether to include raw provider data
+            
+        Returns:
+            Dictionary with standardized fields for the aggregator
+        """
+        # Ensure required keys exist with proper formatting
+        output = {
+            "provider_id": self.name,
+            "success": raw_result.get("success", False),
+            "error_message": raw_result.get("error_message"),
+            "send_amount": raw_result.get("send_amount", 0.0),
+            "source_currency": raw_result.get("source_currency", "").upper(),
+            "destination_amount": raw_result.get("destination_amount", 0.0),
+            "destination_currency": raw_result.get("destination_currency", "").upper(),
+            "exchange_rate": raw_result.get("exchange_rate"),
+            "fee": raw_result.get("fee", 0.0),
+            "payment_method": raw_result.get("payment_method", "cash"),
+            "delivery_method": raw_result.get("delivery_method", "cash"),
+            "delivery_time_minutes": raw_result.get("delivery_time_minutes", 1440),  # Default to 24 hours
+            "timestamp": raw_result.get("timestamp", datetime.now().isoformat()),
+        }
+
+        # Include raw API response if requested and available
+        if provider_specific_data and "raw_response" in raw_result:
+            output["raw_response"] = raw_result["raw_response"]
+
+        return output
+    
     def get_quote(
         self,
         amount: Decimal,
@@ -445,7 +486,7 @@ class AlAnsariProvider(RemittanceProvider):
                 quote_result["error_message"] = ansari_json.get("message", "Unknown error from Al Ansari")
                 quote_result["success"] = False
                 
-            return quote_result
+            return self.standardize_response(quote_result, provider_specific_data=kwargs.get("include_raw", False))
                 
         except requests.RequestException as e:
             quote_result["error_message"] = f"Connection error: {str(e)}"
@@ -482,24 +523,9 @@ class AlAnsariProvider(RemittanceProvider):
             source_country=source_country,
             dest_country=dest_country
         )
-        if not quote["success"]:
-            return {
-                "success": False,
-                "error": quote.get("error_message", "Unknown error"),
-                "source_currency": source_currency,
-                "target_currency": dest_currency,
-                "provider": self.name
-            }
-
-        return {
-            "success": True,
-            "source_currency": source_currency,
-            "target_currency": dest_currency,
-            "rate": quote.get("exchange_rate"),
-            "fee": quote.get("fee"),
-            "timestamp": datetime.now().isoformat(),
-            "provider": self.name
-        }
+        
+        # No need to transform, simply return the quote which is already standardized
+        return quote
 
     def get_supported_countries(self) -> List[str]:
         """Returns a list of all mapped countries (uppercase)."""
