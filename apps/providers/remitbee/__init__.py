@@ -8,4 +8,22 @@ The integration accesses Remitbee's public quote API to fetch exchange rates and
 for international money transfers.
 """
 
+from apps.providers.remitbee.integration import RemitbeeProvider
+from apps.providers.remitbee.exceptions import (
+    RemitbeeError,
+    RemitbeeConnectionError,
+    RemitbeeApiError,
+    RemitbeeValidationError,
+    RemitbeeRateLimitError
+)
+
+__all__ = [
+    'RemitbeeProvider',
+    'RemitbeeError',
+    'RemitbeeConnectionError',
+    'RemitbeeApiError',
+    'RemitbeeValidationError',
+    'RemitbeeRateLimitError'
+]
+
 __version__ = "0.1.0"

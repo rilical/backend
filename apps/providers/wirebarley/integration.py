@@ -153,22 +153,23 @@ class WireBarleyProvider(RemittanceProvider):
                 "error_message": error_message or "Unknown error from WireBarley"
             }
 
-        # Otherwise fill aggregator success shape
+        # Otherwise fill aggregator success shape with standard field names
         return {
             "provider_id": self.name,
             "success": True,
             "error_message": None,
 
-            "send_amount": result.get("send_amount", 0.0),
-            "source_currency": str(result.get("send_currency", "")).upper(),
-            "destination_amount": result.get("receive_amount", 0.0),
-            "destination_currency": str(result.get("receive_currency", "")),
+            # Map to standard field names expected by the base provider
+            "send_amount": result.get("source_amount", 0.0),
+            "send_currency": str(result.get("source_currency", "")).upper(),
+            "receive_amount": result.get("destination_amount", 0.0),
+            "receive_currency": str(result.get("destination_currency", "")).upper(),
             "exchange_rate": result.get("exchange_rate", 0.0),
             "fee": result.get("fee", 0.0),
 
             # Payment/Delivery methods (generic for WireBarley)
-            "payment_method": "bankAccount",
-            "delivery_method": "bankDeposit",
+            "payment_method": "BANK",
+            "delivery_method": "BANK",
             "delivery_time_minutes": 1440,  # default 1 day in minutes
             "timestamp": result.get("timestamp", now_iso)
         }
@@ -253,34 +254,53 @@ class WireBarleyProvider(RemittanceProvider):
             return None
     
     def _initialize_session(self):
-        """Initialize session with cookies."""
-        # First try getting cookies from environment
-        cookies = self._get_browser_cookies()
-        
-        # Fall back to Selenium automation if needed
-        if not cookies:
-            self.logger.info("No cookies found in environment, falling back to Selenium")
-            cookies = self._get_selenium_cookies()
-            
-            if not cookies:
-                self.logger.error("Failed to get browser session data")
-                return False
-        
-        # Create session with retry capability
+        """Initialize session with browser-like behavior that works with public API."""
+        # Create a session with retry capability
         self.session = self._create_session_with_retry()
         
-        # Set cookies
-        for name, value in cookies.items():
-            self.session.cookies.set(name, value)
-        
-        # Set user agent
+        # Set browser-like headers
         self.session.headers.update({
-            "User-Agent": os.environ.get("WIREBARLEY_USER_AGENT", self.DEFAULT_USER_AGENT)
+            "User-Agent": os.environ.get("WIREBARLEY_USER_AGENT", self.DEFAULT_USER_AGENT),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
+            "DNT": "1"
         })
         
-        self.session_timestamp = time.time()
-        self.logger.info("WireBarley session initialized successfully")
-        return True
+        # Step 1: Visit the homepage to get cookies
+        try:
+            homepage_url = self.BASE_URL
+            self.logger.info(f"Visiting WireBarley homepage: {homepage_url}")
+            homepage_response = self.session.get(homepage_url, timeout=10)
+            
+            if homepage_response.status_code != 200:
+                self.logger.error(f"Failed to access homepage: {homepage_response.status_code}")
+                return False
+                
+            # Step 2: Visit the homepage again with Referer header (critical step)
+            self.session.headers.update({
+                "Referer": homepage_url
+            })
+            
+            second_response = self.session.get(homepage_url, timeout=10)
+            if second_response.status_code != 200:
+                self.logger.error(f"Failed on second homepage visit: {second_response.status_code}")
+                return False
+                
+            self.session_timestamp = time.time()
+            self.logger.info("WireBarley session initialized successfully")
+            return True
+                
+        except requests.RequestException as e:
+            self.logger.error(f"Error initializing session: {str(e)}")
+            return False
     
     def _validate_session(self):
         """Validate session by making a test request."""
@@ -502,139 +522,143 @@ class WireBarleyProvider(RemittanceProvider):
         receive_currency: str,
         **kwargs
     ) -> Dict[str, Any]:
-        """Get exchange rate information for a specific currency pair."""
+        """Get exchange rate information for a specific currency pair using the most reliable method."""
         try:
-            # First try using the public API endpoint which doesn't require authentication
+            # First ensure we have a valid session
+            self._ensure_valid_session()
+            
+            # Determine country code for the send currency
+            source_country = self.CURRENCY_TO_COUNTRY.get(send_currency, send_currency[:2])
             country_code = self.CURRENCY_TO_COUNTRY.get(receive_currency, receive_currency[:2])
             
             # Use public endpoint to get rates for all corridors in a single request
-            public_url = f"{self.BASE_URL}/my/remittance/api/v1/exrate/{self.ORIGIN_COUNTRY}/{send_currency}"
+            public_url = f"{self.BASE_URL}/my/remittance/api/v1/exrate/{source_country}/{send_currency}"
             
-            try:
-                session = self._create_session_with_retry()
-                response = session.get(
-                    public_url,
-                    headers={
-                        "Content-Type": "application/json",
-                        "Pragma": "no-cache",
-                        "Accept": "*/*",
-                        "Sec-Fetch-Site": "same-origin",
-                        "Accept-Language": "en-US,en;q=0.9",
-                        "Cache-Control": "no-cache",
-                        "Sec-Fetch-Mode": "cors",
-                        "User-Agent": self.DEFAULT_USER_AGENT,
-                        "Referer": f"{self.BASE_URL}/",
-                        "Device-Type": "WEB",
-                        "Lang": "en",
-                        "Request-ID": str(uuid.uuid4()),
-                        "Request-Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                    },
-                    cookies={"lang": "en"},
-                    timeout=10
-                )
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    if data.get("status") == 0 and "data" in data and data["data"] is not None:
-                        # Find the matching rate data for our corridor
-                        for rate_data in data["data"]["exRates"]:
-                            if rate_data.get("currency") == receive_currency:
-                                # Found our corridor - extract rate information
-                                wb_rate = rate_data.get("wbRate", 0)
-                                
-                                # Get threshold-based rate if available
-                                if "wbRateData" in rate_data:
-                                    threshold_rate = self._pick_threshold_rate(rate_data, send_amount)
-                                    if threshold_rate:
-                                        wb_rate = threshold_rate
-                                
-                                # Find the fee structure
-                                fee = 0
-                                if "paymentFees" in rate_data:
-                                    for fee_data in rate_data["paymentFees"]:
-                                        # Default to first available fee structure
-                                        fee = self._calculate_fee({"paymentFees": [fee_data]}, send_amount)
-                                        break
-                                
-                                # Calculate destination amount
-                                destination_amount = float(send_amount) * wb_rate
-                                
-                                return {
-                                    "success": True,
-                                    "send_amount": float(send_amount),
-                                    "send_currency": send_currency,
-                                    "receive_amount": destination_amount,
-                                    "receive_currency": receive_currency,
-                                    "exchange_rate": wb_rate,
-                                    "fee": fee,
-                                    "payment_method": "bankAccount",
-                                    "delivery_method": "bankDeposit",
-                                    "delivery_time_minutes": 1440  # 24 hours
+            # Set API-specific headers - this is the key to making it work
+            api_headers = {
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "X-Requested-With": "XMLHttpRequest",
+                "Referer": self.BASE_URL + "/",
+                "Sec-Fetch-Dest": "empty",
+                "Sec-Fetch-Mode": "cors",
+                "Sec-Fetch-Site": "same-origin",
+                "Device-Type": "WEB",
+                "Device-Model": "Safari",
+                "Device-Version": "605.1.15",
+                "Lang": "en",
+                "Request-ID": str(uuid.uuid4()),
+                "Request-Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            }
+            
+            self.logger.info(f"Fetching exchange rates from {public_url}")
+            
+            # Use the existing session with the API-specific headers
+            self.session.headers.update(api_headers)
+            response = self.session.get(public_url, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("data") is not None and "exRates" in data["data"]:
+                    # Find the matching rate data for our corridor
+                    self.logger.info(f"Found {len(data['data']['exRates'])} exchange rates")
+                    for rate_data in data["data"]["exRates"]:
+                        if rate_data.get("currency") == receive_currency:
+                            # Found our corridor - extract rate information
+                            wb_rate = rate_data.get("wbRate", 0)
+                            
+                            # Get threshold-based rate if available
+                            if "wbRateData" in rate_data:
+                                threshold_rate = self._pick_threshold_rate(rate_data, send_amount)
+                                if threshold_rate:
+                                    wb_rate = threshold_rate
+                            
+                            # Calculate fee
+                            fee = self._calculate_fee(rate_data, send_amount)
+                            
+                            # Calculate destination amount
+                            destination_amount = send_amount * Decimal(str(wb_rate))
+                            
+                            self.logger.info(f"Rate found for {send_currency} to {receive_currency}: {wb_rate}")
+                            
+                            # Format the response in the expected aggregator format
+                            raw_response = {
+                                "success": True,
+                                "source_amount": float(send_amount),
+                                "source_currency": send_currency,
+                                "destination_amount": float(destination_amount),
+                                "destination_currency": receive_currency,
+                                "exchange_rate": float(wb_rate),
+                                "fee": float(fee) if fee is not None else 0.0,
+                                "payment_method": "BANK",
+                                "delivery_method": "BANK",
+                                "delivery_time_minutes": 1440,  # 24 hours in minutes
+                                "timestamp": str(datetime.now(timezone.utc).isoformat()),
+                                "raw_data": {
+                                    "provider": "wirebarley",
+                                    "rate_data": rate_data
                                 }
-            except Exception as e:
-                self.logger.debug(f"Public API error: {str(e)}")
-            
-            # Continue with original authenticated flow if public API didn't work
-            self._ensure_valid_session()
-            
-            # Base result for failures
-            aggregator_fail = {
-                "success": False,
-                "provider_id": self.name,
-                "error_message": None
-            }
-            
-            # Validate input
-            if send_currency not in self.CURRENCY_TO_COUNTRY:
-                aggregator_fail["error_message"] = f"Unsupported send currency: {send_currency}"
-                return self.standardize_response(aggregator_fail)
-            
-            if receive_currency not in self.CURRENCY_TO_COUNTRY:
-                aggregator_fail["error_message"] = f"Unsupported receive currency: {receive_currency}"
-                return self.standardize_response(aggregator_fail)
-            
-            if not (self.MIN_SUPPORTED_AMOUNT <= send_amount <= self.MAX_SUPPORTED_AMOUNT):
-                aggregator_fail["error_message"] = f"Amount {send_amount} not in allowed range {self.MIN_SUPPORTED_AMOUNT}-{self.MAX_SUPPORTED_AMOUNT}"
-                return self.standardize_response(aggregator_fail)
-
-            # Get the receive country code
-            receive_country_code = self.CURRENCY_TO_COUNTRY.get(receive_currency)
-            if not receive_country_code:
-                aggregator_fail["error_message"] = f"Could not find country code for currency: {receive_currency}"
-                return self.standardize_response(aggregator_fail)
-
-            # Ensure session is valid
-            self._ensure_valid_session()
-            if not self.session:
-                aggregator_fail["error_message"] = "No valid session. Check WireBarley cookies or Selenium login."
-                return self.standardize_response(aggregator_fail)
-
-            # Fetch data from API
-            raw_data = self._fetch_api_data(send_currency, receive_country_code, send_amount)
-            if raw_data.get("success") is False:
-                # pass along the error
-                aggregator_fail["error_message"] = raw_data.get("error_message", "Unknown WireBarley error")
-                return self.standardize_response(aggregator_fail)
-
-            # Success! Create standardized response
-            aggregator_ok = {
-                "success": True,
-                "provider_id": self.name,
-                "send_amount": float(send_amount),
-                "send_currency": send_currency,
-                "receive_amount": raw_data.get("receive_amount"),
-                "receive_currency": receive_currency,
-                "exchange_rate": raw_data.get("exchange_rate"),
-                "fee": raw_data.get("fee", 0.0),
-                "timestamp": raw_data.get("timestamp"),
-                "raw_response": raw_data.get("raw_data")  # Include raw API response for debugging
-            }
-            return self.standardize_response(aggregator_ok)
+                            }
+                            
+                            # Return standardized response
+                            return self.standardize_response(raw_response)
+                    
+                    # If we get here, we didn't find the currency
+                    return self.standardize_response({
+                        "success": False,
+                        "error_message": f"No exchange rate found for {send_currency} to {receive_currency}"
+                    })
+                else:
+                    self.logger.error("API returned data in unexpected format")
+                    # Fallback to authenticated API if public API fails
+                    return self._try_authenticated_api(send_amount, send_currency, receive_currency, country_code)
+            else:
+                self.logger.error(f"Public API returned status {response.status_code}")
+                # Fallback to authenticated API if public API fails
+                return self._try_authenticated_api(send_amount, send_currency, receive_currency, country_code)
+                
         except Exception as e:
-            self.logger.error(f"Error in get_exchange_rate: {e}", exc_info=True)
+            self.logger.error(f"Error in get_exchange_rate: {str(e)}")
             return self.standardize_response({
                 "success": False,
-                "error_message": f"Exchange rate error: {str(e)}"
+                "error_message": f"Error: {str(e)}"
+            })
+    
+    def _try_authenticated_api(self, send_amount, send_currency, receive_currency, country_code):
+        """Fallback to the authenticated API if the public API fails."""
+        try:
+            # Ensure we have valid authenticated session
+            self._ensure_valid_session()
+            
+            # Use the authenticated API endpoint
+            result = self._fetch_api_data(send_currency, country_code, send_amount)
+            
+            # The fetch_api_data method returns in a different format
+            # We need to reformat it for standardized response
+            if result.get("success"):
+                # Extract needed values and create raw_response
+                raw_response = {
+                    "success": True,
+                    "source_amount": float(send_amount),
+                    "source_currency": send_currency,
+                    "destination_amount": result.get("receive_amount", 0),
+                    "destination_currency": receive_currency,
+                    "exchange_rate": result.get("exchange_rate", 0),
+                    "fee": result.get("fee", 0),
+                    "payment_method": "BANK",
+                    "delivery_method": "BANK",
+                    "delivery_time_minutes": 1440,
+                    "timestamp": str(datetime.now(timezone.utc).isoformat()),
+                    "raw_data": result
+                }
+                
+                return self.standardize_response(raw_response)
+            else:
+                return self.standardize_response(result)
+        except Exception as e:
+            self.logger.error(f"Error in authenticated API fallback: {str(e)}")
+            return self.standardize_response({
+                "success": False,
+                "error_message": f"Error in authenticated fallback: {str(e)}"
             })
     
     def get_quote(
@@ -656,13 +680,28 @@ class WireBarleyProvider(RemittanceProvider):
             if not isinstance(amount, Decimal):
                 amount = Decimal(str(amount))
             
-            # Call get_exchange_rate for the actual implementation
+            # Validate amount
             if amount < 0:
                 return self.standardize_response({
                     "success": False,
                     "error_message": "Amount must be positive"
                 })
+            
+            # Check for min/max amount limits
+            if amount < self.MIN_SUPPORTED_AMOUNT:
+                return self.standardize_response({
+                    "success": False,
+                    "error_message": f"Amount {amount} is below minimum supported amount {self.MIN_SUPPORTED_AMOUNT}"
+                })
                 
+            if amount > self.MAX_SUPPORTED_AMOUNT:
+                return self.standardize_response({
+                    "success": False,
+                    "error_message": f"Amount {amount} is above maximum supported amount {self.MAX_SUPPORTED_AMOUNT}"
+                })
+                
+            # Call get_exchange_rate for the actual implementation
+            # get_exchange_rate already returns a standardized response
             return self.get_exchange_rate(
                 send_amount=amount,
                 send_currency=source_currency,
@@ -671,30 +710,144 @@ class WireBarleyProvider(RemittanceProvider):
             )
             
         except Exception as e:
-            self.logger.error(f"Error in get_quote: {e}", exc_info=True)
+            self.logger.error(f"Error in get_quote: {str(e)}")
             return self.standardize_response({
                 "success": False,
-                "error_message": f"Quote error: {str(e)}"
+                "error_message": f"Error in quote generation: {str(e)}"
             })
     
     def get_corridors(self, source_currency: str = "USD") -> Dict[str, Any]:
         """Get available corridors for a source currency."""
-        aggregator_fail = {
+        # Initialize failure structure
+        failure_response = {
             "success": False,
-            "provider_id": self.name,
-            "error_message": None
+            "error_message": None,
+            "provider_id": self.name
         }
         
         # Validate currency
         if source_currency not in self.CURRENCY_TO_COUNTRY:
-            aggregator_fail["error_message"] = f"Unsupported source currency: {source_currency}"
-            return self.standardize_response(aggregator_fail)
+            failure_response["error_message"] = f"Unsupported source currency: {source_currency}"
+            return failure_response
         
         # Ensure session is valid
         self._ensure_valid_session()
         if not self.session:
-            aggregator_fail["error_message"] = "No valid session"
-            return self.standardize_response(aggregator_fail)
+            failure_response["error_message"] = "No valid session. Check WireBarley cookies or Selenium login."
+            return failure_response
+        
+        try:
+            # Try using our new browser-like approach to get available corridors
+            source_country = self.CURRENCY_TO_COUNTRY.get(source_currency, source_currency[:2])
+            
+            # Use public endpoint to get rates for all corridors in a single request
+            public_url = f"{self.BASE_URL}/my/remittance/api/v1/exrate/{source_country}/{source_currency}"
+            
+            # Set API-specific headers - same approach as get_exchange_rate
+            api_headers = {
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "X-Requested-With": "XMLHttpRequest",
+                "Referer": self.BASE_URL + "/",
+                "Sec-Fetch-Dest": "empty",
+                "Sec-Fetch-Mode": "cors",
+                "Sec-Fetch-Site": "same-origin",
+                "Device-Type": "WEB",
+                "Device-Model": "Safari",
+                "Device-Version": "605.1.15",
+                "Lang": "en",
+                "Request-ID": str(uuid.uuid4()),
+                "Request-Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            }
+            
+            self.logger.info(f"Fetching available corridors from {public_url}")
+            
+            # Try to use cached data first
+            cache_key = f"corridors_{source_currency}"
+            if (
+                cache_key in self._corridors_cache and
+                cache_key in self._cache_timestamp and
+                (time.time() - self._cache_timestamp[cache_key]) < self._cache_duration
+            ):
+                self.logger.info(f"Using cached corridors for {source_currency}")
+                return self._corridors_cache[cache_key]
+            
+            # Use the existing session with the API-specific headers
+            self.session.headers.update(api_headers)
+            response = self.session.get(public_url, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if data.get("data") is not None and "exRates" in data["data"]:
+                    ex_rates = data["data"]["exRates"]
+                    self.logger.info(f"Found {len(ex_rates)} potential corridors")
+                    
+                    # Extract corridors from exchange rates
+                    corridors = []
+                    for rate_data in ex_rates:
+                        if "currency" in rate_data and "country" in rate_data:
+                            target_currency = rate_data["currency"]
+                            country_code = rate_data["country"]
+                            
+                            # Find min/max amounts from fee information
+                            min_amount = self.MIN_SUPPORTED_AMOUNT
+                            max_amount = self.MAX_SUPPORTED_AMOUNT
+                            
+                            if "transferFees" in rate_data and rate_data["transferFees"]:
+                                # Take the most permissive min/max across all fee structures
+                                for fee_struct in rate_data["transferFees"]:
+                                    if "min" in fee_struct and fee_struct["min"] is not None:
+                                        min_struct = Decimal(str(fee_struct["min"]))
+                                        if min_struct < min_amount:
+                                            min_amount = min_struct
+                                            
+                                    if "max" in fee_struct and fee_struct["max"] is not None:
+                                        max_struct = Decimal(str(fee_struct["max"]))
+                                        if max_struct > max_amount:
+                                            max_amount = max_struct
+                            
+                            corridors.append({
+                                "source_currency": source_currency,
+                                "target_currency": target_currency,
+                                "source_country": source_country,
+                                "target_country": country_code,
+                                "min_amount": float(min_amount),
+                                "max_amount": float(max_amount)
+                            })
+                    
+                    # Create success response
+                    result = {
+                        "success": True,
+                        "provider_id": self.name,
+                        "corridors": corridors
+                    }
+                    
+                    # Cache the result
+                    self._corridors_cache[cache_key] = result
+                    self._cache_timestamp[cache_key] = time.time()
+                    
+                    return result
+                else:
+                    self.logger.error("API returned data in unexpected format for corridors")
+                    # Fall back to old method
+                    return self._try_authenticated_corridors_api(source_currency)
+            else:
+                self.logger.error(f"Public API returned status {response.status_code} for corridors")
+                # Fall back to old method
+                return self._try_authenticated_corridors_api(source_currency)
+                
+        except Exception as e:
+            self.logger.error(f"Error in get_corridors: {str(e)}")
+            failure_response["error_message"] = f"Error getting corridors: {str(e)}"
+            return failure_response
+    
+    def _try_authenticated_corridors_api(self, source_currency):
+        """Use the authenticated API to get corridors as a fallback."""
+        failure_response = {
+            "success": False,
+            "error_message": None,
+            "provider_id": self.name
+        }
         
         try:
             # Get source country code
@@ -706,35 +859,25 @@ class WireBarleyProvider(RemittanceProvider):
                 "Content-Type": "application/json"
             }
             
-            # Try to use cached data first
-            cache_key = f"corridors_{source_currency}"
-            if (
-                cache_key in self._corridors_cache and
-                cache_key in self._cache_timestamp and
-                (time.time() - self._cache_timestamp[cache_key]) < self._cache_duration
-            ):
-                return self._corridors_cache[cache_key]
-            
             # Get data from API
             url = f"{self.API_BASE_URL}/api/v1/remittance/getRemittanceList?sendCurrency={source_currency}&sendCountry={source_country_code}"
             response = self.session.get(url, headers=headers, timeout=15)
             
             # Parse response
             if response.status_code != 200:
-                aggregator_fail["error_message"] = f"API error: HTTP {response.status_code}"
-                return self.standardize_response(aggregator_fail)
+                failure_response["error_message"] = f"API error: HTTP {response.status_code}"
+                return failure_response
                 
             data = response.json()
             
             # Handle API-level errors
             if data.get("status") != "success":
                 error_msg = data.get("message", "Unknown API error")
-                aggregator_fail["error_message"] = f"API error: {error_msg}"
-                return self.standardize_response(aggregator_fail)
+                failure_response["error_message"] = f"API error: {error_msg}"
+                return failure_response
             
             # Extract corridor information
             corridors = []
-            send_info = data.get("data", {}).get("sendInfo", {})
             receive_list = data.get("data", {}).get("receiveList", [])
             
             for receive_info in receive_list:
@@ -750,9 +893,10 @@ class WireBarleyProvider(RemittanceProvider):
                         corridors.append({
                             "source_currency": source_currency,
                             "target_currency": currency,
-                            "country_code": country_code,
-                            "min_amount": str(min_amount),
-                            "max_amount": str(max_amount)
+                            "source_country": source_country_code,
+                            "target_country": country_code,
+                            "min_amount": float(min_amount),
+                            "max_amount": float(max_amount)
                         })
             
             # Create response
@@ -762,15 +906,12 @@ class WireBarleyProvider(RemittanceProvider):
                 "corridors": corridors
             }
             
-            # Cache the result
-            self._corridors_cache[cache_key] = result
-            self._cache_timestamp[cache_key] = time.time()
-            
-            return self.standardize_response(result)
+            return result
             
         except Exception as e:
-            aggregator_fail["error_message"] = f"Error getting corridors: {str(e)}"
-            return self.standardize_response(aggregator_fail)
+            self.logger.error(f"Error in authenticated corridors API: {str(e)}")
+            failure_response["error_message"] = f"Error getting corridors: {str(e)}"
+            return failure_response
     
     def close(self):
         """Close and clean up resources."""
