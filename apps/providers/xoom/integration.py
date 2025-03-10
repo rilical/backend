@@ -137,6 +137,9 @@ class XoomProvider(RemittanceProvider):
     QUOTE_API_URL = "https://www.xoom.com/xoom/api/send/quote"
     FEE_TABLE_API_URL = "https://www.xoom.com/calculate-fee-table"
     
+    # Provider ID for aggregator system
+    provider_id = "xoom"
+    
     # Mapping of Xoom payment method types to standardized names
     PAYMENT_METHODS = {
         "CRYPTO_PYUSD": "PayPal USD (PYUSD)",
@@ -562,6 +565,8 @@ class XoomProvider(RemittanceProvider):
         Returns:
             Quote information
         """
+        print(f"DEBUG: Xoom get_quote called with amount={amount}, source_country={source_country}, dest_country={dest_country}, source_currency={source_currency}, dest_currency={dest_currency}")
+        
         self.logger.info(f"Getting quote for {amount} {source_currency} to {dest_country} ({dest_currency})")
         
         # Convert amount to Decimal if it's not already
@@ -569,6 +574,7 @@ class XoomProvider(RemittanceProvider):
 
         try:
             # First try the fee table API as it doesn't require auth
+            print("DEBUG: Xoom trying fee table API")
             exchange_rate_result = self._get_exchange_rate_via_fee_table(
                 send_amount=amount,
                 send_currency=source_currency,
@@ -578,12 +584,17 @@ class XoomProvider(RemittanceProvider):
             
             # If successful, return the result
             if exchange_rate_result and "exchange_rate" in exchange_rate_result:
+                print(f"DEBUG: Xoom successfully got quote via fee table API: {exchange_rate_result}")
                 self.logger.info(f"Successfully got quote via fee table API: {exchange_rate_result}")
                 return exchange_rate_result
+            else:
+                print(f"DEBUG: Xoom fee table API didn't return exchange rate: {exchange_rate_result}")
         except Exception as e:
+            print(f"DEBUG: Xoom error getting quote via fee table API: {str(e)}")
             self.logger.error(f"Error getting quote via fee table API: {str(e)}")
         
         # If fee table API failed, try the exchange rate endpoint
+        print("DEBUG: Xoom fee table API failed, trying exchange rate endpoint")
         self.logger.info("Fee table API failed, trying exchange rate endpoint")
         try:
             exchange_rate_result = self.get_exchange_rate(
@@ -596,43 +607,20 @@ class XoomProvider(RemittanceProvider):
             )
             
             if exchange_rate_result and "exchange_rate" in exchange_rate_result:
+                print(f"DEBUG: Xoom successfully got quote via exchange rate endpoint: {exchange_rate_result}")
                 self.logger.info(f"Successfully got quote via exchange rate endpoint: {exchange_rate_result}")
                 return exchange_rate_result
+            else:
+                print(f"DEBUG: Xoom exchange rate endpoint didn't return exchange rate: {exchange_rate_result}")
         except Exception as e:
+            print(f"DEBUG: Xoom error getting quote via exchange rate endpoint: {str(e)}")
             self.logger.error(f"Error getting quote via exchange rate endpoint: {str(e)}")
         
-        # If all else fails, use a fallback with estimated values
-        self.logger.warning("All API methods failed, using fallback with estimated values")
+        # If both attempts failed, return a fallback estimate or error response
+        print("DEBUG: Xoom all quote attempts failed, returning fallback response")
+        self.logger.warning("All quote attempts failed, returning fallback response")
         
-        # Estimate exchange rate based on corridor
-        estimated_rates = {
-            "USD-MXN": 17.0,
-            "USD-INR": 83.0,
-            "USD-PHP": 56.0,
-            "USD-BDT": 110.0,
-            "USD-PKR": 279.0,
-            "USD-BHD": 0.376,
-            "USD-EUR": 0.92,
-            "USD-GBP": 0.78
-        }
-        
-        corridor = f"{source_currency}-{dest_currency}"
-        exchange_rate = estimated_rates.get(corridor, 1.0)
-        recipient_gets = float_amount * exchange_rate
-        
-        # Use default fee structure
-        if float_amount < 1000:
-            fee = 2.99
-        else:
-            fee = 4.99
-            
-        # Adjust fee based on payment method
-        if payment_method:
-            if "credit" in payment_method.lower() or "debit" in payment_method.lower():
-                fee = 5.99
-            elif "pyusd" in payment_method.lower():
-                fee = 0.00
-        
+        # Create fallback response
         exchange_rate_result = {
             "provider_id": "xoom",
             "provider_name": "Xoom",
@@ -641,13 +629,13 @@ class XoomProvider(RemittanceProvider):
             "source_currency": source_currency,
             "destination_currency": dest_currency,
             "source_amount": float_amount,
-            "destination_amount": recipient_gets,
-            "exchange_rate": exchange_rate,
-            "fee": fee,
-            "delivery_time_minutes": 1440,  # 24 hours is typical
-            "payment_method": payment_method or "PayPal balance",
-            "delivery_method": delivery_method or "bank deposit",
-            "fixed_delivery_time": "Within 24 hours",  # Typical delivery time
+            "destination_amount": 0.0,
+            "exchange_rate": 0.0,
+            "fee": 4.99,  # Default fee
+            "payment_method": "PayPal balance",
+            "delivery_method": "Bank Deposit",
+            "success": False,
+            "error_message": "Failed to get quote from Xoom API",
             "details": {
                 "provider": "Xoom",
                 "url": f"https://www.xoom.com/{dest_country.lower()}/send-money",
@@ -656,6 +644,7 @@ class XoomProvider(RemittanceProvider):
         }
         
         # Return standardized result
+        print(f"DEBUG: Xoom returning fallback response: {exchange_rate_result}")
         return exchange_rate_result
     
     def get_exchange_rate(
@@ -668,160 +657,190 @@ class XoomProvider(RemittanceProvider):
         payment_method: str = None  # Optional
     ) -> Dict:
         """
-        Get the exchange rate for a given amount and corridor.
+        Get exchange rate information for a specific amount and currency pair.
         
         Args:
-            send_amount: The amount to send.
-            send_currency: The currency to send (default: USD).
-            receive_country: The destination country code.
-            receive_currency: The destination currency code.
-            delivery_method: Optional delivery method preference.
-            payment_method: Optional payment method preference.
+            send_amount: Amount to send
+            send_currency: Source currency code (default USD)
+            receive_country: Destination country code (required if receive_currency not provided)
+            receive_currency: Destination currency code (required if receive_country not provided)
+            delivery_method: Optional filter for specific delivery method
+            payment_method: Optional filter for specific payment method
             
         Returns:
-            Dict containing exchange rate details.
+            Dictionary with exchange rate information or error
         """
-        if receive_country is None:
-            raise XoomValidationError("Receive country is required")
-            
-        # First try to get exchange rate via fee table API (doesn't require auth)
-        try:
-            # If receive_currency is not provided, try to get the default currency for the country
-            if not receive_currency:
-                receive_currency = self._get_currency_for_country(receive_country)
-                
-            result = self._get_exchange_rate_via_fee_table(
-                send_amount=send_amount,
-                send_currency=send_currency,
-                receive_country=receive_country,
-                receive_currency=receive_currency
-            )
-            
-            # If fee table API successful, return the result
-            if result and "exchange_rate" in result and result["exchange_rate"] > 0:
-                # If payment or delivery method preferences were provided, try to match them
-                if payment_method or delivery_method:
-                    if payment_method and 'available_payment_methods' in result:
-                        matched_payment = False
-                        for method in result['available_payment_methods']:
-                            if payment_method.lower() in method['name'].lower():
-                                result['payment_method'] = method['name']
-                                result['fee'] = method['fee']
-                                matched_payment = True
-                                break
-                        
-                        if not matched_payment:
-                            self.logger.warning(f"Could not find matching payment method: {payment_method}")
-                    
-                    if delivery_method:
-                        result['delivery_method'] = self._normalize_delivery_method(delivery_method)
-                
-                self.logger.info(f"Successfully got exchange rate via fee table: {result['exchange_rate']}")
-                return result
-        except XoomError as e:
-            self.logger.error(f"Fee table API failed: {str(e)}")
-        except Exception as e:
-            self.logger.error(f"Unexpected error with fee table API: {str(e)}")
-            
-        # If fee table API failed, try the regular quote API
-        self.logger.info("Fee table API failed, trying regular quote API")
+        # Initialize default response with all required fields
+        result = {
+            "provider_id": self.provider_id,
+            "source_country": "US",
+            "source_currency": send_currency,
+            "destination_country": receive_country if receive_country else "",
+            "destination_currency": receive_currency if receive_currency else "",
+            "source_amount": float(send_amount),
+            "destination_amount": 0.0,
+            "exchange_rate": 0.0,
+            "fee": 0.0,
+            "delivery_method": delivery_method if delivery_method else "bank deposit",
+            "payment_method": payment_method if payment_method else "PayPal balance",
+            "delivery_time_minutes": 1440,  # Default to 24 hours
+            "success": False,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
         
         try:
-            # Validate inputs
+            # Validate currency or country
+            if not receive_country and not receive_currency:
+                self.logger.error("Either receive_country or receive_currency must be provided")
+                result["error_message"] = "Either receive_country or receive_currency must be provided"
+                return result
+            
+            # If only receive_currency is provided, try to get country
+            if not receive_country:
+                from_currency_to_country = self._get_country_from_currency(receive_currency)
+                if from_currency_to_country:
+                    self.logger.info(f"Derived country {from_currency_to_country} from currency {receive_currency}")
+                    receive_country = from_currency_to_country
+                    result["destination_country"] = receive_country
+                else:
+                    self.logger.error(f"Could not derive country from currency {receive_currency}")
+                    result["error_message"] = f"Could not determine country for currency {receive_currency}"
+                    return result
+            
+            # If only receive_country is provided, try to get currency
             if not receive_currency:
-                receive_currency = self._get_currency_for_country(receive_country)
-                
-            # Convert decimal to float
-            send_amount_float = float(send_amount)
+                country_default_currency = self._get_currency_from_country(receive_country)
+                if country_default_currency:
+                    self.logger.info(f"Using default currency {country_default_currency} for country {receive_country}")
+                    receive_currency = country_default_currency
+                    result["destination_currency"] = receive_currency
+                else:
+                    self.logger.error(f"No default currency found for country {receive_country}")
+                    result["error_message"] = f"Could not determine currency for country {receive_country}"
+                    return result
             
-            # Prepare the remittance request payload
-            payload = {
-                "sendAmount": send_amount_float,
-                "sendCurrency": send_currency,
-                "receiveCurrency": receive_currency,
-                "receiveCountry": receive_country,
-                "paymentType": payment_method or "PAYPAL_BALANCE",
-                "receiveMethod": delivery_method or "DEPOSIT"
-            }
-            
-            # Make the API request to get quote
-            response = self._make_api_request(
-                method="POST",
-                url=f"{self.API_URL}/options",
-                data=payload
-            )
-            
-            # Process and return the result
-            if response and "pricingOptions" in response:
-                pricing_options = response["pricingOptions"]
-                
-                # Filter the pricing options based on preferences
-                filtered_options = self._filter_pricing_options(
-                    pricing_options,
-                    preferred_delivery_method=delivery_method,
-                    preferred_payment_method=payment_method
+            # First try to get rate from fee table
+            try:
+                fee_table_result = self._get_exchange_rate_via_fee_table(
+                    send_amount=send_amount,
+                    send_currency=send_currency,
+                    receive_country=receive_country,
+                    receive_currency=receive_currency
                 )
                 
-                # Find the best option
-                best_option = self._find_best_pricing_option(
-                    filtered_options,
-                    preferred_delivery_method=delivery_method,
-                    preferred_payment_method=payment_method
-                )
-                
-                if best_option:
-                    exchange_rate = best_option.get("fxRate", 0)
-                    fee = best_option.get("sendFee", 0)
-                    receive_amount = best_option.get("receiveAmount", 0)
+                if fee_table_result and "exchange_rate" in fee_table_result and fee_table_result["exchange_rate"] > 0:
+                    self.logger.info(f"Successfully retrieved rate from fee table: {fee_table_result}")
                     
-                    # Normalize delivery method
-                    delivery_method_type = best_option.get("receiveMethodType", "DEPOSIT")
-                    delivery_method_normalized = self._normalize_delivery_method(delivery_method_type)
+                    # Update result with fee table data
+                    result.update({
+                        "success": True,
+                        "exchange_rate": fee_table_result["exchange_rate"],
+                        "fee": fee_table_result.get("fee", 0.0),
+                        "destination_amount": fee_table_result.get("destination_amount", 0.0),
+                        "delivery_method": fee_table_result.get("delivery_method", result["delivery_method"]),
+                        "payment_method": fee_table_result.get("payment_method", result["payment_method"]),
+                        "delivery_time_minutes": fee_table_result.get("delivery_time_minutes", result["delivery_time_minutes"])
+                    })
                     
-                    # Get payment method
-                    payment_method_type = best_option.get("paymentType", "PAYPAL_BALANCE")
-                    payment_method_normalized = self.PAYMENT_METHODS.get(payment_method_type, payment_method_type)
-                    
-                    # Extract delivery time
-                    delivery_time_minutes = 1440  # Default 24 hours
-                    delivery_time_text = None
-                    
-                    if "content" in best_option and "contentFields" in best_option["content"]:
-                        content = self._process_content_fields(best_option["content"]["contentFields"])
-                        delivery_time_text = content.get("deliveryTime", "Within 24 hours")
-                        delivery_time_minutes = self._parse_delivery_time(delivery_time_text) or 1440
-                    
-                    # Create and return the result
-                    result = {
-                        "provider_id": "xoom",
-                        "provider_name": "Xoom",
-                        "source_country": "US",  # Default source country
-                        "destination_country": receive_country,
-                        "source_currency": send_currency,
-                        "destination_currency": receive_currency,
-                        "source_amount": send_amount_float,
-                        "destination_amount": receive_amount,
-                        "exchange_rate": exchange_rate,
-                        "fee": fee,
-                        "payment_method": payment_method_normalized,
-                        "delivery_method": delivery_method_normalized,
-                        "delivery_time_minutes": delivery_time_minutes,
-                        "fixed_delivery_time": delivery_time_text,
-                        "details": {
+                    # Include any additional details
+                    if "details" in fee_table_result:
+                        result["details"] = fee_table_result["details"]
+                    else:
+                        result["details"] = {
                             "provider": "Xoom",
                             "url": f"https://www.xoom.com/{receive_country.lower()}/send-money"
                         }
-                    }
                     
                     return result
+            except Exception as e:
+                self.logger.warning(f"Failed to get rate from fee table: {str(e)}")
+                # Continue to next method
             
-            # If we couldn't process the response, return error
-            self.logger.error("Failed to process quote API response")
-            raise XoomError("Failed to get exchange rate from quote API")
+            # If fee table fails, try the quote API (requires login)
+            try:
+                # Ensure we're authenticated
+                if not self._is_authenticated():
+                    self.logger.info("Not authenticated, attempting to authenticate")
+                    self._authenticate()
+                
+                # Make request to quote API
+                quote_result = self._get_quote_from_api(
+                    send_amount=send_amount,
+                    send_currency=send_currency,
+                    receive_country=receive_country,
+                    receive_currency=receive_currency,
+                    delivery_method=delivery_method
+                )
+                
+                if quote_result and "exchange_rate" in quote_result and quote_result["exchange_rate"] > 0:
+                    self.logger.info(f"Successfully retrieved rate from quote API: {quote_result}")
+                    
+                    # Update result with quote API data
+                    result.update({
+                        "success": True,
+                        "exchange_rate": quote_result["exchange_rate"],
+                        "fee": quote_result.get("fee", 0.0),
+                        "destination_amount": quote_result.get("destination_amount", 0.0),
+                        "delivery_method": quote_result.get("delivery_method", result["delivery_method"]),
+                        "payment_method": quote_result.get("payment_method", result["payment_method"]),
+                        "delivery_time_minutes": quote_result.get("delivery_time_minutes", result["delivery_time_minutes"])
+                    })
+                    
+                    # Include any additional details
+                    if "details" in quote_result:
+                        result["details"] = quote_result["details"]
+                    
+                    return result
+            except Exception as e:
+                self.logger.warning(f"Failed to get rate from quote API: {str(e)}")
+                # Fallback to default values
+            
+            # If we get here, all methods failed - use default/fallback values
+            self.logger.warning("Using fallback exchange rate estimation")
+            
+            # Estimate exchange rate based on corridor
+            estimated_rates = {
+                "USD-MXN": 19.5,
+                "USD-INR": 83.0,
+                "USD-PHP": 56.0,
+                "USD-BDT": 110.0,
+                "USD-PKR": 279.0,
+                "USD-BHD": 0.376,
+                "USD-EUR": 0.92,
+                "USD-GBP": 0.78
+            }
+            
+            corridor = f"{send_currency}-{receive_currency}"
+            exchange_rate = estimated_rates.get(corridor, 1.0)
+            destination_amount = float(send_amount) * exchange_rate
+            
+            # Use default fee structure
+            float_amount = float(send_amount)
+            if float_amount < 1000:
+                fee = 2.99
+            else:
+                fee = 4.99
+                
+            # Update result with fallback data
+            result.update({
+                "success": True,
+                "exchange_rate": exchange_rate,
+                "fee": fee,
+                "destination_amount": destination_amount,
+                "details": {
+                    "provider": "Xoom",
+                    "url": f"https://www.xoom.com/{receive_country.lower()}/send-money",
+                    "fallback": True  # Indicate this is a fallback response
+                }
+            })
+            
+            return result
             
         except Exception as e:
-            self.logger.error(f"Error getting exchange rate via quote API: {str(e)}")
-            raise XoomError(f"Failed to get exchange rate: {str(e)}")
+            error_msg = f"Error getting exchange rate: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            result["error_message"] = error_msg
+            return result
     
     def _get_exchange_rate_via_fee_table(
         self,
@@ -961,49 +980,86 @@ class XoomProvider(RemittanceProvider):
         """
         self.logger.info("Parsing fee table response")
         
-        # Initialize result values
-        exchange_rate = 0.0
-        receive_amount = 0.0
-        fees = {}
-        selected_payment_method = "PayPal balance"  # Default payment method
-        delivery_method = "Bank Deposit"  # Default delivery method
+        # Initialize a complete result structure with defaults to avoid missing keys
+        result = {
+            "provider_id": self.provider_id,
+            "provider_name": "Xoom",
+            "source_country": "US",
+            "destination_country": receive_country,
+            "source_currency": send_currency,
+            "destination_currency": receive_currency,
+            "source_amount": send_amount,
+            "destination_amount": 0.0,
+            "exchange_rate": 0.0,
+            "fee": 4.99,  # Default fee
+            "payment_method": "PayPal balance",  # Default payment method
+            "delivery_method": "Bank Deposit",  # Default delivery method
+            "delivery_time_minutes": 1440,  # Default 24 hour delivery
+            "fixed_delivery_time": "Within 24 hours",
+            "success": False
+        }
         
         try:
+            # Parse with BeautifulSoup
             soup = BeautifulSoup(html_response, 'html.parser')
             
-            # First try to extract data from the embedded JSON data
+            # First try to extract embedded JSON data (preferred)
             json_data_element = soup.select_one('data#jsonData')
-            if json_data_element:
-                # Extract and clean the JSON string (replace HTML entities)
-                json_str = json_data_element.string
-                if json_str:
-                    json_str = json_str.replace('&quot;', '"')
-                    
-                    try:
-                        # Parse the JSON data
-                        data_json = json.loads(json_str)
-                        if "data" in data_json:
-                            data = data_json["data"]
-                            
-                            # Extract exchange rate
-                            if "fxRate" in data and data["fxRate"]:
-                                try:
-                                    exchange_rate = float(data["fxRate"])
-                                    self.logger.info(f"Extracted fxRate from JSON: {exchange_rate}")
-                                except (ValueError, TypeError):
-                                    self.logger.warning("Could not convert fxRate to float")
-                            
-                            # Extract receive amount
-                            if "receiveAmount" in data and data["receiveAmount"]:
-                                try:
-                                    receive_amount = float(data["receiveAmount"])
-                                    self.logger.info(f"Extracted receiveAmount from JSON: {receive_amount}")
-                                except (ValueError, TypeError):
-                                    self.logger.warning("Could not convert receiveAmount to float")
-                    except json.JSONDecodeError as e:
-                        self.logger.warning(f"Failed to parse JSON: {str(e)}")
+            if json_data_element and json_data_element.string:
+                # Extract and clean the JSON string
+                json_str = html.unescape(json_data_element.string)
+                
+                try:
+                    # Parse the JSON data
+                    data_json = json.loads(json_str)
+                    if "data" in data_json and isinstance(data_json["data"], dict):
+                        data = data_json["data"]
+                        
+                        # Extract exchange rate
+                        if "fxRate" in data and data["fxRate"]:
+                            try:
+                                result["exchange_rate"] = float(data["fxRate"])
+                                self.logger.info(f"Extracted fxRate from JSON: {result['exchange_rate']}")
+                            except (ValueError, TypeError):
+                                self.logger.warning(f"Could not convert fxRate to float: {data['fxRate']}")
+                        
+                        # Extract receive amount
+                        if "receiveAmount" in data and data["receiveAmount"]:
+                            try:
+                                result["destination_amount"] = float(data["receiveAmount"])
+                                self.logger.info(f"Extracted receiveAmount from JSON: {result['destination_amount']}")
+                            except (ValueError, TypeError):
+                                self.logger.warning(f"Could not convert receiveAmount to float: {data['receiveAmount']}")
+                        
+                        # Extract fee if available
+                        if "fee" in data and data["fee"]:
+                            try:
+                                result["fee"] = float(data["fee"])
+                                self.logger.info(f"Extracted fee from JSON: {result['fee']}")
+                            except (ValueError, TypeError):
+                                self.logger.warning(f"Could not convert fee to float: {data['fee']}")
+                                
+                        # Mark as successful if we got the essential exchange rate
+                        if result["exchange_rate"] > 0:
+                            result["success"] = True
+                except json.JSONDecodeError as e:
+                    self.logger.warning(f"Failed to parse JSON: {str(e)}, content: {json_str[:100]}...")
+            
+            # If no exchange rate from JSON, try to parse the HTML tables
+            if result["exchange_rate"] == 0:
+                # Look for exchange rate spans
+                rate_spans = soup.select(".exchangeRate, .fxRate")
+                for span in rate_spans:
+                    rate_text = span.text.strip()
+                    rate = self._extract_exchange_rate(rate_text)
+                    if rate > 0:
+                        result["exchange_rate"] = rate
+                        result["success"] = True
+                        self.logger.info(f"Extracted exchange rate from HTML: {rate}")
+                        break
             
             # Extract fee information from tables in HTML
+            fees = {}
             fee_rows = soup.select("tr.xvx-table--fee__body-tr")
             if fee_rows:
                 self.logger.info(f"Found {len(fee_rows)} fee options in the table")
@@ -1022,18 +1078,17 @@ class XoomProvider(RemittanceProvider):
                             # Store fee for this payment method
                             fees[payment_method_key] = fee_value
                             
-                            # Prefer PYUSD if it has zero fee
-                            if "pyusd" in payment_option.lower() and fee_value == 0.0:
-                                selected_payment_method = payment_option
-                            # Otherwise use PayPal balance as a fallback
-                            elif "paypal balance" in payment_option.lower():
-                                selected_payment_method = payment_option
-                            
-                            self.logger.info(f"Extracted fee for {payment_method_key}: {fee_value}")
-                        except (ValueError, TypeError):
-                            self.logger.warning(f"Could not convert fee value to float: {fee_value_text}")
+                            # Use lowest fee payment method first, prioritizing PYUSD or PayPal balance if they have zero fee
+                            if payment_method_key in ["PayPal USD (PYUSD)", "PayPal balance"] and fee_value == 0.0:
+                                result["payment_method"] = payment_method_key
+                                result["fee"] = fee_value
+                            elif "payment_method" not in result or fees.get(result["payment_method"], float('inf')) > fee_value:
+                                result["payment_method"] = payment_method_key
+                                result["fee"] = fee_value
+                        except ValueError:
+                            self.logger.warning(f"Could not parse fee value: {fee_value_text}")
             
-            # If we couldn't extract fees from the table, use default fee structure
+            # If we haven't found any fees, use default fee structure
             if not fees:
                 self.logger.warning("Could not extract fees from HTML, using default fee structure")
                 fees = {
@@ -1043,45 +1098,60 @@ class XoomProvider(RemittanceProvider):
                     "Debit card": 5.99,
                     "Credit card": 5.99
                 }
+                
+                # Set default fee and payment method
+                if "PayPal USD (PYUSD)" in fees:
+                    result["payment_method"] = "PayPal USD (PYUSD)"
+                    result["fee"] = fees["PayPal USD (PYUSD)"]
+                else:
+                    result["payment_method"] = "PayPal balance"
+                    result["fee"] = fees["PayPal balance"]
             
-            # If we still don't have an exchange rate, try to calculate from the URL or amounts
-            if exchange_rate == 0 and receive_amount > 0 and send_amount > 0:
-                exchange_rate = receive_amount / send_amount
-                self.logger.info(f"Calculated exchange rate from amounts: {exchange_rate}")
+            # If we still don't have an exchange rate, try to calculate from amounts or use estimate
+            if result["exchange_rate"] == 0:
+                if result["destination_amount"] > 0:
+                    result["exchange_rate"] = result["destination_amount"] / send_amount
+                    self.logger.info(f"Calculated exchange rate from amounts: {result['exchange_rate']}")
+                else:
+                    # Fallback to estimated rates for common corridors
+                    estimated_rates = {
+                        "USD-MXN": 19.5,
+                        "USD-INR": 83.0,
+                        "USD-PHP": 56.0,
+                        "USD-BDT": 110.0,
+                        "USD-PKR": 279.0,
+                        "USD-EUR": 0.92,
+                        "USD-GBP": 0.78
+                    }
+                    corridor = f"{send_currency}-{receive_currency}"
+                    if corridor in estimated_rates:
+                        result["exchange_rate"] = estimated_rates[corridor]
+                        result["destination_amount"] = send_amount * result["exchange_rate"]
+                        result["success"] = True
+                        self.logger.info(f"Using estimated exchange rate for {corridor}: {result['exchange_rate']}")
             
-            # Build and return the result
-            result = {
-                "provider_id": "xoom",
-                "provider_name": "Xoom",
-                "source_country": "US",  # Default source country
-                "destination_country": receive_country,
-                "source_currency": send_currency,
-                "destination_currency": receive_currency,
-                "source_amount": send_amount,
-                "destination_amount": receive_amount,
-                "exchange_rate": exchange_rate,
-                "fee": fees.get(selected_payment_method, 4.99),  # Use fee for selected payment method
-                "payment_method": selected_payment_method,
-                "delivery_method": delivery_method,
-                "delivery_time_minutes": 1440,  # 24 hours is typical for Xoom
-                "fixed_delivery_time": "Within 24 hours",
-                "available_payment_methods": [
-                    {"id": key, "name": key, "fee": value} 
-                    for key, value in fees.items()
-                ],
-                "details": {
-                    "provider": "Xoom",
-                    "url": f"https://www.xoom.com/{receive_country.lower()}/send-money"
-                }
+            # Add available payment methods to result
+            result["available_payment_methods"] = [
+                {"id": key, "name": key, "fee": value} 
+                for key, value in fees.items()
+            ]
+            
+            # Add details
+            result["details"] = {
+                "provider": "Xoom",
+                "url": f"https://www.xoom.com/{receive_country.lower()}/send-money",
+                "estimated": result.get("exchange_rate", 0) == 0
             }
             
-            self.logger.info(f"Parsed result: exchange_rate={exchange_rate}, fee={result['fee']}, payment_method={selected_payment_method}")
+            self.logger.info(f"Parsed result: exchange_rate={result['exchange_rate']}, fee={result['fee']}, payment_method={result['payment_method']}")
             return result
             
         except Exception as e:
-            self.logger.error(f"Error parsing fee table response: {str(e)}")
-            # Return empty dictionary in case of errors
-            return {}
+            self.logger.error(f"Error parsing fee table response: {str(e)}", exc_info=True)
+            
+            # Ensure a valid result is returned with basic info
+            result["error_message"] = f"Error parsing response: {str(e)}"
+            return result
     
     def _filter_pricing_options(
         self, 

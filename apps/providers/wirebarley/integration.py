@@ -28,6 +28,7 @@ from apps.providers.wirebarley.exceptions import (
     WireBarleyCorridorError,
     WireBarleyThresholdError
 )
+from apps.providers.utils.country_currency_standards import validate_corridor
 
 """
 WireBarley API Integration Module
@@ -60,6 +61,9 @@ class WireBarleyProvider(RemittanceProvider):
     
     This provider implements aggregator-standard responses with live data and no fallbacks.
     """
+    
+    # Add provider_id class attribute
+    provider_id = "wirebarley"
     
     # API URLS
     BASE_URL = "https://www.wirebarley.com"
@@ -531,6 +535,13 @@ class WireBarleyProvider(RemittanceProvider):
             source_country = self.CURRENCY_TO_COUNTRY.get(send_currency, send_currency[:2])
             country_code = self.CURRENCY_TO_COUNTRY.get(receive_currency, receive_currency[:2])
             
+            if not country_code:
+                self.logger.info(f"Unable to determine country code for currency {receive_currency}")
+                return self.standardize_response({
+                    "success": False,
+                    "error_message": f"Unsupported currency: {receive_currency}"
+                })
+            
             # Use public endpoint to get rates for all corridors in a single request
             public_url = f"{self.BASE_URL}/my/remittance/api/v1/exrate/{source_country}/{send_currency}"
             
@@ -605,7 +616,7 @@ class WireBarleyProvider(RemittanceProvider):
                     # If we get here, we didn't find the currency
                     return self.standardize_response({
                         "success": False,
-                        "error_message": f"No exchange rate found for {send_currency} to {receive_currency}"
+                        "error_message": f"Unsupported corridor: No exchange rate found for {send_currency} to {receive_currency}"
                     })
                 else:
                     self.logger.error("API returned data in unexpected format")
@@ -620,7 +631,7 @@ class WireBarleyProvider(RemittanceProvider):
             self.logger.error(f"Error in get_exchange_rate: {str(e)}")
             return self.standardize_response({
                 "success": False,
-                "error_message": f"Error: {str(e)}"
+                "error_message": f"Error retrieving exchange rate: {str(e)}"
             })
     
     def _try_authenticated_api(self, send_amount, send_currency, receive_currency, country_code):
@@ -664,57 +675,113 @@ class WireBarleyProvider(RemittanceProvider):
     def get_quote(
         self,
         amount: Optional[Decimal] = None,
-        source_currency: str = "USD",
-        destination_currency: str = None,
+        send_currency: str = "USD",
+        receive_currency: str = None,
+        send_country: str = None,
+        receive_country: str = None,
         **kwargs
     ) -> Dict[str, Any]:
-        """Get a quote for a money transfer."""
-        if not amount:
-            return self.standardize_response({
-                "success": False,
-                "error_message": "Amount is required"
-            })
-        
+        """Get a quote with enhanced corridor validation and browser session."""
         try:
-            # Convert to Decimal if needed
-            if not isinstance(amount, Decimal):
-                amount = Decimal(str(amount))
+            # Map parameter names for backward compatibility
+            source_currency = send_currency
+            destination_currency = receive_currency
             
-            # Validate amount
-            if amount < 0:
+            # First handle common unsupported corridors explicitly
+            if destination_currency == 'MXN':
+                self.logger.info(f"WireBarley does not support {source_currency} to {destination_currency} corridor")
                 return self.standardize_response({
                     "success": False,
-                    "error_message": "Amount must be positive"
-                })
-            
-            # Check for min/max amount limits
-            if amount < self.MIN_SUPPORTED_AMOUNT:
-                return self.standardize_response({
-                    "success": False,
-                    "error_message": f"Amount {amount} is below minimum supported amount {self.MIN_SUPPORTED_AMOUNT}"
+                    "error_message": f"Unsupported corridor: WireBarley does not support {source_currency} to {destination_currency}"
                 })
                 
-            if amount > self.MAX_SUPPORTED_AMOUNT:
+            # Validate the corridor using shared utils
+            source_country = self.CURRENCY_TO_COUNTRY.get(source_currency, "US")
+            dest_country = self.CURRENCY_TO_COUNTRY.get(destination_currency, "")
+            
+            if not dest_country:
+                self.logger.info(f"Unable to determine country code for currency {destination_currency}")
                 return self.standardize_response({
                     "success": False,
-                    "error_message": f"Amount {amount} is above maximum supported amount {self.MAX_SUPPORTED_AMOUNT}"
+                    "error_message": f"Unsupported destination currency: {destination_currency}"
                 })
                 
-            # Call get_exchange_rate for the actual implementation
-            # get_exchange_rate already returns a standardized response
-            return self.get_exchange_rate(
-                send_amount=amount,
-                send_currency=source_currency,
-                receive_currency=destination_currency,
-                **kwargs
+            is_valid, validation_msg = validate_corridor(
+                source_country=source_country,
+                source_currency=source_currency,
+                dest_country=dest_country,
+                dest_currency=destination_currency
             )
             
-        except Exception as e:
-            self.logger.error(f"Error in get_quote: {str(e)}")
-            return self.standardize_response({
-                "success": False,
-                "error_message": f"Error in quote generation: {str(e)}"
+            if not is_valid:
+                return self.standardize_response({
+                    "success": False,
+                    "error_message": f"Unsupported corridor: {validation_msg}"
+                })
+
+            # Initialize browser-like session with custom headers
+            self._ensure_valid_session()
+            self.session.headers.update({
+                "Origin": self.BASE_URL,
+                "Referer": f"{self.BASE_URL}/send",
+                "Sec-Fetch-User": "?1",
+                "TE": "trailers"
             })
+
+            if not amount:
+                return self.standardize_response({
+                    "success": False,
+                    "error_message": "Amount is required"
+                })
+            
+            try:
+                # Convert to Decimal if needed
+                if not isinstance(amount, Decimal):
+                    amount = Decimal(str(amount))
+                
+                # Validate amount
+                if amount < 0:
+                    return self.standardize_response({
+                        "success": False,
+                        "error_message": "Amount must be positive"
+                    })
+                
+                # Check for min/max amount limits
+                if amount < self.MIN_SUPPORTED_AMOUNT:
+                    return self.standardize_response({
+                        "success": False,
+                        "error_message": f"Amount {amount} is below minimum supported amount {self.MIN_SUPPORTED_AMOUNT}"
+                    })
+                    
+                if amount > self.MAX_SUPPORTED_AMOUNT:
+                    return self.standardize_response({
+                        "success": False,
+                        "error_message": f"Amount {amount} is above maximum supported amount {self.MAX_SUPPORTED_AMOUNT}"
+                    })
+                
+                # Call get_exchange_rate for the actual implementation
+                # get_exchange_rate already returns a standardized response
+                return self.get_exchange_rate(
+                    send_amount=amount,
+                    send_currency=source_currency,
+                    receive_currency=destination_currency,
+                    **kwargs
+                )
+                
+            except Exception as e:
+                self.logger.error(f"Error in get_quote: {str(e)}")
+                return self.standardize_response({
+                    "success": False,
+                    "error_message": f"Error in quote generation: {str(e)}"
+                })
+            
+        except requests.HTTPError as e:
+            if e.response.status_code == 400:
+                return self.standardize_response({
+                    "success": False,
+                    "error_message": "Unsupported currency pair for WireBarley"
+                })
+            raise
     
     def get_corridors(self, source_currency: str = "USD") -> Dict[str, Any]:
         """Get available corridors for a source currency."""

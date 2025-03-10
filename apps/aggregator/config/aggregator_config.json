@@ -1,0 +1,28 @@
+{
+  "enabled_providers": [
+    "WireBarleyProvider",
+    "XEAggregatorProvider",
+    "PangeaProvider",
+    "OrbitRemitProvider",
+    "KoronaPayProvider",
+    "InstaRemProvider",
+    "RemitlyProvider",
+    "MukuruProvider",
+    "WiseProvider",
+    "DahabshiilProvider",
+    "RemitbeeProvider",
+    "PaysendProvider",
+    "SendwaveProvider",
+    "XoomProvider",
+    "TransferGoProvider",
+    "RIAProvider",
+    "AlAnsariProvider",
+    "RewireProvider",
+    "SingXProvider"
+  ],
+  "default_sort": "best_rate",
+  "default_max_workers": 5,
+  "default_timeout": 20,
+  "enable_caching": true,
+  "cache_ttl_seconds": 600
+}

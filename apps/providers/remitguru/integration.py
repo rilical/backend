@@ -12,7 +12,7 @@ import json
 import logging
 import time
 import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation as DecimalException
 from typing import Dict, List, Any, Optional, Tuple
 import requests
 
@@ -32,7 +32,7 @@ class RemitGuruProvider(RemittanceProvider):
     public API for specific corridors. If an error or unsupported corridor
     is encountered, it returns an error response instead of fallback data.
     
-    NOTE: RemitGuru currently only supports money transfers from UK (GBP) to India (INR).
+    NOTE: RemitGuru currently only supports money transfers from UK (GBP) to India (IN).
     All other corridors will return appropriate error responses.
     """
     
@@ -51,15 +51,16 @@ class RemitGuruProvider(RemittanceProvider):
     }
     
     # Maps RemitGuru country codes to default currency codes
-    # Only GB->IN is supported, so we only need these currencies
     CURRENCY_MAPPING = {
         "GB": "GBP",  # United Kingdom - British Pound
+        "UK": "GBP",  # Alternative code for United Kingdom
         "IN": "INR",  # India - Indian Rupee
     }
     
-    # IMPORTANT: RemitGuru only supports this one corridor
+    # IMPORTANT: RemitGuru only supports these corridors
     SUPPORTED_CORRIDORS = [
-        ("GB", "IN"),  # UK to India - ONLY SUPPORTED CORRIDOR
+        ("GB", "IN"),  # UK to India
+        ("UK", "IN"),  # UK to India (alternate country code)
     ]
     
     def __init__(self, name="remitguru", **kwargs):
@@ -75,15 +76,16 @@ class RemitGuruProvider(RemittanceProvider):
         self.session.headers.update({
             "User-Agent": (
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 "
-                "Safari/537.36"
+                "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15"
             ),
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "Content-Type": "application/x-www-form-urlencoded",
             "Accept": "*/*",
             "Origin": self.BASE_URL,
-            "Referer": f"{self.BASE_URL}/",
+            "Referer": f"{self.BASE_URL}/send-money-UK-to-India",
             "Connection": "keep-alive",
-            "Accept-Language": "en-US,en;q=0.9"
+            "Accept-Language": "en-US,en;q=0.9",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache"
         })
         self.logger = logging.getLogger(f"providers.{name}")
         self._visit_homepage()
@@ -96,30 +98,41 @@ class RemitGuruProvider(RemittanceProvider):
         """
         Standardize the response shape for aggregator consumption.
         
-        Follows the structure defined in RemittanceProvider base class
-        to ensure consistent response format across all providers.
+        Args:
+            raw_result: Raw provider response
+            provider_specific_data: Whether to include provider-specific data
+            
+        Returns:
+            Standardized response dictionary
         """
-        # Ensure required keys exist with proper formatting
-        output = {
-            "provider_id": self.name,
+        logger.debug(f"RemitGuru standardize_response input: {raw_result}")
+        
+        # Initialize standard response structure
+        response = {
+            "provider_id": "remitguru",
+            "provider_name": "RemitGuru",
             "success": raw_result.get("success", False),
             "error_message": raw_result.get("error_message"),
-            "send_amount": raw_result.get("send_amount", 0.0),
-            "source_currency": raw_result.get("source_currency", "").upper(),
+            "source_country": raw_result.get("source_country", "GB"),  # Default to GB
+            "destination_country": raw_result.get("destination_country", "IN"),  # Default to IN
+            "source_currency": raw_result.get("source_currency", "GBP"),
+            "destination_currency": raw_result.get("destination_currency", "INR"),
+            "source_amount": raw_result.get("send_amount", 0.0),
             "destination_amount": raw_result.get("destination_amount", 0.0),
-            "destination_currency": raw_result.get("destination_currency", "").upper(),
-            "exchange_rate": raw_result.get("exchange_rate"),
+            "exchange_rate": raw_result.get("exchange_rate", 0.0),
             "fee": raw_result.get("fee", 0.0),
             "payment_method": raw_result.get("payment_method", self.DEFAULT_PAYMENT_METHOD),
             "delivery_method": raw_result.get("delivery_method", self.DEFAULT_DELIVERY_METHOD),
             "delivery_time_minutes": raw_result.get("delivery_time_minutes", self.DEFAULT_DELIVERY_TIME),
-            "timestamp": raw_result.get("timestamp", datetime.datetime.now().isoformat()),
+            "timestamp": raw_result.get("timestamp", datetime.datetime.now().isoformat())
         }
-
+        
+        # Include raw response if requested
         if provider_specific_data and "raw_response" in raw_result:
-            output["raw_response"] = raw_result["raw_response"]
-
-        return output
+            response["raw_response"] = raw_result["raw_response"]
+            
+        logger.debug(f"RemitGuru standardize_response output: {response}")
+        return response
     
     def _visit_homepage(self):
         """Obtain initial cookies by visiting RemitGuru's homepage."""
@@ -174,79 +187,119 @@ class RemitGuruProvider(RemittanceProvider):
         
         Args:
             send_amount: Decimal, amount to send
-            send_country_code: Source country code (e.g., "GB")
+            send_country_code: Source country code (e.g., "GB" or "UK")
             recv_country_code: Destination country code (e.g., "IN")
         
         Returns:
             Parsed response dict or None if an error occurs
         """
-        send_country_mapped = self.CORRIDOR_MAPPING.get(send_country_code, send_country_code)
-        recv_country_mapped = self.CORRIDOR_MAPPING.get(recv_country_code, recv_country_code)
-        send_currency = self._get_country_currency(send_country_code)
-        recv_currency = self._get_country_currency(recv_country_code)
-        
-        if not send_currency or not recv_currency:
-            logger.error(f"No currency mapping for corridor {send_country_code} -> {recv_country_code}")
+        # Only GB/UK to IN is supported
+        if send_country_code not in ["GB", "UK"] or recv_country_code != "IN":
+            logger.error(f"RemitGuru only supports GB/UK to IN corridor, got: {send_country_code} -> {recv_country_code}")
             return None
+
+        # Hardcode the corridor for UK/GB to India which is the only supported one
+        corridor_str = "GB~GBP~IN~INR"
         
-        if not self._is_corridor_supported(send_country_mapped, recv_country_mapped):
-            logger.warning(f"Corridor {send_country_mapped} -> {recv_country_mapped} not in known corridors")
-        
-        corridor_str = self._build_corridor_str(
-            send_country_mapped, send_currency,
-            recv_country_mapped, recv_currency
-        )
+        # Format the amount as a whole number as required by the API
+        amount_int = int(send_amount)
         
         payload = {
-            "amountTransfer": str(int(send_amount)),
+            "amountTransfer": str(amount_int),
             "corridor": corridor_str,
             "sendMode": "CIP-FER"
         }
         
         url = f"{self.BASE_URL}{self.QUOTE_ENDPOINT}"
         try:
+            logger.debug(f"Requesting RemitGuru quote with payload: {payload}")
             resp = self.session.post(url, data=payload, timeout=30)
-            resp.raise_for_status()
+            
             content = resp.text.strip()
-            if not content or '|' not in content:
-                logger.error(f"Invalid RemitGuru response: {content}")
-                return None
+            logger.debug(f"RemitGuru raw response: {content}")
             
+            # Check if the response is empty
+            if not content:
+                logger.error("Empty response from RemitGuru")
+                return None
+                
+            # Example successful response: "128115.68|103.99|0.00|1232.00||true|GBP|"
+            # Format: receive_amount|exchange_rate|fee|send_amount|error_msg|valid_flag|send_currency|[error_code]
             parts = content.split('|')
-            if len(parts) < 7:
-                logger.error(f"Not enough data in RemitGuru response: {content}")
+            
+            # Log the parsed parts for debugging
+            logger.debug(f"RemitGuru response parsed into {len(parts)} parts: {parts}")
+            
+            if len(parts) < 6:
+                logger.error(f"Invalid RemitGuru response format: {content}")
                 return None
             
-            receive_amount_str, rate_str, fee_str, send_amt_str, error_msg, valid_flag, send_cur = parts[:7]
-            error_code = parts[7] if len(parts) > 7 else None
+            # Parse response parts
+            receive_amount_str = parts[0].strip() if parts[0].strip() else None
+            rate_str = parts[1].strip() if len(parts) > 1 and parts[1].strip() else None
+            fee_str = parts[2].strip() if len(parts) > 2 and parts[2].strip() else "0.00"
+            send_amt_str = parts[3].strip() if len(parts) > 3 and parts[3].strip() else None
+            error_msg = parts[4].strip() if len(parts) > 4 and parts[4].strip() else ""
+            valid_flag = parts[5].strip().lower() if len(parts) > 5 and parts[5].strip() else "false"
+            send_cur = parts[6].strip() if len(parts) > 6 and parts[6].strip() else "GBP"
             
-            if valid_flag.lower() != "true":
+            # Debug logging
+            logger.debug(f"RemitGuru parsed values: receive={receive_amount_str}, rate={rate_str}, fee={fee_str}, "
+                        f"send={send_amt_str}, error={error_msg}, valid={valid_flag}, currency={send_cur}")
+            
+            # Check if the quote is valid
+            is_valid = valid_flag == "true"
+            
+            # If not valid, return error info
+            if not is_valid:
+                error_text = error_msg or "Invalid quote"
+                logger.error(f"RemitGuru invalid quote: {error_text}")
                 return {
                     "is_valid": False,
-                    "error": error_msg or "Invalid quote",
-                    "error_code": error_code,
+                    "error": error_text,
                     "raw_response": content
                 }
             
-            receive_amount = Decimal(receive_amount_str) if receive_amount_str else None
-            exchange_rate = Decimal(rate_str) if rate_str else None
-            fee = Decimal(fee_str) if fee_str else Decimal('0')
-            send_amount_confirmed = Decimal(send_amt_str) if send_amt_str else send_amount
-            return {
-                "receive_amount": receive_amount,
-                "exchange_rate": exchange_rate,
-                "fee": fee,
-                "send_amount": send_amount_confirmed,
-                "is_valid": True,
-                "send_currency": send_cur if send_cur else send_currency,
-                "receive_currency": recv_currency,
-                "raw_response": content
-            }
+            # If valid but required values are missing, treat as an error
+            if is_valid and (not receive_amount_str or not rate_str):
+                logger.error("RemitGuru fee not defined or missing required values")
+                return {
+                    "is_valid": False,
+                    "error": "Fee Not Define.",
+                    "raw_response": content
+                }
+            
+            # Parse numeric values, handling empty strings
+            try:
+                receive_amount = Decimal(receive_amount_str) if receive_amount_str else None
+                exchange_rate = Decimal(rate_str) if rate_str else None
+                fee = Decimal(fee_str) if fee_str else Decimal('0')
+                send_amount_confirmed = Decimal(send_amt_str) if send_amt_str else send_amount
+                
+                # Success case
+                return {
+                    "receive_amount": receive_amount,
+                    "exchange_rate": exchange_rate,
+                    "fee": fee,
+                    "send_amount": send_amount_confirmed,
+                    "is_valid": True,
+                    "send_currency": send_cur,
+                    "receive_currency": "INR",
+                    "raw_response": content
+                }
+            except (ValueError, DecimalException) as e:
+                logger.error(f"Error parsing numeric values in RemitGuru response: {e}")
+                return {
+                    "is_valid": False,
+                    "error": f"Failed to parse response values: {e}",
+                    "raw_response": content
+                }
+                
         except requests.RequestException as exc:
             logger.error(f"RemitGuru API request failed: {exc}")
             return None
         except Exception as exc:
-            logger.error(f"Unexpected error parsing RemitGuru quote: {exc}")
+            logger.error(f"Unexpected error processing RemitGuru quote: {exc}")
             return None
     
     def get_quote(
@@ -265,36 +318,57 @@ class RemitGuruProvider(RemittanceProvider):
         
         This implements the abstract method from RemittanceProvider.
         """
+        # Log the input parameters for debugging
+        logger.debug(f"RemitGuru get_quote called with: amount={amount}, source_country={source_country}, "
+                    f"source_currency={source_currency}, dest_country={dest_country}, "
+                    f"dest_currency={dest_currency}")
+        
         # Normalize country codes
+        source_country_original = source_country
+        dest_country_original = dest_country
         source_country = normalize_country_code(source_country)
         dest_country = normalize_country_code(dest_country)
         
-        # Validate corridor
-        is_valid, error_message = validate_corridor(
-            source_country=source_country,
-            source_currency=source_currency,
-            dest_country=dest_country,
-            dest_currency=dest_currency
-        )
+        # Special case for RemitGuru: UK is valid and maps to GB
+        is_uk_to_india = (source_country == "UK" or source_country == "GB") and dest_country == "IN"
         
-        if not is_valid:
-            return self.standardize_response({
-                "success": False,
-                "error_message": error_message,
-                "send_amount": float(amount),
-                "source_currency": source_currency.upper(),
-                "destination_currency": dest_currency.upper(),
-                "payment_method": payment_method or self.DEFAULT_PAYMENT_METHOD,
-                "delivery_method": delivery_method or self.DEFAULT_DELIVERY_METHOD
-            })
+        # Skip validation for the special UK to India case
+        if not is_uk_to_india:
+            # Validate corridor
+            is_valid, error_message = validate_corridor(
+                source_country=source_country,
+                source_currency=source_currency,
+                dest_country=dest_country,
+                dest_currency=dest_currency
+            )
+            
+            if not is_valid:
+                logger.warning(f"RemitGuru corridor validation failed: {error_message}")
+                return self.standardize_response({
+                    "success": False,
+                    "error_message": error_message,
+                    "send_amount": float(amount),
+                    "source_currency": source_currency.upper(),
+                    "destination_currency": dest_currency.upper(),
+                    "payment_method": payment_method or self.DEFAULT_PAYMENT_METHOD,
+                    "delivery_method": delivery_method or self.DEFAULT_DELIVERY_METHOD
+                })
+        else:
+            logger.debug("RemitGuru: Special case UK/GB to India (IN) - bypassing validation")
         
+        # Special handling for UK/GB - ensure UK is mapped to GB for internal processing
+        if source_country == "UK":
+            source_country = "GB"
+            
         # Get the internal quote
         quote = self._internal_get_quote(amount, source_country, dest_country)
         
         if not quote:
+            error_msg = "RemitGuru quote request failed or invalid response"
+            logger.error(error_msg)
             return self.standardize_response({
                 "success": False,
-                "error_message": "RemitGuru quote request failed or invalid response",
+                "error_message": error_msg,
                 "send_amount": float(amount),
                 "source_currency": source_currency.upper(),
                 "destination_currency": dest_currency.upper(),
@@ -303,18 +377,22 @@ class RemitGuruProvider(RemittanceProvider):
             })
         
         if not quote.get("is_valid", False):
+            error_msg = quote.get("error", "Invalid corridor or unknown error")
+            raw_response = quote.get("raw_response", "No raw response")
+            logger.error(f"RemitGuru invalid quote: {error_msg}, raw response: {raw_response}")
             return self.standardize_response({
                 "success": False,
-                "error_message": quote.get("error", "Invalid corridor or unknown error"),
+                "error_message": error_msg,
                 "send_amount": float(amount),
                 "source_currency": source_currency.upper(),
                 "destination_currency": dest_currency.upper(),
                 "payment_method": payment_method or self.DEFAULT_PAYMENT_METHOD,
-                "delivery_method": delivery_method or self.DEFAULT_DELIVERY_METHOD
+                "delivery_method": delivery_method or self.DEFAULT_DELIVERY_METHOD,
+                "raw_response": raw_response if kwargs.get("include_raw", False) else None
             })
         
         # Build success response
-        return self.standardize_response({
+        response_data = {
             "success": True,
             "error_message": None,
             "send_amount": float(quote.get("send_amount", amount)),
@@ -326,8 +404,14 @@ class RemitGuruProvider(RemittanceProvider):
             "payment_method": payment_method or self.DEFAULT_PAYMENT_METHOD,
             "delivery_method": delivery_method or self.DEFAULT_DELIVERY_METHOD,
             "delivery_time_minutes": self.DEFAULT_DELIVERY_TIME,
-            "timestamp": datetime.datetime.now().isoformat()
-        })
+            "timestamp": datetime.datetime.now().isoformat(),
+            "raw_response": quote.get("raw_response") if kwargs.get("include_raw", False) else None
+        }
+        
+        logger.debug(f"RemitGuru quote success: {response_data}")
+        response = self.standardize_response(response_data)
+        logger.debug(f"RemitGuru standardized response: {response}")
+        return response
     
     def get_exchange_rate(
         self,

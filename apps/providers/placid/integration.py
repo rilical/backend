@@ -113,6 +113,8 @@ class PlacidProvider(RemittanceProvider):
     ) -> Dict[str, Any]:
         """
         Internal method that calls Placid's POST endpoint to fetch the corridor info.
+        If the corridor is unsupported or an error occurs, returns an error response.
+        No fallback to mock data is provided.
         """
         if not corridor_val:
             return {
@@ -127,6 +129,15 @@ class PlacidProvider(RemittanceProvider):
         if not rndval:
             rndval = str(int(time.time() * 1000))
 
+        # Get the ISO currency code for this corridor for error messaging
+        currency_code = None
+        if corridor_val in CORRIDOR_TO_ISO:
+            currency_code = CORRIDOR_TO_ISO[corridor_val]['currency']
+        else:
+            # If corridor is not recognized, treat corridor_val as currency
+            currency_code = corridor_val
+            logger.warning(f"Using corridor_val {corridor_val} as currency code (not found in mapping)")
+
         # Prepare query params
         query_params = {
             "TaskType": "ChgContIndx",
@@ -140,56 +151,79 @@ class PlacidProvider(RemittanceProvider):
         data = {"rndval": rndval}
 
         url = f"{self.BASE_URL}{self.ENDPOINT}"
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15",
+            "Accept": "*/*",
+            "Sec-Fetch-Site": "same-origin",
+            "Origin": "https://www.placid.net",
+            "Referer": "https://www.placid.net/"
+        }
+        
         try:
-            resp = self.session.post(url, params=query_params, data=data, timeout=15)
+            logger.info(f"Requesting Placid corridor info for {corridor_val} with URL: {url}, params: {query_params}")
+            resp = self.session.post(url, params=query_params, data=data, headers=headers, timeout=15)
             resp.raise_for_status()
             content = resp.text
+            logger.debug(f"Placid response for {corridor_val}: {content}")
 
             # Check corridor presence
             if corridor_val not in content:
                 # Might be an unsupported corridor or changed internal logic
                 if "|//|" in content:
                     # Possibly a generic response with no specific corridor info
+                    logger.warning(f"Corridor code {corridor_val} not found in response, but pipe-delimited data exists")
                     return {
-                        "success": True,
+                        "success": False,
                         "corridor_val": corridor_val,
                         "rate": 0.0,
                         "raw_response": content,
                         "error_message": f"No specific corridor data for {corridor_val}"
                     }
                 else:
+                    logger.error(f"Corridor {corridor_val} not found in response: {content}")
                     raise PlacidCorridorUnsupportedError(f"Corridor {corridor_val} not found in response")
 
-            # Get the ISO currency code for this corridor
-            currency_code = None
-            if corridor_val in CORRIDOR_TO_ISO:
-                currency_code = CORRIDOR_TO_ISO[corridor_val]['currency']
-            else:
-                # If corridor is not recognized, treat corridor_val as currency
-                currency_code = corridor_val
-
-            # Attempt to parse an exchange rate
-            pattern = rf"(\d+[\.,]?\d*)\s*{currency_code}"
-            match = re.search(pattern, content)
-            if match:
-                rate_str = match.group(1).replace(",", "")
-                rate = float(rate_str)
-                return {
-                    "success": True,
-                    "corridor_val": corridor_val,
-                    "rate": rate,
-                    "raw_response": content
-                }
-            else:
-                raise PlacidResponseError(f"Exchange rate for {currency_code} not found in response")
-
+            # Parse pipe-delimited response
+            # Format typically: COUNTRY_CODE|//|COUNTRY_NAME|//|CURRENCY|//|OTHER_DATA|//|...|//|RATE|//|...
+            if "|//|" in content:
+                parts = content.split("|//|")
+                
+                # Look for rate in the parts
+                for i, part in enumerate(parts):
+                    # Try to find a number that could be an exchange rate (typically after PLAC marker)
+                    if i > 0 and "PLAC" in parts[i-1]:
+                        try:
+                            # Extract the first number after PLAC
+                            rate_match = re.search(r"(\d+[\.,]?\d*)", part)
+                            if rate_match:
+                                rate_str = rate_match.group(1).replace(",", ".")
+                                rate = float(rate_str)
+                                logger.info(f"Successfully extracted rate {rate} for {corridor_val} from pipe-delimited data")
+                                return {
+                                    "success": True,
+                                    "corridor_val": corridor_val,
+                                    "rate": rate,
+                                    "raw_response": content
+                                }
+                        except Exception as e:
+                            logger.warning(f"Error parsing rate from part {part}: {str(e)}")
+            
+            # No rate found in response
+            logger.error(f"No rate found in response for {corridor_val}")
+            raise PlacidResponseError(f"Failed to extract rate from response: {content[:200]}")
+        
         except requests.RequestException as e:
-            raise PlacidConnectionError(f"Connection error to Placid: {str(e)}")
-        except PlacidError:
-            # re-raise known Placid exceptions
+            logger.error(f"Connection error when fetching rate for {corridor_val}: {str(e)}")
+            raise PlacidConnectionError(f"Connection error: {str(e)}")
+        
+        except PlacidError as e:
+            logger.error(f"Placid provider error for {corridor_val}: {str(e)}")
             raise
+        
         except Exception as e:
-            raise PlacidApiError(f"Unexpected Placid error: {str(e)}")
+            logger.error(f"Unexpected error fetching rate for {corridor_val}: {str(e)}")
+            raise PlacidApiError(f"API error: {str(e)}")
 
     def get_quote(
         self,
@@ -231,19 +265,33 @@ class PlacidProvider(RemittanceProvider):
             local_res["error_message"] = "Invalid amount: must be > 0"
             return self.standardize_response(local_res)
         
-        # Validate corridor
-        is_valid, error_message = validate_corridor(
-            source_country=source_country,
-            source_currency=source_currency,
-            dest_country=dest_country,
-            dest_currency=dest_currency
-        )
+        # Enhanced corridor validation with better country support
+        # Special case handling for EUR destination currency - all Eurozone countries valid
+        if dest_currency == 'EUR' and dest_country in ['AT', 'BE', 'DE', 'ES', 'EE', 'FI', 'FR', 
+                                                       'GR', 'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 
+                                                       'NL', 'PT', 'SK', 'SI', 'CY', 'HR']:
+            # Eurozone country with EUR is valid - skip specific validation
+            pass
+        else:
+            # Use generic validation first to ensure country codes are valid
+            is_valid, error_message = validate_corridor(
+                source_country=source_country,
+                source_currency=source_currency,
+                dest_country=dest_country,
+                dest_currency=dest_currency
+            )
+            
+            if not is_valid:
+                local_res["error_message"] = error_message
+                return self.standardize_response(local_res)
+            
+            # Now check if source country is specifically supported by Placid
+            valid_source_countries = get_supported_source_countries()
+            if source_country not in valid_source_countries:
+                local_res["error_message"] = f"Unsupported source country: {source_country}"
+                return self.standardize_response(local_res)
         
-        if not is_valid:
-            local_res["error_message"] = error_message
-            return self.standardize_response(local_res)
-        
-        # Check if source currency is supported
+        # Check if source currency is supported by Placid
         valid_source_currencies = get_supported_source_currencies()
         if source_currency not in valid_source_currencies:
             local_res["error_message"] = (
@@ -252,7 +300,7 @@ class PlacidProvider(RemittanceProvider):
             )
             return self.standardize_response(local_res)
 
-        # Derive corridor from destination currency
+        # Derive corridor from destination currency using Placid-specific mapping
         corridor_val = get_corridor_from_currency(dest_currency)
         if not corridor_val:
             # Not recognized

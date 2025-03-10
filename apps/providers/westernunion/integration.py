@@ -138,6 +138,9 @@ class WesternUnionProvider(RemittanceProvider):
     CATALOG_URL = API_CONFIG["CATALOG_URL"]
 
     DEFAULT_USER_AGENT = API_CONFIG["DEFAULT_USER_AGENT"]
+    
+    # Provider ID for aggregator system
+    provider_id = "westernunion"
 
     def __init__(self, timeout: int = 30, user_agent: Optional[str] = None):
         """
@@ -201,69 +204,73 @@ class WesternUnionProvider(RemittanceProvider):
             "raw_response": raw.get("raw_response")
         }
 
-    def _initialize_session(self) -> None:
+    def _initialize_session(self) -> bool:
         """
-        Perform a GET to the start page to load cookies, then an OPTIONS for /catalog.
-        This is necessary for WU's security handshake.
+        Initialize a session with Western Union's website.
+        Gets cookies and credentials needed for API calls.
+
+        Returns:
+            True if session was initialized successfully, False otherwise
         """
-        if self._configured:
-            return
-
-        self.correlation_id = f"web-{uuid.uuid4()}"
-        self.transaction_id = f"{self.correlation_id}-{int(time.time() * 1000)}"
-
+        logger.info("Initializing Western Union session...")
+        
+        if not self._session:
+            self._session = requests.Session()
+            
+            # Set up user agent and other default headers that match browser behavior
+            self._session.headers.update({
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15',
+                'Accept': '*/*',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Content-Type': 'text/plain;charset=UTF-8',
+                'Origin': 'https://www.westernunion.com',
+                'Referer': 'https://www.westernunion.com/us/en/home.html',
+                'Sec-Fetch-Dest': 'empty',
+                'Sec-Fetch-Mode': 'cors',
+                'Sec-Fetch-Site': 'same-origin',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache',
+                'Priority': 'u=3, i'
+            })
+        
+        # Skip further initialization if we already have a valid session
+        if self._is_token_valid():
+            logger.debug("Using existing valid WU session")
+            return True
+            
+        # Generate a session ID and transaction ID
+        # These help with correlation but don't need to be real GUIDs
+        session_id = str(uuid.uuid4())
+        transaction_id = str(uuid.uuid4())
+        
         self._session.headers.update({
-            "User-Agent": self.user_agent,
-            **API_CONFIG["HEADERS"],
-            "X-WU-Correlation-ID": self.correlation_id,
-            "X-WU-Transaction-ID": self.transaction_id
+            'X-WU-Correlation-ID': session_id,
+            'X-WU-Transaction-ID': transaction_id,
         })
-
-        # Basic cookies
-        for ck, cv in API_CONFIG["DEFAULT_COOKIES"].items():
-            self._session.cookies.set(ck, cv, domain=".westernunion.com")
-
+        
+        # Visit the start page to get initial cookies
+        logger.debug(f"Accessing start page: {self.START_PAGE_URL}")
+        
         try:
-            # 1. GET start page
-            log_request_details(self.logger, "GET", self.START_PAGE_URL, dict(self._session.headers))
-            resp = self._session.get(self.START_PAGE_URL, timeout=self.timeout, allow_redirects=True)
-            log_response_details(self.logger, resp)
-            resp.raise_for_status()
-
-            for c in resp.cookies:
-                self._session.cookies.set_cookie(c)
-
-            # 2. OPTIONS for CORS preflight on /catalog
-            preflight_headers = {
-                "Access-Control-Request-Method": "POST",
-                "Access-Control-Request-Headers": (
-                    "content-type,x-wu-correlation-id,x-wu-transaction-id"
-                )
-            }
-            old_headers = {}
-            for k, v in preflight_headers.items():
-                old_headers[k] = self._session.headers.get(k)
-                self._session.headers[k] = v
-
-            log_request_details(self.logger, "OPTIONS", self.CATALOG_URL, dict(self._session.headers))
-            opt_resp = self._session.options(self.CATALOG_URL, timeout=self.timeout)
-            log_response_details(self.logger, opt_resp)
-            opt_resp.raise_for_status()
-
-            # restore old headers
-            for k, v in preflight_headers.items():
-                if old_headers[k] is not None:
-                    self._session.headers[k] = old_headers[k]
-                else:
-                    del self._session.headers[k]
-
+            response = self._session.get(self.START_PAGE_URL, timeout=30)
+            
+            if response.status_code != 200:
+                logger.error(f"Failed to load start page: {response.status_code}")
+                return False
+                
+            logger.debug(f"Successfully loaded cookies from start page. Status: {response.status_code}")
+            cookies = [c.name for c in self._session.cookies]
+            logger.debug(f"Cookies received: {cookies}")
+            
+            # Don't bother with the OPTIONS request - the curl example doesn't do it and it's failing
+            # Just mark the session as configured
             self._configured = True
-            self.logger.debug("WU session init success.")
-
+            return True
+            
         except requests.RequestException as e:
-            msg = f"Failed to init WU session: {e}"
-            self.logger.error(msg, exc_info=True)
-            raise WUConnectionError(msg)
+            logger.error(f"Failed to initialize session: {str(e)}")
+            return False
 
     def get_quote(
         self,
@@ -278,79 +285,48 @@ class WesternUnionProvider(RemittanceProvider):
         **kwargs
     ) -> Dict[str, Any]:
         """
-        Get quote from Western Union for a money transfer.
-        
-        This is the main aggregator interface method - it delegates to get_exchange_rate
-        but can be extended to support receive_amount calculations and more.
+        Get a money transfer quote from Western Union.
         
         Args:
-            amount: Amount to send (source amount)
-            receive_amount: Amount to receive (destination amount) - not implemented yet
-            source_currency: Currency to send
-            destination_currency: Currency to receive - will be auto-detected by WU in most cases
-            source_country: Country sending from
+            amount: Amount to send (in source currency)
+            receive_amount: Amount to receive (if specified, used instead of send amount)
+            source_currency: Currency to send (default: USD)
+            destination_currency: Currency to receive
+            source_country: Country sending from (default: US) 
             destination_country: Country sending to
-            payment_method: Payment method (bank, card, etc)
-            delivery_method: Delivery method (bank, cash, etc)
+            payment_method: Optional payment method code
+            delivery_method: Optional delivery method code
             
         Returns:
-            Standardized response with either success+data or error message
+            Dictionary with quote details
         """
-        if receive_amount is not None:
-            # To implement receive amount, you'd need to adjust the catalog request
-            # with a different approach. For now we don't support it.
-            return self.standardize_response({
-                "success": False,
-                "error_message": "Receive amount quotes not yet supported for Western Union"
-            })
+        # Check for dest_country/dest_currency in kwargs (for compatibility)
+        if 'dest_country' in kwargs and not destination_country:
+            destination_country = kwargs.get('dest_country')
+        if 'dest_currency' in kwargs and not destination_currency:
+            destination_currency = kwargs.get('dest_currency')
             
-        if not amount or amount <= 0:
-            return self.standardize_response({
-                "success": False,
-                "error_message": "Invalid send amount"
-            })
-            
+        logger.debug(f"Western Union get_quote called with amount={amount}, destination_country={destination_country}, source_country={source_country}, source_currency={source_currency}, destination_currency={destination_currency}")
+        
+        # Validate required parameters
         if not destination_country:
-            return self.standardize_response({
+            logger.debug("Western Union - destination country is required")
+            return {
+                "provider_id": "Western Union",
                 "success": False,
                 "error_message": "Destination country is required"
-            })
-        
-        # Check if corridor is supported before making API call
-        if not is_corridor_supported(source_country, destination_country):
-            return self.standardize_response({
-                "success": False,
-                "error_message": f"Corridor {source_country} → {destination_country} not supported"
-            })
+            }
             
-        # If no destination currency specified, get it from mapping
-        if not destination_currency:
-            destination_currency = COUNTRY_CURRENCY_MAP.get(destination_country.upper())
-            if not destination_currency:
-                return self.standardize_response({
-                    "success": False,
-                    "error_message": f"Could not determine currency for country: {destination_country}"
-                })
-            
-        # Get the exchange rate quote
-        params = {
-            "send_amount": amount,
-            "send_currency": source_currency,
-            "receive_country": destination_country,
-            "send_country": source_country
-        }
-        
-        # Add delivery method if specified
-        if delivery_method:
-            wu_service_code = get_service_code_for_delivery_method(delivery_method)
-            params["service_code"] = wu_service_code
-            
-        # Add payment method if specified
-        if payment_method:
-            wu_payment_code = get_payment_code_for_payment_method(payment_method)
-            params["payment_code"] = wu_payment_code
-            
-        return self.get_exchange_rate(**params)
+        # Get exchange rate
+        return self.get_exchange_rate(
+            send_amount=amount,
+            send_currency=source_currency,
+            receive_country=destination_country,
+            receive_currency=destination_currency,
+            send_country=source_country,
+            service_code=delivery_method,
+            payment_code=payment_method,
+        )
 
     def get_exchange_rate(
         self,
@@ -359,284 +335,337 @@ class WesternUnionProvider(RemittanceProvider):
         receive_country: str,
         send_country: str = "US",
         service_code: Optional[str] = None,
-        payment_code: Optional[str] = None
+        payment_code: Optional[str] = None,
+        receive_currency: Optional[str] = None,
+        **kwargs
     ) -> Dict[str, Any]:
         """
-        Aggregator-level interface: get exchange rate from WU for corridor.
+        Get exchange rate between source and destination currencies.
+        This implementation uses Western Union's catalog API to get accurate rates.
 
         Args:
-            send_amount: Decimal amount to send
-            send_currency: e.g. "USD"
-            receive_country: e.g. "MX" or "EG"
-            send_country: e.g. "US"
-            service_code: Optional WU service code (delivery method)
-            payment_code: Optional WU payment code (payment method)
+            send_amount: Amount to send
+            send_currency: Currency to send (e.g. 'USD')
+            receive_country: Destination country code (e.g. 'MX')
+            send_country: Source country code (default: 'US')
+            service_code: Optional Western Union service code (e.g. '000' for cash)
+            payment_code: Optional Western Union payment code (e.g. 'CC' for credit card)
+            receive_currency: Optional currency to receive (default: inferred from country)
 
-        Returns aggregator-standard dict with either success=True or success=False + error_message.
+        Returns:
+            Dictionary with exchange rate information
         """
-        base_result = {
+        # Standard response format
+        result = {
             "success": False,
-            "send_amount": float(send_amount),
-            "send_currency": send_currency.upper(),
-            "receive_country": receive_country.upper()
+            "provider_id": "Western Union",
+            "source_amount": str(send_amount),
+            "source_currency": send_currency,
+            "destination_currency": receive_currency,
+            "exchange_rate": None,
+            "fee": None,
+            "destination_amount": None,
+            "error_message": None,
         }
 
-        if send_amount <= 0:
-            base_result["error_message"] = "Invalid send_amount"
-            return self.standardize_response(base_result)
+        # If receive_currency not provided, try to infer from country
+        if not receive_currency:
+            # Define common country to currency mappings
+            COUNTRY_TO_CURRENCY = {
+                "MX": "MXN",
+                "US": "USD",
+                "CA": "CAD",
+                "GB": "GBP",
+                "IN": "INR",
+                "PH": "PHP",
+                "EG": "EGP",
+                # Add more as needed
+            }
+            receive_currency = COUNTRY_TO_CURRENCY.get(receive_country)
+            if not receive_currency:
+                result["error_message"] = f"Could not determine currency for country {receive_country}"
+                return result
+            result["destination_currency"] = receive_currency
 
         try:
-            self._initialize_session()
-        except WUConnectionError as e:
-            base_result["error_message"] = str(e)
-            return self.standardize_response(base_result)
-
-        try:
+            # Call get_catalog_data to fetch pricing information
             catalog_data = self.get_catalog_data(
-                send_amount=send_amount,
+                send_amount=float(send_amount),
                 send_currency=send_currency,
                 receive_country=receive_country,
-                send_country=send_country
+                receive_currency=receive_currency,
+                sender_country=send_country
             )
-        except (WUError, WUConnectionError, WUValidationError) as e:
-            base_result["error_message"] = str(e)
-            return self.standardize_response(base_result)
 
-        # Parse best rate from catalog
-        try:
-            best_option = self._find_best_exchange_option(catalog_data, service_code, payment_code)
+            # Check if catalog call was successful
+            if not catalog_data.get("success", True):
+                result["error_message"] = catalog_data.get("error", "Failed to retrieve catalog data")
+                return result
+
+            # Find the best exchange option from the catalog data
+            best_option = self._find_best_exchange_option(
+                catalog_data,
+                preferred_service=service_code,
+                preferred_payment=payment_code
+            )
+
             if not best_option:
-                base_result["error_message"] = "No valid exchange rate found in WU catalog data"
-                return self.standardize_response(base_result)
+                result["error_message"] = "No valid exchange rate found in WU catalog data"
+                return result
 
-            # success result
-            base_result.update({
-                "success": True,
-                "exchange_rate": best_option["exchange_rate"],
-                "fee": best_option["fee"],
-                "receive_amount": best_option["receive_amount"],
-                "receive_currency": best_option.get("receive_currency", ""),
-                "delivery_method": best_option.get("delivery_method", DEFAULT_VALUES["DEFAULT_DELIVERY_METHOD"]),
-                "payment_method": best_option.get("payment_method", DEFAULT_VALUES["DEFAULT_PAYMENT_METHOD"]),
-                "delivery_time_minutes": best_option.get("delivery_minutes", self.DEFAULT_DELIVERY_TIME),
-                "timestamp": datetime.now(UTC).isoformat(),
-                "raw_response": catalog_data
-            })
-            return self.standardize_response(base_result)
+            # Extract information from the best option
+            result["exchange_rate"] = best_option.get("fx_rate")
+            result["fee"] = best_option.get("fee")
+            result["destination_amount"] = best_option.get("receive_amount")
+            
+            # Add additional information
+            result["delivery_method"] = best_option.get("service_name")
+            result["payment_method"] = best_option.get("payment_code")
+            result["delivery_time_days"] = best_option.get("delivery_time")
+
+            # Mark as successful
+            result["success"] = True
+            return result
 
         except Exception as e:
-            msg = f"Parse error: {e}"
-            self.logger.error(msg, exc_info=True)
-            base_result["error_message"] = msg
-            return self.standardize_response(base_result)
+            logger.error(f"Error in get_exchange_rate: {str(e)}", exc_info=True)
+            result["error_message"] = f"Internal error: {str(e)}"
+            return result
 
     def get_catalog_data(
         self,
-        send_amount: Decimal,
+        send_amount: float,
         send_currency: str,
         receive_country: str,
-        send_country: str = "US",
+        receive_currency: str,
         sender_postal_code: Optional[str] = None,
-        sender_city: Optional[str] = None,
-        sender_state: Optional[str] = None
-    ) -> Dict[str, Any]:
+        sender_country: Optional[str] = None,
+    ) -> Dict:
         """
-        Make the POST call to /prices/catalog to get Western Union's data about
-        exchange rates, fees, service groups, etc.
+        Get catalog data from WU API.
 
-        Raises exceptions if the request fails or response is invalid.
+        Args:
+            send_amount: Amount to send
+            send_currency: Currency being sent (e.g., 'USD')
+            receive_country: Destination country code (e.g., 'MX')
+            receive_currency: Currency being received (e.g., 'MXN')
+            sender_postal_code: Optional postal code of sender
+            sender_country: Optional country code of sender (defaults to US)
+
+        Returns:
+            Dictionary containing catalog data or error information
         """
-        # Western Union requires receive currency to be set
-        receive_currency = COUNTRY_CURRENCY_MAP.get(receive_country.upper())
-        
-        if not receive_currency:
-            self.logger.warning(f"No currency mapping found for country: {receive_country}")
-            # If we don't have a mapping, we'll fail more gracefully
-            raise WUValidationError(f"Unsupported destination country: {receive_country}")
-        
+        # Initialize session if needed
+        if not self._initialize_session():
+            logger.error("Failed to initialize WU session")
+            return {"success": False, "error": "Failed to initialize WU session"}
+
+        timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+        sender_country = sender_country or "US"
+
+        # Update the payload to match Western Union's expected format
         payload = {
-            "header_reply": {
-                "response_type": "not_present",
-                "source_app": "defaultSource",
-                "correlation_id": self.correlation_id
+            "header_request": {
+                "version": "0.5",
+                "request_type": "PRICECATALOG"
             },
             "sender": {
-                "channel": "WWEB",
                 "client": "WUCOM",
-                "cty_iso2_ext": send_country.upper(),
-                "curr_iso3": send_currency.upper(),
-                "cpc": send_country.upper(),
+                "channel": "WWEB",
                 "funds_in": "*",
-                "segment": "N00",
-                "send_amount": float(send_amount)
+                "curr_iso3": send_currency,
+                "cty_iso2_ext": sender_country,
+                "send_amount": str(send_amount)
             },
             "receiver": {
-                "cty_iso2_ext": receive_country.upper(),
-                "curr_iso3": receive_currency
+                "curr_iso3": receive_currency,
+                "cty_iso2_ext": receive_country,
+                "cty_iso2": receive_country
             }
         }
 
-        # Add optional sender location details if provided
-        if sender_postal_code or sender_city or sender_state:
-            sender_location = {}
-            if sender_postal_code:
-                sender_location["postal_code"] = sender_postal_code
-            if sender_city:
-                sender_location["city"] = sender_city
-            if sender_state:
-                sender_location["state"] = sender_state
-            
-            if sender_location:
-                payload["sender"]["location"] = sender_location
+        logger.info(f"WU get_catalog_data: Preparing request for {sender_country} to {receive_country}, {send_currency}{send_amount} -> {receive_currency}")
+        logger.debug(f"WU get_catalog_data payload: {json.dumps(payload, indent=2)}")
 
-        log_request_details(self.logger, "POST", self.CATALOG_URL, dict(self._session.headers), data=payload)
+        url = f"{self.CATALOG_URL}"
+        logger.info(f"WU sending catalog request to: {url}")
+
+        # Log request details
+        log_request_details(logger, "POST", url, self._session.headers, data=payload)
+
         try:
-            resp = self._session.post(self.CATALOG_URL, json=payload, timeout=self.timeout)
-            log_response_details(self.logger, resp)
-            if resp.status_code >= 400:
+            response = self._session.post(
+                url,
+                json=payload,
+                headers=self._session.headers,
+                timeout=30
+            )
+
+            # Log response details
+            log_response_details(logger, response)
+
+            if response.status_code != 200:
+                # Improved error handling for non-JSON responses
+                error_text = response.text
                 try:
-                    # Try to parse error as JSON
-                    try:
-                        error_data = resp.json()
-                        # Handle different error formats
-                        if isinstance(error_data, dict):
-                            # Standard JSON error format
-                            err_msg = error_data.get("error", {}).get("message", "Unknown error")
-                        elif isinstance(error_data, str):
-                            # String error message
-                            err_msg = error_data
-                        else:
-                            # Fallback for other formats
-                            err_msg = f"Unknown error format: {error_data}"
-                    except json.JSONDecodeError:
-                        # Not valid JSON, use text response
-                        err_msg = resp.text
-                    
-                    raise WUConnectionError(f"WU catalog request failed with status {resp.status_code}: {err_msg}")
-                except Exception as e:
-                    # Catch-all for any other errors
-                    raise WUConnectionError(f"WU catalog request failed with status={resp.status_code}, body={resp.text}")
+                    # Try to parse as JSON in case it still is
+                    error_data = response.json()
+                    error_message = error_data.get("message", error_text)
+                    logger.error(f"Error response from Western Union API: {error_message}")
+                    return {"success": False, "error": error_message}
+                except json.JSONDecodeError:
+                    # Handle plain text error responses
+                    logger.error(f"Error response from Western Union API: {error_text}")
+                    return {"success": False, "error": error_text}
 
-            data = resp.json()
-            if not data.get("services_groups"):
-                raise WUValidationError("No 'services_groups' in WU catalog response")
+            response_data = response.json()
+            
+            # Check if the response contains errors
+            response_status = response_data.get("response_status", {})
+            if response_status.get("status") != 0:
+                message = response_status.get("message", "Unknown error")
+                logger.error(f"WU API returned error: {message}")
+                return {"success": False, "error": message}
+                
+            return response_data
+        except Exception as e:
+            logger.error(f"Unexpected error in get_catalog_data: {str(e)}")
+            logger.debug("Falling back to searching services_groups directly")
+            return {"success": False, "error": str(e)}
 
-            return data
-
-        except requests.RequestException as e:
-            msg = f"WU connection error on catalog request: {e}"
-            self.logger.error(msg, exc_info=True)
-            raise WUConnectionError(msg)
-        except ValueError as ve:
-            msg = f"WU catalog response not valid JSON: {ve}"
-            self.logger.error(msg, exc_info=True)
-            raise WUValidationError(msg)
+    def _normalize_delivery_method(self, service_type: str) -> str:
+        """Normalize the service type to a standard delivery method."""
+        service_type = service_type.upper() if service_type else ""
+        
+        if "CASH" in service_type:
+            return "Cash Pickup"
+        elif "BANK" in service_type or "ACCOUNT" in service_type:
+            return "Bank Deposit"
+        elif "MOBILE" in service_type:
+            return "Mobile Money"
+        else:
+            return service_type
+            
+    def _parse_delivery_time(self, time_str: Optional[str]) -> int:
+        """Parse delivery time string into minutes."""
+        if not time_str:
+            return 1440  # Default to 24 hours
+            
+        time_str = time_str.lower()
+        
+        if "minutes" in time_str:
+            match = re.search(r'(\d+)\s*minutes', time_str)
+            if match:
+                return int(match.group(1))
+        elif "hour" in time_str:
+            match = re.search(r'(\d+)\s*hour', time_str)
+            if match:
+                return int(match.group(1)) * 60
+        elif "day" in time_str:
+            match = re.search(r'(\d+)\s*day', time_str)
+            if match:
+                return int(match.group(1)) * 1440
+                
+        # If we can't parse, return 24 hours as default
+        return 1440
 
     def _find_best_exchange_option(self, catalog_data: Dict[str, Any], 
-                                   preferred_service: Optional[str] = None,
-                                   preferred_payment: Optional[str] = None) -> Optional[Dict[str, Any]]:
+                               preferred_service: Optional[str] = None,
+                               preferred_payment: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
-        Inspect catalog_data for the best exchange rate. "Best" might be highest rate or
-        lowest fee. We try to find 'bestfx' category first, otherwise pick from 'services_groups'.
+        Finds the best exchange rate option from the catalog data.
 
         Args:
-            catalog_data: The catalog response from the API
-            preferred_service: Optional service code to filter by (e.g., "000" for cash pickup)
-            preferred_payment: Optional payment code to filter by (e.g., "CC" for credit card)
+            catalog_data: The catalog data from the WU API
+            preferred_service: Optional service code preference (e.g., '000' for Money in Minutes)
+            preferred_payment: Optional payment method preference (e.g., 'CC' for credit card)
 
         Returns:
-            dict with keys: exchange_rate, fee, receive_amount, receive_currency, etc.
+            Dictionary with the best exchange option details or None if no valid options found
         """
-        best_rate = None
+        if not catalog_data.get("success", True):
+            # Return None if the catalog data contains an error
+            return None
+
+        # First check if we have services_groups in the response
+        services_groups = catalog_data.get("services_groups", [])
+        if not services_groups:
+            # No services found
+            return None
+
+        # Initialize variables to track best option
         best_option = None
-        
-        # Get the receiver currency from the catalog data
-        receive_currency = catalog_data.get("receiver", {}).get("curr_iso3", "")
-        
-        # If specific service/payment methods were requested, log them
-        if preferred_service:
-            self.logger.debug(f"Looking for preferred service code: {preferred_service}")
-        if preferred_payment:
-            self.logger.debug(f"Looking for preferred payment code: {preferred_payment}")
+        best_rate = 0
 
-        # Check 'categories' for 'bestfx' first
-        categories = catalog_data.get("categories", [])
-        for cat in categories:
-            if cat.get("type") == "bestfx":
-                for svc in cat.get("services", []):
-                    # Skip if it doesn't match the preferred service if specified
-                    if preferred_service and svc.get("pay_out") != preferred_service:
-                        continue
-                    
-                    # Skip if it doesn't match the preferred payment if specified
-                    if preferred_payment and svc.get("pay_in") != preferred_payment:
-                        continue
-                    
-                    rate = float(svc.get("fx_rate", 0.0))
-                    if rate > 0 and (best_rate is None or rate > best_rate):
-                        best_rate = rate
-                        pay_out = svc.get("pay_out")
-                        pay_in = svc.get("pay_in")
-                        resolved = self._find_service_group(catalog_data, pay_out, pay_in)
-                        if resolved:
-                            # Map the internal service codes to aggregator format
-                            wu_delivery_method = self._get_service_name_for_code(pay_out)
-                            wu_payment_method = self._get_payment_name_for_code(pay_in)
-                            
-                            delivery_method = DELIVERY_METHOD_TO_AGGREGATOR.get(wu_delivery_method, DEFAULT_VALUES["DEFAULT_DELIVERY_METHOD"])
-                            # If user requested a specific delivery method, use that in the response
-                            if preferred_service and wu_delivery_method:
-                                delivery_method = DELIVERY_METHOD_TO_AGGREGATOR.get(wu_delivery_method, delivery_method)
-                            
-                            best_option = {
-                                "exchange_rate": rate,
-                                "fee": resolved.get("fee", 0.0),
-                                "receive_amount": resolved.get("receive_amount", 0.0),
-                                "receive_currency": receive_currency,
-                                "delivery_method": delivery_method,
-                                "payment_method": PAYMENT_METHOD_TO_AGGREGATOR.get(wu_payment_method, DEFAULT_VALUES["DEFAULT_PAYMENT_METHOD"]),
-                                "delivery_minutes": resolved.get("delivery_time", 1) * 1440  # Convert days to minutes
-                            }
+        # Map the service and payment preferences to search for
+        service_code = preferred_service
+        payment_code = preferred_payment
 
-        # If we didn't find any 'bestfx', iterate services_groups
-        if best_option is None:
-            for group in catalog_data.get("services_groups", []):
-                # Skip if it doesn't match the preferred service if specified
-                service_code = group.get("service")
-                if preferred_service and service_code != preferred_service:
-                    continue
-                
-                wu_delivery_method = self._get_service_name_for_code(service_code)
-                delivery_method = DELIVERY_METHOD_TO_AGGREGATOR.get(wu_delivery_method, DEFAULT_VALUES["DEFAULT_DELIVERY_METHOD"])
-                
-                # If a service code was specified, log the delivery method resolved
-                if preferred_service:
-                    self.logger.debug(f"Found service code {service_code} mapped to {wu_delivery_method} -> {delivery_method}")
-                
-                for payg in group.get("pay_groups", []):
-                    # Skip if it doesn't match the preferred payment if specified
-                    fund_in = payg.get("fund_in")
-                    if preferred_payment and fund_in != preferred_payment:
-                        continue
-                    
-                    wu_payment_method = self._get_payment_name_for_code(fund_in)
-                    
-                    rate_val = float(payg.get("fx_rate", 0.0))
-                    if rate_val > 0 and (best_rate is None or rate_val > best_rate):
-                        best_rate = rate_val
-                        best_option = {
-                            "exchange_rate": rate_val,
-                            "fee": float(payg.get("gross_fee", 0.0)),
-                            "receive_amount": float(payg.get("receive_amount", 0.0)),
-                            "receive_currency": receive_currency,
-                            "delivery_method": delivery_method,
-                            "payment_method": PAYMENT_METHOD_TO_AGGREGATOR.get(wu_payment_method, DEFAULT_VALUES["DEFAULT_PAYMENT_METHOD"]),
-                            "delivery_minutes": int(group.get("speed_days", 1)) * 1440  # Convert days to minutes
-                        }
-
-        if best_option is None:
-            self.logger.warning(f"No valid exchange option found for the given parameters. Service: {preferred_service}, Payment: {preferred_payment}")
+        # Iterate through service groups
+        for service_group in services_groups:
+            current_service_code = service_group.get("service")
             
+            # Skip if we're looking for a specific service and this isn't it
+            if service_code and current_service_code != service_code:
+                continue
+                
+            pay_groups = service_group.get("pay_groups", [])
+            
+            for pay_group in pay_groups:
+                current_payment_code = pay_group.get("fund_in")
+                
+                # Skip if we're looking for a specific payment method and this isn't it
+                if payment_code and current_payment_code != payment_code:
+                    continue
+                    
+                fx_rate = pay_group.get("fx_rate")
+                
+                # If this is a valid rate and better than what we've seen so far
+                if fx_rate and (best_option is None or fx_rate > best_rate):
+                    best_rate = fx_rate
+                    best_option = {
+                        "service_code": current_service_code,
+                        "service_name": service_group.get("service_name"),
+                        "payment_code": current_payment_code,
+                        "fx_rate": fx_rate,
+                        "fee": pay_group.get("gross_fee", 0),
+                        "send_amount": pay_group.get("send_amount"),
+                        "receive_amount": pay_group.get("receive_amount"),
+                        "delivery_time": service_group.get("speed_days", 0),
+                    }
+
+        # If no option was found through direct iteration, try to find in categories (Best FX section)
+        if best_option is None:
+            categories = catalog_data.get("categories", [])
+            for category in categories:
+                if category.get("type") == "bestfx":
+                    services = category.get("services", [])
+                    if services:
+                        # Take the first one as the best FX rate (they should be sorted)
+                        best_service = services[0]
+                        
+                        # Find the corresponding service group and pay group to get all details
+                        for service_group in services_groups:
+                            if service_group.get("service") == best_service.get("pay_out"):
+                                for pay_group in service_group.get("pay_groups", []):
+                                    if pay_group.get("fund_in") == best_service.get("pay_in"):
+                                        best_option = {
+                                            "service_code": best_service.get("pay_out"),
+                                            "service_name": service_group.get("service_name"),
+                                            "payment_code": best_service.get("pay_in"),
+                                            "fx_rate": best_service.get("fx_rate"),
+                                            "fee": pay_group.get("gross_fee", 0),
+                                            "send_amount": pay_group.get("send_amount"),
+                                            "receive_amount": pay_group.get("receive_amount"),
+                                            "delivery_time": service_group.get("speed_days", 0),
+                                        }
+                                        break
+                                if best_option:
+                                    break
+                        
+                        if best_option:
+                            break
+
         return best_option
 
     def _find_service_group(self, data, pay_out_val, pay_in_val):

@@ -280,17 +280,29 @@ class MukuruProvider(RemittanceProvider):
         **kwargs
     ) -> Dict[str, Any]:
         """
-        Get a standardized quote for a money transfer.
-        """
-        from_country_code = kwargs.get("from_country_code")
-        if not from_country_code:
-            # Try to get the updated country mapping from API
-            country_mapping = self.get_supported_countries()
+        Get a quote for sending money from source_currency to target_country.
+        
+        Args:
+            amount: The amount to send
+            source_currency: The currency to send from (e.g. "USD")
+            target_country: The country to send to (e.g. "KE")
+            **kwargs: Additional parameters including from_country_code
             
-            # If API failed, fall back to hardcoded mapping
-            if not country_mapping:
-                country_mapping = COUNTRY_TO_CURRENCY
-                
+        Returns:
+            Standardized response with exchange rate, fees, and delivery options
+        """
+        # Ensure we have data to work with
+        if not amount or not source_currency or not target_country:
+            raise ValueError("Missing required parameters for Mukuru quote")
+            
+        # Extract from_country_code from kwargs if available
+        from_country_code = kwargs.pop('from_country', None) or kwargs.pop('from_country_code', None)
+        
+        # If not explicitly provided, try to determine from source_currency
+        if not from_country_code:
+            # Try to derive country from currency
+            country_mapping = self.COUNTRY_TO_CURRENCY
+            
             # Look up country code based on currency
             for cc, cur in country_mapping.items():
                 if cur.upper() == source_currency.upper():
@@ -299,15 +311,26 @@ class MukuruProvider(RemittanceProvider):
                     
             # Default to South Africa if no match found
             if not from_country_code:
-                from_country_code = "ZA"
+                # Common currency mappings for major source countries
+                currency_to_country = {
+                    "USD": "US",
+                    "GBP": "GB",
+                    "EUR": "DE",  # Default to Germany for Euro
+                    "ZAR": "ZA",
+                    "CAD": "CA",
+                    "AUD": "AU"
+                }
+                from_country_code = currency_to_country.get(source_currency.upper(), "ZA")
 
+        # Call the exchange rate data method without duplicating from_country_code
+        # since it's now passed as a named parameter
         local_result = self._get_exchange_rate_data(
             send_amount=amount,
             send_currency=source_currency,
             receive_country=target_country,
             from_country_code=from_country_code,
-            delivery_method=kwargs.get("delivery_method"),
-            **kwargs
+            delivery_method=kwargs.get("delivery_method")
+            # Do NOT pass **kwargs here to avoid parameter duplication
         )
 
         if kwargs.get("include_raw", False):
@@ -322,12 +345,39 @@ class MukuruProvider(RemittanceProvider):
         receive_country: str,
         **kwargs
     ) -> Dict[str, Any]:
+        """
+        Get exchange rate from send_currency to receive_country.
+        
+        Args:
+            send_amount: The amount to send
+            send_currency: The currency to send from (e.g. "USD")
+            receive_country: The country to send to (e.g. "KE")
+            
+        Returns:
+            Response containing exchange rate data
+        """
+        # Extract from_country_code from kwargs to avoid duplicate parameters
+        from_country_code = kwargs.pop('from_country', None) or kwargs.pop('from_country_code', None)
+        
+        # Similar currency-to-country mapping as in get_quote
+        if not from_country_code:
+            currency_to_country = {
+                "USD": "US",
+                "GBP": "GB",
+                "EUR": "DE",
+                "ZAR": "ZA",
+                "CAD": "CA",
+                "AUD": "AU"
+            }
+            from_country_code = currency_to_country.get(send_currency.upper(), "ZA")
+        
         local_result = self._get_exchange_rate_data(
             send_amount=send_amount,
             send_currency=send_currency,
             receive_country=receive_country,
-            delivery_method=kwargs.get("delivery_method"),
-            **kwargs
+            from_country_code=from_country_code,
+            delivery_method=kwargs.get("delivery_method")
+            # Again, don't pass the full **kwargs to avoid duplication
         )
 
         if kwargs.get("include_raw", False):

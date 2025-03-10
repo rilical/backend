@@ -21,12 +21,15 @@ class DahabshiilProvider(RemittanceProvider):
 
     BASE_URL = "https://apigw-us.dahabshiil.com/remit/transaction"
     GET_CHARGES_ENDPOINT = "/get-charges-anonymous"
+    # Default delivery time in minutes (24 hours)
+    DEFAULT_DELIVERY_TIME = 1440
 
     def __init__(self, name="dahabshiil"):
         """Initialize the Dahabshiil provider."""
         super().__init__(name=name, base_url=self.BASE_URL)
         self.session = requests.Session()
 
+        # Update headers based on actual request headers
         self.session.headers.update({
             "User-Agent": (
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -40,7 +43,8 @@ class DahabshiilProvider(RemittanceProvider):
             "Sec-Fetch-Site": "same-site",
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Dest": "empty",
-            "Origin": "https://www.dahabshiil.com"
+            "Origin": "https://www.dahabshiil.com",
+            "Priority": "u=3, i"
         })
         
         self.logger = logging.getLogger(f"providers.{name}")
@@ -54,9 +58,23 @@ class DahabshiilProvider(RemittanceProvider):
     ) -> List[Dict[str, Any]]:
         """
         Return the list of delivery methods (bank deposit, mobile wallet, etc.).
-        For simplicity, we'll let the aggregator handle method selection.
         """
-        return []
+        return [
+            {
+                "id": "Mobile Transfer",
+                "name": "Mobile Transfer",
+                "description": "Send to mobile wallet",
+                "fee": 0.0,
+                "delivery_time_minutes": self.DEFAULT_DELIVERY_TIME
+            },
+            {
+                "id": "Cash Pickup",
+                "name": "Cash Pickup",
+                "description": "Recipient picks up cash at agent location",
+                "fee": 0.0,
+                "delivery_time_minutes": self.DEFAULT_DELIVERY_TIME
+            }
+        ]
 
     def get_quote(
         self,
@@ -78,37 +96,45 @@ class DahabshiilProvider(RemittanceProvider):
             dest_currency: Destination currency code (e.g., "KES")
             source_country: Source country code (e.g., "US")
             dest_country: Destination country code (e.g., "KE")
-            delivery_method: Method of delivery (ignored here)
-            payment_method: Method of payment (ignored here)
+            delivery_method: Method of delivery (default: Mobile Transfer)
+            payment_method: Method of payment 
             **kwargs: Additional parameters (e.g. include_raw=True)
 
         Returns:
             Dictionary containing aggregator-standard quote information.
         """
+        # Default values
+        if not delivery_method:
+            delivery_method = "Mobile Transfer"
+        
+        # Default payment method
+        if not payment_method:
+            payment_method = "bank"
+        
         # Local dictionary for initial result
         quote_result = {
             "success": False,
             "send_amount": float(amount),
             "source_currency": source_currency.upper(),
             "destination_currency": dest_currency.upper(),
-            "exchange_rate": None,
-            "fee": None,
-            "destination_amount": None,
-            "total_cost": None,
-            "error_message": None,
+            "exchange_rate": 0.0,
+            "fee": 0.0,
+            "destination_amount": 0.0,
             "delivery_method": delivery_method,
             "payment_method": payment_method,
+            "delivery_time_minutes": self.DEFAULT_DELIVERY_TIME,
+            "error_message": None,
         }
         
         try:
-            # Build query params as you described for the GET request
+            # Build query params based on the successful curl request
             params = {
                 "source_country_code": source_country.upper(),
                 "destination_country_iso2": dest_country.upper(),
                 "amount_type": "SOURCE",
-                "amount": str(amount),
+                "amount": f"{amount:.2f}",
                 "destination_currency": dest_currency.upper(),
-                "type": "Mobile Transfer"  # default to "Mobile Transfer"
+                "type": delivery_method
             }
             
             self.logger.info(f"Dahabshiil request: {params}")
@@ -122,10 +148,9 @@ class DahabshiilProvider(RemittanceProvider):
             response.raise_for_status()
 
             data = response.json()
-            self.logger.info(f"Dahabshiil response: {data}")
+            self.logger.debug(f"Dahabshiil response: {data}")
 
-            # Example success structure: 
-            # {"status": "Success", "code": 200, "data": {"charges": {...}}}
+            # Check for success based on the provided sample response
             if (
                 data.get("status") == "Success"
                 and data.get("code") == 200
@@ -138,14 +163,14 @@ class DahabshiilProvider(RemittanceProvider):
                 exchange_rate = Decimal(str(charges.get("rate", 0)))
                 fee = Decimal(str(charges.get("commission", 0)))
                 receive_amount = Decimal(str(charges.get("destination_amount", 0)))
-                total_cost = send_amount + fee
 
+                # Update quote result with successful response data
                 quote_result.update({
                     "success": True,
+                    "send_amount": float(send_amount),
                     "exchange_rate": float(exchange_rate),
                     "fee": float(fee),
                     "destination_amount": float(receive_amount),
-                    "total_cost": float(total_cost),
                 })
 
                 # If aggregator wants raw response for debugging
@@ -171,123 +196,98 @@ class DahabshiilProvider(RemittanceProvider):
             self.logger.error(error_msg)
             quote_result["error_message"] = error_msg
 
-        # If aggregator specifically wants the unstandardized data with raw...
-        if kwargs.get("include_raw", False):
-            # Return the aggregator-ready dictionary but let them see raw
-            return self.standardize_response(
-                raw_result=quote_result,
-                provider_specific_data=True
-            )
-        else:
-            # Return aggregator-ready dictionary
-            return self.standardize_response(raw_result=quote_result)
+        # Return standardized response for the aggregator
+        return self.standardize_response(raw_result=quote_result, 
+                                          provider_specific_data=kwargs.get("include_raw", False))
 
     def get_exchange_rate(
         self,
-        source_currency: str,
+        send_amount: Decimal,
+        send_currency: str,
         target_currency: str,
-        source_country: str,
-        target_country: str,
-        amount: Decimal = Decimal("1000")
+        **kwargs
     ) -> Dict[str, Any]:
         """
         Get current exchange rate for a currency pair using `get_quote`.
-
-        The aggregator typically expects:
-        {
-          "success": bool,
-          "error_message": str|None,
-          "source_currency": ...,
-          "target_currency": ...,
-          "rate": float|None,
-          "fee": float|None,
-          "timestamp": iso-string,
-          "provider_id": "dahabshiil"
-        }
+        
+        Implementation adheres to the aggregator's expected method signature.
         """
         try:
-            # We'll call get_quote with include_raw=True, then re-map fields
+            # Extract source and target countries from kwargs if provided, otherwise use defaults
+            source_country = kwargs.get('source_country', 'US')
+            target_country = kwargs.get('target_country', self._get_default_country_for_currency(target_currency))
+            
+            # Call get_quote to obtain exchange rate information
             quote = self.get_quote(
-                amount=amount,
-                source_currency=source_currency,
+                amount=send_amount,
+                source_currency=send_currency,
                 dest_currency=target_currency,
                 source_country=source_country,
-                dest_country=target_country,
-                include_raw=True
+                dest_country=target_country
             )
-            # Now build a minimal dict with aggregator's expected get_exchange_rate fields
-            # note aggregator looks for "rate" not "exchange_rate"
-            rate_info = {
-                "success": quote.get("success", False),
-                "error_message": quote.get("error_message"),
-                "source_currency": quote.get("source_currency", ""),
-                "target_currency": quote.get("destination_currency", ""),
-                "rate": quote.get("exchange_rate"),
-                "fee": quote.get("fee"),
-                # aggregator also expects a timestamp
-                "timestamp": datetime.now().isoformat()
-            }
-            return self.standardize_response(raw_result=rate_info)
+            
+            # Return the standardized response as-is (it already contains all necessary fields)
+            return quote
+            
         except Exception as exc:
             logger.error(f"Failed to get exchange rate: {exc}", exc_info=True)
-            # Return aggregator shape with error
+            # Return standardized error response
             error_result = {
+                "provider_id": self.name,
                 "success": False,
                 "error_message": str(exc),
-                "source_currency": source_currency,
-                "target_currency": target_currency,
-                "rate": None,
-                "fee": None,
+                "source_currency": send_currency,
+                "destination_currency": target_currency,
+                "exchange_rate": 0.0,
+                "fee": 0.0,
+                "send_amount": float(send_amount),
+                "destination_amount": 0.0,
                 "timestamp": datetime.now().isoformat()
             }
-            return self.standardize_response(raw_result=error_result)
+            return error_result
+
+    def _get_default_country_for_currency(self, currency_code: str) -> str:
+        """Return a default country code for a given currency code."""
+        currency_to_country = {
+            'KES': 'KE',  # Kenya
+            'USD': 'US',  # United States
+            'GBP': 'GB',  # United Kingdom
+            'EUR': 'DE',  # Germany/Eurozone
+            'CAD': 'CA',  # Canada
+            'AUD': 'AU',  # Australia
+            'INR': 'IN',  # India
+            'NGN': 'NG',  # Nigeria
+            'UGX': 'UG',  # Uganda
+            'TZS': 'TZ',  # Tanzania
+            'ETB': 'ET',  # Ethiopia
+            'SOS': 'SO',  # Somalia
+            'DJF': 'DJ',  # Djibouti
+        }
+        return currency_to_country.get(currency_code.upper(), 'US')  # Default to US if not found
 
     def standardize_response(self, raw_result=None, provider_specific_data=False) -> Dict[str, Any]:
         """
         Standardize the response shape for aggregator usage.
-
-        We pass in raw_result containing keys like:
-          - "success", "error_message", "send_amount", "source_currency", ...
-          - "exchange_rate", "fee", "destination_amount", "total_cost", ...
-          - "rate" (for get_exchange_rate)
-          - Possibly "raw_response" if include_raw=True
+        
+        The standardized format matches the aggregator's expected schema.
         """
         if raw_result is None:
             raw_result = {}
-
-        # aggregator expects "rate" in get_exchange_rate responses,
-        # plus "exchange_rate" for quote, so we'll unify them:
-        # "rate" = raw_result.get("exchange_rate") or raw_result.get("rate")
-        final_rate = raw_result.get("rate")
-        if final_rate is None:  # fallback
-            final_rate = raw_result.get("exchange_rate")
-
-        # aggregator also wants "target_currency" instead of just "destination_currency"
-        final_target_currency = raw_result.get("target_currency")
-        if not final_target_currency:
-            final_target_currency = raw_result.get("destination_currency", "")
 
         # Build the aggregator-standard dictionary
         standardized = {
             "provider_id": self.name,
             "success": raw_result.get("success", False),
             "error_message": raw_result.get("error_message"),
-
-            # For quotes
             "send_amount": raw_result.get("send_amount", 0.0),
             "source_currency": raw_result.get("source_currency", ""),
-            "destination_amount": raw_result.get("destination_amount"),
+            "destination_amount": raw_result.get("destination_amount", 0.0),
             "destination_currency": raw_result.get("destination_currency", ""),
-            "exchange_rate": raw_result.get("exchange_rate"),
-
-            # For aggregator's get_exchange_rate test
-            "rate": final_rate,
-            "target_currency": final_target_currency,
-
-            "fee": raw_result.get("fee"),
-            "payment_method": raw_result.get("payment_method"),
-            "delivery_method": raw_result.get("delivery_method"),
-            "delivery_time_minutes": raw_result.get("delivery_time_minutes"),
+            "exchange_rate": raw_result.get("exchange_rate", 0.0),
+            "fee": raw_result.get("fee", 0.0),
+            "payment_method": raw_result.get("payment_method", "bank"),
+            "delivery_method": raw_result.get("delivery_method", "Mobile Transfer"),
+            "delivery_time_minutes": raw_result.get("delivery_time_minutes", self.DEFAULT_DELIVERY_TIME),
             "timestamp": raw_result.get("timestamp", datetime.now().isoformat()),
         }
 

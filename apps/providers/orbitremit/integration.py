@@ -204,9 +204,10 @@ class OrbitRemitProvider(RemittanceProvider):
         }
 
         try:
+            # Update parameter names to match the API's expected format
             payload = {
-                'send_currency': send_currency.upper(),
-                'payout_currency': dest_currency.upper(),
+                'send': send_currency.upper(),
+                'payout': dest_currency.upper(),
                 'send_amount': str(float(amount)) if amount else '1000.00'
             }
             headers = {
@@ -234,10 +235,19 @@ class OrbitRemitProvider(RemittanceProvider):
             data = response.json()
             logger.info(f"OrbitRemit rates response: {data}")
 
+            # Update response parsing to match expected format
+            # Check for the new response format first
+            if data.get('code') == 200 and data.get('status') == 'success' and 'data' in data:
+                if 'rate' in data['data']:
+                    local_result['success'] = True
+                    local_result['rate'] = Decimal(str(data['data']['rate']))
+                    return local_result
+                
+            # Fallback to previous response handling patterns
             # Extract rate from nested structure
             # Typical new structure => data->data->attributes->rate
             # or top-level 'data': { 'attributes': {...} }
-            if data.get('type') == 'success' and 'data' in data:
+            elif data.get('type') == 'success' and 'data' in data:
                 attr = data['data'].get('data', {}).get('attributes', {})
                 rate_val = attr.get('rate') or attr.get('promotion_rate')
             else:
@@ -312,10 +322,10 @@ class OrbitRemitProvider(RemittanceProvider):
 
         try:
             params = {
-                "send_currency": send_currency.upper(),
-                "payout_currency": payout_currency.upper(),
+                "send": send_currency.upper(),
+                "payout": payout_currency.upper(),
                 "amount": str(float(send_amount)),
-                "recipient_type": recipient_type
+                "type": recipient_type
             }
             logger.info(f"OrbitRemit fees request to {endpoint_url}, params={params}")
             timeout = getattr(self, 'timeout', 15)
@@ -325,8 +335,15 @@ class OrbitRemitProvider(RemittanceProvider):
             data = resp.json()
             logger.info(f"OrbitRemit fees response: {data}")
 
-            # Check for direct 'fee'
-            if "fee" in data:
+            # Update response parsing to match the sample response structure
+            if "code" in data and data["code"] == 200 and data["status"] == "success" and "data" in data:
+                if "fee" in data["data"]:
+                    result["fee"] = float(data["data"]["fee"])
+                    result["success"] = True
+                else:
+                    result["error_message"] = f"Could not locate 'fee' in data: {data}"
+            # Keep the previous parsing logic as fallback
+            elif "fee" in data:
                 result["fee"] = float(data["fee"])
                 result["success"] = True
             elif "data" in data and isinstance(data["data"], dict):
@@ -385,6 +402,18 @@ class OrbitRemitProvider(RemittanceProvider):
             local_result["error_message"] = "Missing required params: amount, source_currency, dest_currency"
             return self.standardize_response(local_result)
 
+        # Validate supported corridor
+        src_curr = source_currency.upper()
+        dst_curr = dest_currency.upper()
+        
+        if src_curr not in self.SUPPORTED_SOURCE_CURRENCIES:
+            local_result["error_message"] = f"Unsupported source currency: {src_curr}"
+            return self.standardize_response(local_result)
+            
+        if src_curr in self.SUPPORTED_CORRIDORS and dst_curr not in self.SUPPORTED_CORRIDORS[src_curr]:
+            local_result["error_message"] = f"Unsupported corridor: {src_curr}->{dst_curr}"
+            return self.standardize_response(local_result)
+
         # 1) Attempt to get fee
         try:
             fee_info = self.get_fee_info(
@@ -395,36 +424,37 @@ class OrbitRemitProvider(RemittanceProvider):
             if fee_info.get("success"):
                 fee_val = Decimal(str(fee_info.get("fee", "6.00")))
             else:
-                fee_val = self.FIXED_FEES.get(source_currency.upper(), Decimal("6.00"))  # fallback
+                logger.warning(f"Fee call returned error: {fee_info.get('error_message')}")
+                fee_val = self.FIXED_FEES.get(src_curr, Decimal("6.00"))  # fallback
         except Exception as e:
             logger.warning(f"Fee call failed: {str(e)}")
-            fee_val = self.FIXED_FEES.get(source_currency.upper(), Decimal("6.00"))  # fallback
+            fee_val = self.FIXED_FEES.get(src_curr, Decimal("6.00"))  # fallback
 
         local_result["fee"] = float(fee_val)
 
-        # 2) Attempt to get rate from /api/rates
-        try:
-            rate_data = self.get_rates(source_currency, dest_currency, amount)
-            if rate_data.get("success"):
-                rate = rate_data.get("rate")
-            else:
-                rate = None
-        except Exception as e:
-            logger.warning(f"Rate call failed: {str(e)}")
-            rate = None
-
-        # 3) If no rate from live, fallback to embedded
+        # 2) Use embedded exchange rates as the API seems to be unreliable
+        logger.info("Using embedded exchange rates fallback")
+        src_map = self.EXCHANGE_RATES.get(src_curr, {})
+        rate = src_map.get(dst_curr)
+        
         if not rate:
-            logger.info("Using embedded exchange rates fallback")
-            src_map = self.EXCHANGE_RATES.get(source_currency.upper(), {})
-            rate = src_map.get(dest_currency.upper())
+            # Try API as last resort
+            try:
+                rate_data = self.get_rates(source_currency, dest_currency, amount)
+                if rate_data.get("success"):
+                    rate = rate_data.get("rate")
+                else:
+                    logger.warning(f"Rate call returned error: {rate_data.get('error_message')}")
+            except Exception as e:
+                logger.warning(f"Rate call failed: {str(e)}")
+            
             if not rate:
-                local_result["error_message"] = f"No exchange rate found for {source_currency}->{dest_currency}"
+                local_result["error_message"] = f"No exchange rate found for {src_curr}->{dst_curr}"
                 return self.standardize_response(local_result)
 
         local_result["exchange_rate"] = float(rate)
 
-        # 4) Calculate destination amount
+        # 3) Calculate destination amount
         send_amount_dec = Decimal(str(amount))
         adj_send_amount = send_amount_dec - fee_val
         if adj_send_amount < 0:
