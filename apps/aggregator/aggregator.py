@@ -483,25 +483,3 @@ class Aggregator:
             "successful_providers": len(all_quotes),
             "timestamp": datetime.datetime.now().isoformat()
         }
-
-
-def sample_usage():
-    from decimal import Decimal
-    aggregator_result = Aggregator.get_all_quotes(
-        source_country="US",
-        dest_country="IN",
-        source_currency="USD",
-        dest_currency="INR",
-        amount=Decimal("1000"),
-        sort_by="best_rate"
-    )
-
-    print(f"Global success: {aggregator_result['success']}")
-    print(f"Found {len(aggregator_result['results'])} quotes")
-
-    for i, quote in enumerate(aggregator_result["results"], 1):
-        if quote.get('success'):
-            print(f"{i}. {quote.get('provider_id')}: rate={quote.get('exchange_rate')}, "
-                  f"fee={quote.get('fee')}, delivery={quote.get('delivery_time_minutes')} min")
-        else:
-            print(f"{i}. {quote.get('provider_id')}: FAILED - {quote.get('error_message')}")

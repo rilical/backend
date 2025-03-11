@@ -1,12 +1,12 @@
 # RemitScout Quotes System
 
-This module implements the quote storage, caching, and API systems for RemitScout.
+Core quote storage, caching, and API systems for RemitScout.
 
 ## Features
 
-- RESTful API for retrieving remittance quotes
-- PostgreSQL database storage for quote data
-- Redis caching system with intelligent invalidation
+- RESTful API for remittance quotes
+- PostgreSQL storage for quote data
+- Redis caching with intelligent invalidation
 - Signal-based cache updates
 - Management commands for cache control
 
@@ -14,45 +14,17 @@ This module implements the quote storage, caching, and API systems for RemitScou
 
 ### Database Models
 
-- `Provider`: Stores information about remittance providers
-- `FeeQuote`: Stores fee and rate information for specific corridors
-- `QuoteQueryLog`: Logs all quote requests for analytics
+- `Provider`: Stores remittance provider information
+- `FeeQuote`: Stores fees and rates for specific corridors
+- `QuoteQueryLog`: Logs quote requests for analytics
 
 ### Caching System
 
-The caching system uses Redis for high-performance in-memory storage with the following features:
-
-#### Cache Key Design
-
-Cache keys follow a structured pattern:
-
-- Quote caches: `v1:fee:{source_country}:{dest_country}:{source_currency}:{dest_currency}:{amount}`
-- Corridor caches: `corridor:{source_country}:{dest_country}`
-- Provider caches: `provider:{provider_id}`
-
-The `v1:` prefix allows for version upgrades without breaking existing cached data.
-
-#### TTL and Jitter
-
-- Different TTLs are set for different types of data:
-  - Quotes: 30 minutes
-  - Provider data: 24 hours
-  - Corridor info: 12 hours
-- Each TTL has jitter (randomization) to prevent the "thundering herd" problem
-
-#### Invalidation Strategies
-
-1. **Automatic invalidation** via signals:
-   - When a `FeeQuote` is saved or deleted, related cache entries are automatically invalidated
-   - When a `Provider` is updated, related cache entries are invalidated
-
-2. **Manual invalidation** via management commands:
-   - `python manage.py cache_utils --action invalidate_all` - Invalidate all quote caches
-   - `python manage.py cache_utils --action invalidate_corridor --source_country US --dest_country MX` - Invalidate specific corridor
-   - `python manage.py cache_utils --action invalidate_provider --provider_id XoomProvider` - Invalidate specific provider
-
-3. **Preloading** for performance:
-   - `python manage.py cache_utils --action preload_corridors` - Preload corridor availability information
+Cache keys:
+- Quote: `v1:fee:{source_country}:{dest_country}:{source_currency}:{dest_currency}:{amount}`
+- Corridor: `corridor:{source_country}:{dest_country}`
+- Provider: `provider:{provider_id}`
+- Corridor rate: `corridor_rate:{source_country}:{dest_country}:{source_currency}:{dest_currency}`
 
 ## API Usage
 

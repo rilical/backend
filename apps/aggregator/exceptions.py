@@ -1,6 +1,4 @@
-"""
-Exceptions for the aggregator module
-"""
+"""Exceptions for the aggregator module"""
 
 from typing import Dict, Any, Optional
 
@@ -15,28 +13,28 @@ class AggregatorError(Exception):
 
 
 class NoProvidersAvailableError(AggregatorError):
-    """Raised when no providers are available for a particular corridor."""
+    """No providers available for a corridor."""
     
     def __init__(self, message: str = "No providers available for this corridor", details: Optional[Dict[str, Any]] = None):
         super().__init__(message, details)
 
 
 class QuoteFetchError(AggregatorError):
-    """Raised when there is an error fetching quotes from providers."""
+    """Error fetching quotes from providers."""
     
     def __init__(self, message: str = "Error fetching quotes from providers", details: Optional[Dict[str, Any]] = None):
         super().__init__(message, details)
 
 
 class InvalidCorridorError(AggregatorError):
-    """Raised when an invalid corridor is specified."""
+    """Invalid corridor specified."""
     
     def __init__(self, message: str = "Invalid corridor specified", details: Optional[Dict[str, Any]] = None):
         super().__init__(message, details)
 
 
 class NoSuccessfulQuotesError(AggregatorError):
-    """Raised when all provider quotes fail."""
+    """All provider quotes failed."""
     
     def __init__(self, message: str = "No successful quotes were obtained", details: Optional[Dict[str, Any]] = None):
         super().__init__(message, details)

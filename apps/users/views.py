@@ -18,7 +18,7 @@ class UserViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     
     def get_queryset(self):
-        """Users can only see their own profile."""
+        """Filter queryset based on permissions."""
         user = self.request.user
         if user.is_staff:
             return User.objects.all()
@@ -26,7 +26,7 @@ class UserViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def me(self, request):
-        """Get the current user's data."""
+        """Get current user's data."""
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
 
@@ -37,70 +37,77 @@ class APIKeyViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     
     def get_queryset(self):
-        """Users can only see their own API keys."""
+        """Filter to only show user's own API keys."""
         return APIKey.objects.filter(user=self.request.user)
     
     def perform_create(self, serializer):
-        """Generate a new API key and save it."""
-        # Generate a secure random key
-        random_key = uuid.uuid4().hex + uuid.uuid4().hex
+        """Create new API key for the user."""
+        # Generate a secure API key
+        api_key = base64.b64encode(uuid.uuid4().bytes).decode('utf-8')
         
-        # Save with the generated key
+        # Create a key prefix for identification
+        prefix = api_key[:8]
+        
+        # Hash the API key for storage
+        hashed_key = hashlib.sha256(api_key.encode('utf-8')).hexdigest()
+        
         serializer.save(
             user=self.request.user,
-            key=random_key
+            key_prefix=prefix,
+            hashed_key=hashed_key
         )
+        
+        # Return the API key to the user (only time it will be visible)
+        serializer.instance.raw_key = api_key
     
     @action(detail=False, methods=['post'])
     def regenerate(self, request):
-        """Regenerate an API key."""
-        key_id = request.data.get('key_id')
-        
+        """Regenerate API key for a user."""
         try:
-            api_key = APIKey.objects.get(id=key_id, user=request.user)
+            # Find the user's current API key
+            api_key_obj = APIKey.objects.get(
+                user=request.user,
+                key_prefix=request.data.get('key_prefix')
+            )
             
-            # Generate a new key
-            new_key = uuid.uuid4().hex + uuid.uuid4().hex
-            api_key.key = new_key
-            api_key.save()
+            # Generate a new API key
+            new_api_key = base64.b64encode(uuid.uuid4().bytes).decode('utf-8')
+            new_prefix = new_api_key[:8]
+            new_hashed_key = hashlib.sha256(new_api_key.encode('utf-8')).hexdigest()
             
-            serializer = self.get_serializer(api_key)
-            return Response(serializer.data)
+            # Update the object
+            api_key_obj.key_prefix = new_prefix
+            api_key_obj.hashed_key = new_hashed_key
+            api_key_obj.created_at = timezone.now()
+            api_key_obj.save()
+            
+            # Return the new key to the user
+            return Response({
+                'key_prefix': new_prefix,
+                'api_key': new_api_key,
+                'created_at': api_key_obj.created_at
+            })
             
         except APIKey.DoesNotExist:
             return Response(
-                {"error": "API key not found"},
+                {'error': 'API key not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
 
 
 class APIKeyAuthentication(permissions.BasePermission):
-    """Permission class to authenticate using API key."""
-    
+    """Permission class for API key authentication."""
     def has_permission(self, request, view):
-        """Check if the request has a valid API key."""
-        api_key = request.META.get('HTTP_X_API_KEY') or request.query_params.get('api_key')
-        
+        api_key = request.META.get('HTTP_X_API_KEY', '')
         if not api_key:
             return False
+            
+        prefix = api_key[:8]
+        hashed_key = hashlib.sha256(api_key.encode('utf-8')).hexdigest()
         
         try:
-            # Look up the API key
-            key_obj = APIKey.objects.get(key=api_key, is_active=True)
-            
-            # Update usage statistics
-            key_obj.last_used = timezone.now()
-            key_obj.save()
-            
-            # Update profile statistics
-            profile = key_obj.user.profile
-            profile.api_requests_count += 1
-            profile.last_api_request = timezone.now()
-            profile.save()
-            
-            # Set the authenticated user
+            key_obj = APIKey.objects.get(key_prefix=prefix, hashed_key=hashed_key)
             request.user = key_obj.user
             return True
-            
         except APIKey.DoesNotExist:
             return False

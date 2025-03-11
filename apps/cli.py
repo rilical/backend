@@ -34,168 +34,155 @@ from apps.aggregator.aggregator import Aggregator
 from apps.aggregator.configurator import AggregatorConfig, get_configured_aggregator_params
 
 def parse_arguments():
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description='RemitScout - Compare remittance rates across providers')
+    """Parse command-line arguments for RemitScout CLI."""
+    parser = argparse.ArgumentParser(description='RemitScout CLI - Compare remittance providers')
     
-    # Required arguments
-    parser.add_argument('--amount', type=float, required=True, help='Amount to send')
-    parser.add_argument('--from-country', type=str, required=True, help='Source country code (e.g., US)')
-    parser.add_argument('--to-country', type=str, required=True, help='Destination country code (e.g., IN)')
-    parser.add_argument('--from-currency', type=str, required=True, help='Source currency code (e.g., USD)')
-    parser.add_argument('--to-currency', type=str, required=True, help='Destination currency code (e.g., INR)')
+    # Required parameters
+    parser.add_argument('--amount', type=float, help='Amount to send')
+    parser.add_argument('--from-country', help='Source country code (e.g., US)')
+    parser.add_argument('--to-country', help='Destination country code (e.g., MX)')
+    parser.add_argument('--from-currency', help='Source currency code (e.g., USD)')
+    parser.add_argument('--to-currency', help='Destination currency code (e.g., MXN)')
     
     # Optional filters
-    parser.add_argument('--sort-by', type=str, choices=['best_rate', 'lowest_fee', 'fastest_time'], 
-                        default='best_rate', help='How to sort the results')
-    parser.add_argument('--max-fee', type=float, help='Maximum fee to consider')
-    parser.add_argument('--max-delivery-time', type=int, help='Maximum delivery time in hours')
-    parser.add_argument('--exclude-providers', type=str, help='Comma-separated list of providers to exclude')
-    parser.add_argument('--include-only', type=str, help='Comma-separated list of providers to include (excludes all others)')
+    parser.add_argument('--sort-by', choices=['best_rate', 'lowest_fee', 'fastest_time'], 
+                        default='best_rate', help='How to sort results')
+    parser.add_argument('--max-fee', type=float, help='Maximum fee (in source currency)')
+    parser.add_argument('--max-delivery-time', type=int, help='Maximum delivery time (in hours)')
     
-    # Output options
+    # Provider selection
+    parser.add_argument('--list-providers', action='store_true', help='List all available providers')
+    parser.add_argument('--include-only', help='Comma-separated list of providers to include')
+    parser.add_argument('--exclude-providers', help='Comma-separated list of providers to exclude')
+    
+    # Output format
     parser.add_argument('--json', action='store_true', help='Output in JSON format')
-    parser.add_argument('--output-file', type=str, help='File to save output to')
-    
-    # Advanced options
-    parser.add_argument('--timeout', type=int, default=30, help='Timeout for provider requests in seconds')
-    parser.add_argument('--max-workers', type=int, default=5, help='Maximum number of concurrent requests')
-    parser.add_argument('--disable-cache', action='store_true', help='Disable caching of results')
-    
-    # Provider configuration
-    parser.add_argument('--list-providers', action='store_true', help='List all available providers and exit')
-    parser.add_argument('--save-config', action='store_true', help='Save the current configuration for future use')
+    parser.add_argument('--output-file', help='Save output to specified file')
     
     return parser.parse_args()
 
 def configure_aggregator(args):
-    """Configure the aggregator based on command line arguments."""
-    # Create or load configurator
-    config = AggregatorConfig()
+    """Configure the aggregator based on command-line args."""
+    from apps.aggregator.aggregator import Aggregator
     
-    # Handle provider inclusions/exclusions
-    if args.exclude_providers:
-        excluded = [p.strip() for p in args.exclude_providers.split(',')]
-        for provider in excluded:
-            config.disable_provider(provider)
+    agg = Aggregator()
     
+    # Configure provider inclusion/exclusion
     if args.include_only:
-        included = [p.strip() for p in args.include_only.split(',')]
-        all_providers = config.get_all_available_providers()
-        for provider in all_providers:
-            if provider not in included:
-                config.disable_provider(provider)
+        providers_to_include = [p.strip() for p in args.include_only.split(',')]
+        agg.include_only_providers(providers_to_include)
     
-    # Set default sort
-    config.set_default_sort(args.sort_by)
+    if args.exclude_providers:
+        providers_to_exclude = [p.strip() for p in args.exclude_providers.split(',')]
+        agg.exclude_providers(providers_to_exclude)
     
-    # Set other parameters
-    config.set_default_timeout(args.timeout)
-    config.set_default_max_workers(args.max_workers)
-    
-    if args.disable_cache:
-        config.enable_caching(False)
-    
-    # Save configuration if requested
-    if args.save_config:
-        config._save_config()
-        print("Configuration saved for future use.")
-    
-    # Get parameters for aggregator
-    params = config.get_aggregator_params()
-    
-    # Add command-line specific parameters
-    if args.max_fee:
-        params['max_fee'] = args.max_fee
-    
-    if args.max_delivery_time:
-        params['max_delivery_time_minutes'] = args.max_delivery_time * 60
-    
-    return params
+    # Configure sorting
+    if args.sort_by == 'lowest_fee':
+        agg.sort_by_lowest_fee()
+    elif args.sort_by == 'fastest_time':
+        agg.sort_by_fastest_delivery()
+    else:  # Default to best_rate
+        agg.sort_by_best_rate()
+        
+    # Configure filters
+    filters = {}
+    if args.max_fee is not None:
+        filters['max_fee'] = Decimal(str(args.max_fee))
+        
+    if args.max_delivery_time is not None:
+        filters['max_delivery_time_minutes'] = args.max_delivery_time * 60
+        
+    if filters:
+        agg.set_filters(filters)
+        
+    return agg
 
 def list_available_providers():
-    """List all available providers."""
-    config = AggregatorConfig()
-    config.print_status()
-    sys.exit(0)
+    """List all available providers in the system."""
+    from apps.aggregator.aggregator import Aggregator
+    
+    agg = Aggregator()
+    providers = agg.list_all_providers()
+    return providers
 
 def format_output(result, json_output=False, output_file=None):
-    """Format and display the results."""
-    if not result['success']:
-        print(f"Error: {result.get('error', 'Unknown error')}")
-        return
-    
-    quotes = result['quotes']
-    if not quotes:
-        print("No quotes found matching your criteria.")
-        return
-    
+    """Format the output according to specified parameters."""
     if json_output:
-        output = json.dumps(result, indent=2, default=str)
-        if output_file:
-            with open(output_file, 'w') as f:
-                f.write(output)
-        else:
-            print(output)
-        return
-    
-    # Format for console output
-    table_data = []
-    for quote in quotes:
-        try:
-            row = [
-                quote['provider_name'],
-                f"{float(quote['exchange_rate']):.4f}" if quote['exchange_rate'] else "N/A",
-                f"{float(quote['fee']):.2f}" if quote['fee'] is not None else "N/A",
-                f"{float(quote['recipient_gets']):.2f}" if quote['recipient_gets'] else "N/A",
-                f"{int(quote['delivery_time_minutes']) / 60:.1f} hrs" if quote['delivery_time_minutes'] else "Unknown",
-                quote.get('payment_method', 'N/A')
-            ]
-            table_data.append(row)
-        except Exception as e:
-            logger.error(f"Error formatting quote: {e}")
-            continue
-    
-    # Print table
-    if table_data:
-        table = tabulate(
-            table_data,
-            headers=["Provider", "Rate", "Fee", "Recipient Gets", "Delivery Time", "Payment Method"],
-            tablefmt="grid"
-        )
-        
-        if output_file:
-            with open(output_file, 'w') as f:
-                f.write(table)
-        else:
-            print(table)
+        formatted_output = json.dumps(result, indent=2, default=str)
     else:
-        print("Failed to format any quotes. Try using --json for raw output.")
+        # Create tabular output
+        if not result.get('quotes'):
+            formatted_output = "No quotes found matching your criteria."
+        else:
+            table_data = []
+            for quote in result.get('quotes', []):
+                row = [
+                    quote.get('provider_name'),
+                    f"{quote.get('source_amount')} {quote.get('source_currency')}",
+                    f"{quote.get('destination_amount')} {quote.get('destination_currency')}",
+                    f"{quote.get('exchange_rate'):.4f}",
+                    f"{quote.get('fee')} {quote.get('source_currency')}",
+                    f"{quote.get('delivery_time_minutes') // 60}h" if quote.get('delivery_time_minutes') else "Unknown"
+                ]
+                table_data.append(row)
+            
+            headers = ["Provider", "Send", "Receive", "Rate", "Fee", "Time"]
+            formatted_output = tabulate(table_data, headers=headers, tablefmt="grid")
+            
+            # Add summary info
+            formatted_output += f"\n\nSearch: {result.get('source_amount')} {result.get('source_currency')} → {result.get('destination_currency')}"
+            formatted_output += f"\nFrom: {result.get('source_country')} To: {result.get('destination_country')}"
+            formatted_output += f"\nQuotes found: {len(result.get('quotes', []))}"
+            formatted_output += f"\nSorted by: {result.get('filters_applied', {}).get('sort_by', 'best_rate')}"
+    
+    # Output to file if specified
+    if output_file:
+        with open(output_file, 'w') as f:
+            f.write(formatted_output)
+        print(f"Results saved to {output_file}")
+    
+    return formatted_output
 
 def main():
-    """Main CLI function."""
+    """Main function for the RemitScout CLI."""
     args = parse_arguments()
     
-    # Handle special commands
+    # Just list providers and exit if requested
     if args.list_providers:
-        list_available_providers()
+        providers = list_available_providers()
+        print("\nAvailable Providers:")
+        for idx, provider in enumerate(providers, 1):
+            print(f"{idx}. {provider}")
+        return
     
-    # Configure aggregator
-    params = configure_aggregator(args)
+    # Ensure we have all required parameters
+    required_params = ['amount', 'from_country', 'to_country', 'from_currency', 'to_currency']
+    missing_params = [p.replace('_', '-') for p in required_params if getattr(args, p.lower()) is None]
     
-    # Initialize aggregator
-    aggregator = Aggregator(**params)
+    if missing_params:
+        print(f"Error: Missing required parameters: {', '.join(missing_params)}")
+        print("Use --help for usage information")
+        sys.exit(1)
     
-    # Get quotes
-    result = aggregator.get_quotes(
-        send_amount=Decimal(str(args.amount)),
-        source_country=args.from_country,
-        destination_country=args.to_country,
-        source_currency=args.from_currency,
-        destination_currency=args.to_currency
-    )
+    # Configure and run the aggregator
+    agg = configure_aggregator(args)
     
-    # Format and display output
-    format_output(result, args.json, args.output_file)
+    try:
+        result = agg.get_quotes(
+            source_country=args.from_country,
+            destination_country=args.to_country,
+            source_currency=args.from_currency,
+            destination_currency=args.to_currency,
+            source_amount=Decimal(str(args.amount))
+        )
+        
+        # Format and display the results
+        formatted_output = format_output(result, args.json, args.output_file)
+        print(formatted_output)
+        
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        sys.exit(1)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main() 

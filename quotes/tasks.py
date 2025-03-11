@@ -1,5 +1,10 @@
 """
 Celery tasks for the quotes app.
+
+This module defines scheduled background tasks that handle cache management,
+data cleanup, and other maintenance operations for the RemitScout quotes system.
+
+Version: 1.0
 """
 import logging
 from datetime import timedelta
@@ -20,110 +25,141 @@ logger = logging.getLogger(__name__)
 @shared_task
 def refresh_popular_corridor_caches():
     """
-    Identify popular corridors from recent queries and refresh their caches.
-    This task should run periodically (e.g., every hour) to ensure that
-    popular corridors have fresh data in the cache.
+    Refresh cache for popular corridors based on recent query patterns.
+    
+    This task analyzes user query logs to identify frequently requested
+    corridors and preloads their cache data. This improves user experience
+    by ensuring commonly accessed corridors have fresh data available.
+    
+    Schedule: Runs hourly
     """
     # Get corridors from the last 24 hours
     since = timezone.now() - timedelta(hours=24)
     
     # Count queries by corridor
-    popular_corridors = (
-        QuoteQueryLog.objects
-        .filter(timestamp__gte=since)
-        .values('source_country', 'destination_country')
-        .annotate(count=Count('id'))
-        .order_by('-count')[:20]  # Top 20 corridors
-    )
+    popular_corridors = QuoteQueryLog.objects.filter(
+        timestamp__gte=since
+    ).values(
+        'source_country', 'destination_country'
+    ).annotate(
+        count=Count('id')
+    ).order_by('-count')[:20]  # Top 20 corridors
     
-    # Preload corridor caches
+    # Refresh corridor caches
     for corridor in popular_corridors:
-        logger.info(f"Refreshing cache for popular corridor: {corridor['source_country']}->{corridor['destination_country']}")
+        source_country = corridor['source_country']
+        dest_country = corridor['destination_country']
+        logger.info(f"Refreshing popular corridor cache: {source_country} → {dest_country}")
         
-    # Refresh corridor availability
-    count = preload_corridor_caches()
-    logger.info(f"Refreshed {count} corridor caches")
-    
-    return f"Refreshed caches for {count} corridors"
+        # Get quotes for this corridor
+        quotes = FeeQuote.objects.filter(
+            source_country=source_country,
+            destination_country=dest_country
+        ).distinct('provider_id')[:5]  # Limit to 5 per provider
+        
+    logger.info(f"Refreshed caches for {len(popular_corridors)} popular corridors")
 
 
 @shared_task
 def refresh_popular_quote_caches():
     """
-    Identify the most queried quote parameters and refresh their caches.
-    This ensures that common quotes are always available from cache.
+    Refresh cache for popular quote requests based on recent query logs.
+    
+    This task identifies the most frequently requested quote combinations
+    (corridor + currencies + amount) and preloads their specific cache
+    entries to ensure fast response times for common requests.
+    
+    Schedule: Runs every 2 hours
     """
-    # Get popular queries from the last 24 hours
-    since = timezone.now() - timedelta(hours=24)
+    # Look at the last 48 hours
+    since = timezone.now() - timedelta(hours=48)
     
-    # Find popular queries
-    popular_queries = (
-        QuoteQueryLog.objects
-        .filter(timestamp__gte=since)
-        .values('source_country', 'destination_country', 'source_currency', 'destination_currency', 'send_amount')
-        .annotate(count=Count('id'))
-        .order_by('-count')[:50]  # Top 50 queries
-    )
+    # Find the most popular quote combinations
+    popular_quotes = QuoteQueryLog.objects.filter(
+        timestamp__gte=since
+    ).values(
+        'source_country', 'destination_country', 
+        'source_currency', 'destination_currency', 
+        'send_amount'
+    ).annotate(
+        count=Count('id')
+    ).order_by('-count')[:50]  # Top 50 combinations
     
-    # For each popular query, find a matching FeeQuote and preload its cache
-    for query in popular_queries:
+    # Preload each popular quote combination
+    for quote_params in popular_quotes:
         try:
-            # Find a matching quote
-            quotes = FeeQuote.objects.filter(
-                source_country=query['source_country'],
-                destination_country=query['destination_country'],
-                source_currency=query['source_currency'],
-                destination_currency=query['destination_currency'],
-                send_amount=query['send_amount']
-            ).order_by('-last_updated')
+            # Check if we have recent fee quotes for this
+            recent_quotes = FeeQuote.objects.filter(
+                source_country=quote_params['source_country'],
+                destination_country=quote_params['destination_country'],
+                source_currency=quote_params['source_currency'],
+                destination_currency=quote_params['destination_currency'],
+                send_amount=quote_params['send_amount'],
+                last_updated__gte=timezone.now() - timedelta(hours=24)
+            )
             
-            if quotes.exists():
-                logger.info(f"Refreshing cache for popular quote: {query['source_country']}->{query['destination_country']} ({query['send_amount']} {query['source_currency']})")
-                for quote in quotes[:5]:  # Preload top 5 provider quotes
+            if recent_quotes.exists():
+                logger.info(f"Preloading quote cache for {quote_params}")
+                for quote in recent_quotes:
                     preload_quote_cache(quote)
-                    
         except Exception as e:
-            logger.error(f"Error refreshing quote cache: {str(e)}")
+            logger.error(f"Error preloading quote cache: {str(e)}")
     
-    return f"Refreshed caches for {len(popular_queries)} popular queries"
+    logger.info(f"Refreshed caches for {len(popular_quotes)} popular quote combinations")
 
 
 @shared_task
 def clean_old_quotes():
     """
-    Remove quotes older than a certain threshold.
-    This helps keep the database size manageable.
+    Remove outdated quote data from the database.
+    
+    This task performs database maintenance by deleting fee quotes that are
+    outdated and unlikely to be relevant anymore. This keeps the database size
+    manageable and improves query performance.
+    
+    Schedule: Runs daily
     """
-    # Delete quotes older than 30 days
-    threshold = timezone.now() - timedelta(days=30)
+    # Keep quotes from the last 7 days
+    cutoff_date = timezone.now() - timedelta(days=7)
     
-    # Count quotes to delete
-    old_quotes_count = FeeQuote.objects.filter(last_updated__lt=threshold).count()
+    # Count quotes before deletion
+    total_quotes = FeeQuote.objects.count()
     
-    # Delete them
-    if old_quotes_count > 0:
-        FeeQuote.objects.filter(last_updated__lt=threshold).delete()
-        logger.info(f"Deleted {old_quotes_count} quotes older than 30 days")
+    # Delete old quotes
+    old_quotes = FeeQuote.objects.filter(last_updated__lt=cutoff_date)
+    deleted_count = old_quotes.count()
+    old_quotes.delete()
     
-    return f"Deleted {old_quotes_count} old quotes"
+    logger.info(f"Cleaned {deleted_count} old quotes (retained {total_quotes - deleted_count})")
+    
+    return deleted_count
 
 
 @shared_task
 def refresh_cache_daily():
     """
-    Perform a complete cache refresh once a day.
-    This ensures that long-lived cached data doesn't become stale.
+    Perform full cache refresh and database maintenance.
+    
+    This comprehensive task performs a full cache reset and ensures
+    fresh data is loaded for all active corridors. It also triggers
+    database cleanup operations.
+    
+    Schedule: Runs daily during off-peak hours
     """
-    try:
-        # Invalidate all caches
-        invalidate_all_quote_caches()
-        logger.info("Invalidated all quote caches for daily refresh")
-        
-        # Preload corridor caches
-        count = preload_corridor_caches()
-        logger.info(f"Preloaded {count} corridor caches for daily refresh")
-        
-        return "Daily cache refresh completed successfully"
-    except Exception as e:
-        logger.error(f"Error during daily cache refresh: {str(e)}")
-        return f"Error during daily cache refresh: {str(e)}" 
+    logger.info("Starting daily cache refresh")
+    
+    # First, clean up old quotes
+    cleaned = clean_old_quotes.delay()
+    
+    # Completely invalidate and rebuild the cache
+    invalidate_all_quote_caches()
+    
+    # Preload corridor availability info
+    preload_corridor_caches()
+    
+    # Refresh popular quotes
+    refresh_popular_quote_caches.delay()
+    
+    logger.info("Completed daily cache refresh")
+    
+    return True 

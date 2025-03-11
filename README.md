@@ -90,6 +90,8 @@ If you encounter issues:
 
 # RemitScout Backend
 
+**Version: 1.0**
+
 RemitScout is a powerful remittance comparison platform that helps users find the best deals when sending money internationally. This repository contains the backend services that power the RemitScout platform.
 
 ## Architecture Overview
@@ -98,8 +100,8 @@ RemitScout follows a modular architecture with the following main components:
 
 - **Provider Integrations**: Standardized interfaces to remittance service providers (e.g., Wise, Xoom, XE)
 - **Aggregator**: Core service that collects and compares quotes from multiple providers
-- **API Layer**: REST API for accessing remittance comparison features
-- **Utils**: Shared utility functions and models
+- **Quotes API**: REST API for accessing remittance comparison features
+- **Caching System**: Multi-level Redis-based caching for performance optimization
 
 ## Provider Integrations
 
@@ -134,10 +136,7 @@ apps/aggregator/
 ├── __init__.py
 ├── aggregator.py  # Main aggregator implementation
 ├── filters.py     # Filtering utilities
-├── examples.py    # Usage examples
-├── workflow.py    # Sample workflow
-├── cli.py         # Command-line interface
-└── README.md      # Aggregator-specific documentation
+└── exceptions.py  # Error handling
 ```
 
 ### Aggregator Features
@@ -146,11 +145,31 @@ apps/aggregator/
 - **Multiple Sorting Options**: Sort by best rate, lowest fee, or fastest delivery time
 - **Flexible Filtering**: Filter results based on various criteria
 - **Robust Error Handling**: Captures and reports provider-specific errors
-- **Comprehensive Results**: Returns detailed information from each provider
+
+## Caching System
+
+RemitScout uses a sophisticated multi-level caching system:
+
+```
+quotes/
+├── key_generators.py  # Cache key generation functions
+├── cache_utils.py     # Cache utility functions
+├── signals.py         # Cache invalidation signals
+└── tasks.py           # Scheduled cache maintenance tasks
+```
+
+### Caching Features
+
+- **Multi-level Caching**: Different caching strategies for different data types
+- **Automatic Invalidation**: Cache entries are automatically invalidated when data changes
+- **TTL Management**: Time-to-live settings with jitter to prevent cache stampedes
+- **Preloading**: Popular corridors and amounts are proactively cached
+
+See `docs/caching_implementation.md` for detailed documentation on the caching system.
 
 ## Supported Providers
 
-The platform now integrates with 20+ remittance providers, offering comprehensive coverage for global money transfers:
+The platform integrates with 20+ remittance providers, offering comprehensive coverage for global money transfers:
 
 | Provider | Status | Description |
 |----------|--------|-------------|
@@ -160,36 +179,39 @@ The platform now integrates with 20+ remittance providers, offering comprehensiv
 | RIA | ✅ Working | Global money transfer company |
 | Xoom (PayPal) | ✅ Working | PayPal's international money transfer service |
 | Paysend | ✅ Working | Global card-to-card money transfer platform |
-| AlAnsari | ⚠️ Testing | UAE-based exchange and transfer service |
-| Remitbee | ⚠️ Testing | Canada-based digital remittance service |
-| InstaRem | ⚠️ Testing | Singapore-based cross-border payment company |
-| Pangea | ⚠️ Testing | US-based mobile money transfer service |
-| KoronaPay | ⚠️ Testing | Russia-based money transfer service |
-| Mukuru | ⚠️ Testing | Africa-focused remittance provider |
-| Rewire | ⚠️ Testing | European digital banking service for migrants |
-| Sendwave | ⚠️ Testing | Mobile money transfer app focused on Africa |
-| WireBarley | ⚠️ Testing | South Korea-based global remittance service |
-| OrbitRemit | ⚠️ Testing | New Zealand-based money transfer service |
-| Dahabshiil | ⚠️ Testing | African money transfer operator |
-| SingX | ⚠️ Limited | Singapore-based money transfer service |
-| TransferGo | ⚠️ Limited | Digital remittance service for migrants |
-| Western Union | ❌ Pending | Global financial services company |
-
-Refer to the [Provider Support Matrix](apps/providers/README.md) for detailed information about corridor coverage and API capabilities for each provider.
+| Western Union | ✅ Working | Global financial services company |
+| TransferGo | ✅ Working | Digital remittance service for migrants |
+| SingX | ✅ Working | Singapore-based money transfer service |
+| Remitbee | ✅ Working | Canada-based digital remittance service |
+| InstaRem | ✅ Working | Singapore-based cross-border payment company |
+| Pangea | ✅ Working | US-based mobile money transfer service |
+| KoronaPay | ✅ Working | Russia-based money transfer service |
+| Mukuru | ✅ Working | Africa-focused remittance provider |
+| Rewire | ✅ Working | European digital banking service for migrants |
+| Sendwave | ✅ Working | Mobile money transfer app focused on Africa |
+| WireBarley | ✅ Working | South Korea-based global remittance service |
+| OrbitRemit | ✅ Working | New Zealand-based money transfer service |
+| Dahabshiil | ✅ Working | African money transfer operator |
+| Intermex | ✅ Working | Latin America-focused remittance provider |
+| Placid | ✅ Working | European remittance service |
+| RemitGuru | ✅ Working | India-focused remittance service |
+| AlAnsari | ✅ Working | UAE-based exchange and transfer service |
 
 ## Getting Started
 
 ### Prerequisites
 
 - Python 3.8+
+- PostgreSQL 12+
+- Redis 6+
 - pip
 
 ### Installation
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/remitscout-backend.git
-cd remitscout-backend
+git clone https://github.com/remitscout/backend.git
+cd backend
 ```
 
 2. Install dependencies:
@@ -197,43 +219,37 @@ cd remitscout-backend
 pip install -r requirements.txt
 ```
 
-3. Set up environment variables (create a `.env` file):
+3. Set up environment variables (create a `.env` file based on `.env.example`):
 ```
+# Database configuration
+DATABASE_URL=postgresql://user:password@localhost:5432/remitscout
+
+# Redis configuration
+REDIS_URL=redis://localhost:6379/0
+
+# Cache settings
+QUOTE_CACHE_TTL=1800
+CORRIDOR_CACHE_TTL=43200
+
 # Provider API keys
 WISE_API_KEY=your_wise_api_key
 XE_API_KEY=your_xe_api_key
-REMITLY_API_KEY=your_remitly_api_key
 # ... add other provider keys as needed
-
-# Other configuration
-LOG_LEVEL=INFO
 ```
 
-### Running the Examples
-
-To run the basic examples:
+4. Run migrations:
 ```bash
-PYTHONPATH=/path/to/remitscout-backend python3 apps/aggregator/examples.py
+python manage.py migrate
 ```
 
-To run the workflow example:
+5. Start the development server:
 ```bash
-PYTHONPATH=/path/to/remitscout-backend python3 apps/aggregator/workflow.py
+python manage.py runserver
 ```
 
-### Using the CLI
+## API Documentation
 
-The CLI provides a convenient way to compare remittances:
-```bash
-PYTHONPATH=/path/to/remitscout-backend python3 apps/aggregator/cli.py \
-  --source-country US \
-  --dest-country IN \
-  --source-currency USD \
-  --dest-currency INR \
-  --amount 1000 \
-  --sort-by best_rate \
-  --max-fee 10
-```
+See `API_DOCUMENTATION.md` for detailed API documentation.
 
 ## Usage Examples
 
@@ -253,7 +269,7 @@ result = Aggregator.get_all_quotes(
 )
 
 # Display the results
-for quote in result.get("quotes", []):
+for quote in result.get("results", []):
     if quote.get("success", False):
         print(f"{quote.get('provider_id')}: rate={quote.get('exchange_rate')}, "
               f"fee={quote.get('fee')}, delivery={quote.get('delivery_time_minutes')} min")
@@ -282,84 +298,41 @@ result = Aggregator.get_all_quotes(
 )
 ```
 
-### Configuration and Provider Management
-
-The aggregator includes a configuration utility that allows you to enable/disable providers and customize the behavior:
-
-```python
-from apps.aggregator.configurator import AggregatorConfig
-
-# Print current status of all providers
-config = AggregatorConfig()
-config.print_status()
-
-# Disable a provider that you don't want to use
-config.disable_provider("TransferGoProvider")
-
-# Set default sort order
-config.set_default_sort("lowest_fee")
-
-# Get configured parameters to use with the aggregator
-params = config.get_aggregator_params()
-result = Aggregator.get_all_quotes(
-    source_country="US",
-    dest_country="IN",
-    source_currency="USD",
-    dest_currency="INR",
-    amount=Decimal("1000.00"),
-    **params  # Applies all your configuration settings
-)
-```
-
-### Corridor Support Analysis
-
-You can analyze which providers support which corridors using the corridor support analysis tool:
-
-```bash
-PYTHONPATH=/path/to/remitscout-backend python3 apps/aggregator/tests/test_corridor_support.py
-```
-
-This will test all providers with common corridors and generate a detailed report of provider support.
-
 ## Project Structure
 
 ```
 backend/
-├── apps/
-│   ├── aggregator/  # Aggregator module
-│   ├── api/         # API endpoints
-│   └── providers/   # Provider integrations
-│       ├── wise/
-│       ├── xe/
-│       ├── remitly/
-│       └── ...
-├── utils/           # Shared utilities
-│   ├── currency/
-│   ├── country/
-│   └── ...
-├── tests/           # Test suite
-├── requirements.txt # Dependencies
-└── README.md        # This file
+├── apps/                 # Application modules
+│   ├── aggregator/       # Aggregator module
+│   ├── providers/        # Provider integrations
+│   └── users/            # User management
+├── docs/                 # Documentation
+│   └── caching_implementation.md
+├── quotes/               # Quotes handling and API
+│   ├── key_generators.py
+│   ├── cache_utils.py
+│   ├── signals.py
+│   ├── tasks.py
+│   └── views.py
+├── remit_scout/          # Project settings
+│   ├── settings.py
+│   └── urls.py
+├── tests/                # Test suite
+├── API_DOCUMENTATION.md  # API documentation
+├── manage.py             # Django management script
+├── requirements.txt      # Dependencies
+└── README.md             # This file
 ```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature-name`
-3. Commit your changes: `git commit -am 'Add new feature'`
-4. Push to the branch: `git push origin feature-name`
-5. Submit a pull request
-
-## Adding a New Provider
-
-To add a new remittance provider:
-
-1. Create a new directory under `apps/providers/`
-2. Implement the provider interface (see existing providers for examples)
-3. Add the provider to the aggregator's provider list
-4. Update parameter mappings if needed
-5. Test the provider with the aggregator
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Version History
+
+### Version 1.0 (March, 2024)
+- Initial production release
+- Support for 20+ remittance providers
+- Multi-level caching system with automatic invalidation
+- RESTful API for quote retrieval
+- Flexible filtering and sorting options 

@@ -1,5 +1,13 @@
 #!/usr/bin/env python
-"""Django's command-line utility for administrative tasks."""
+"""
+Django's command-line utility for administrative tasks.
+
+This is the standard Django management script that provides commands for
+managing the RemitScout application, including running the development server,
+creating database migrations, and managing users.
+
+Version: 1.0
+"""
 import os
 import sys
 

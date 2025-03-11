@@ -1,9 +1,4 @@
-"""
-RemitScout Aggregator Module
-
-This module provides a parallel execution aggregator that fetches quotes from multiple
-remittance providers simultaneously and returns consolidated results.
-"""
+"""RemitScout Aggregator Module"""
 
 from apps.aggregator.aggregator import Aggregator
 
