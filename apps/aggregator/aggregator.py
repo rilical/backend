@@ -1,9 +1,13 @@
 import logging
 import time
 from decimal import Decimal
-from typing import List, Dict, Any, Optional, Callable
+from typing import List, Dict, Any, Optional, Callable, Tuple
 import concurrent.futures
 import datetime
+import random
+
+from django.core.cache import cache
+from django.conf import settings
 
 from apps.providers.xe.integration import XEAggregatorProvider
 from apps.providers.remitly.integration import RemitlyProvider
@@ -30,6 +34,11 @@ from apps.providers.westernunion.integration import WesternUnionProvider
 from apps.providers.alansari.integration import AlAnsariProvider
 
 logger = logging.getLogger(__name__)
+
+# Add cache key generator function at the top level
+def get_provider_quote_cache_key(provider_name, source_country, dest_country, source_currency, dest_currency, amount):
+    """Generate a cache key for individual provider quotes."""
+    return f"provider_quote:{provider_name}:{source_country}:{dest_country}:{source_currency}:{dest_currency}:{float(amount)}"
 
 class Aggregator:
 
@@ -274,7 +283,8 @@ class Aggregator:
         max_workers: int = 10,
         filter_fn: Optional[Callable[[Dict[str, Any]], bool]] = None,
         max_delivery_time_minutes: Optional[int] = None,
-        max_fee: Optional[float] = None
+        max_fee: Optional[float] = None,
+        use_cache: bool = True,  # New parameter to control caching
     ) -> Dict[str, Any]:
 
         exclude_providers = exclude_providers or []
@@ -293,13 +303,35 @@ class Aggregator:
         all_quotes = []
         all_provider_results = []
 
-        from apps.aggregator.configurator import get_configured_aggregator_params
-        config_params = get_configured_aggregator_params()
-        timeout = config_params.get("timeout", 20)
+        try:
+            from apps.aggregator.configurator import get_configured_aggregator_params
+            config_params = get_configured_aggregator_params()
+            timeout = config_params.get("timeout", 20)
+        except ImportError:
+            timeout = 20
+            logger.warning("Could not import configurator, using default timeout")
 
         def call_provider(provider):
             provider_name = provider.__class__.__name__
             provider_id = getattr(provider, "provider_id", provider_name)
+            
+            # Check cache first if caching is enabled
+            if use_cache:
+                cache_key = get_provider_quote_cache_key(
+                    provider_name,
+                    source_country,
+                    dest_country,
+                    source_currency,
+                    dest_currency,
+                    amount
+                )
+                cached_result = cache.get(cache_key)
+                if cached_result:
+                    logger.info(f"Cache hit for provider {provider_id}")
+                    if cached_result.get("success", False):
+                        all_quotes.append(cached_result)
+                    return cached_result
+            
             try:
                 provider_params = {
                     "amount": amount,
@@ -323,14 +355,37 @@ class Aggregator:
                 if "provider_id" not in result:
                     result["provider_id"] = provider_id
 
+                # Store successful results in cache with TTL and jitter
+                if use_cache and result.get("success", False):
+                    cache_key = get_provider_quote_cache_key(
+                        provider_name,
+                        source_country,
+                        dest_country,
+                        source_currency,
+                        dest_currency,
+                        amount
+                    )
+                    try:
+                        # Get TTL from settings or use default
+                        provider_ttl = getattr(settings, 'PROVIDER_CACHE_TTL', 60 * 60 * 24)  # 24 hours default
+                        jitter = random.randint(
+                            -getattr(settings, 'JITTER_MAX_SECONDS', 60),
+                            getattr(settings, 'JITTER_MAX_SECONDS', 60)
+                        )
+                        ttl = provider_ttl + jitter
+                        
+                        cache.set(cache_key, result, timeout=ttl)
+                        logger.info(f"Cached result for provider {provider_id} for {ttl} seconds")
+                    except Exception as cache_error:
+                        logger.warning(f"Error caching result for {provider_id}: {str(cache_error)}")
+
                 if result.get("success", False):
                     all_quotes.append(result)
 
                 return result
 
             except Exception as e:
-                logger.exception(f"Error calling {provider_id}: {str(e)}")
-                return {
+                error_result = {
                     "success": False,
                     "provider_id": provider_id,
                     "error_message": f"Exception: {str(e)}",
@@ -340,6 +395,25 @@ class Aggregator:
                     "dest_country": dest_country,
                     "amount": float(amount)
                 }
+                
+                # Cache failures briefly to prevent hammering APIs that are down
+                if use_cache:
+                    try:
+                        cache_key = get_provider_quote_cache_key(
+                            provider_name,
+                            source_country,
+                            dest_country,
+                            source_currency,
+                            dest_currency,
+                            amount
+                        )
+                        # Shorter TTL for failures
+                        cache.set(cache_key, error_result, timeout=300)  # 5 minutes
+                    except Exception:
+                        pass  # Ignore caching errors for failures
+                
+                logger.exception(f"Error calling {provider_id}: {str(e)}")
+                return error_result
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=min(max_workers, len(providers_to_call))) as executor:
             future_to_provider = {

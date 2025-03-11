@@ -1,0 +1,97 @@
+2025-03-11 00:17:06,454 DEBUG Added a stderr logging handler to logger: urllib3
+DEBUG 2025-03-11 00:17:06,454 __init__ 89721 8316897344 Added a stderr logging handler to logger: urllib3
+2025-03-11 00:17:06,466 DEBUG Starting new HTTPS connection (1): public.riamoneytransfer.com:443
+DEBUG 2025-03-11 00:17:06,466 connectionpool 89721 8316897344 Starting new HTTPS connection (1): public.riamoneytransfer.com:443
+2025-03-11 00:17:06,811 DEBUG https://public.riamoneytransfer.com:443 "GET /Authorization/session HTTP/11" 200 2063
+DEBUG 2025-03-11 00:17:06,811 connectionpool 89721 8316897344 https://public.riamoneytransfer.com:443 "GET /Authorization/session HTTP/11" 200 2063
+2025-03-11 00:17:06,934 DEBUG https://public.riamoneytransfer.com:443 "GET /Calculator/Initialize HTTP/11" 200 26464
+DEBUG 2025-03-11 00:17:06,934 connectionpool 89721 8316897344 https://public.riamoneytransfer.com:443 "GET /Calculator/Initialize HTTP/11" 200 26464
+2025-03-11 00:17:07,017 DEBUG Starting new HTTPS connection (1): www.xoom.com:443
+DEBUG 2025-03-11 00:17:07,017 connectionpool 89721 8316897344 Starting new HTTPS connection (1): www.xoom.com:443
+2025-03-11 00:17:07,072 DEBUG https://www.xoom.com:443 "GET / HTTP/11" 200 54448
+DEBUG 2025-03-11 00:17:07,072 connectionpool 89721 8316897344 https://www.xoom.com:443 "GET / HTTP/11" 200 54448
+2025-03-11 00:17:07,250 DEBUG https://www.xoom.com:443 "GET /en-us/send-money HTTP/11" 302 None
+DEBUG 2025-03-11 00:17:07,250 connectionpool 89721 8316897344 https://www.xoom.com:443 "GET /en-us/send-money HTTP/11" 302 None
+2025-03-11 00:17:07,416 DEBUG https://www.xoom.com:443 "GET /sign-in HTTP/11" 200 None
+DEBUG 2025-03-11 00:17:07,416 connectionpool 89721 8316897344 https://www.xoom.com:443 "GET /sign-in HTTP/11" 200 None
+WARNING 2025-03-11 00:17:07,416 integration 89721 8316897344 Redirected to sign-in page. Using anonymous mode.
+2025-03-11 00:17:07,630 DEBUG https://www.xoom.com:443 "GET /en-us/send-money/us/mx HTTP/11" 302 None
+DEBUG 2025-03-11 00:17:07,630 connectionpool 89721 8316897344 https://www.xoom.com:443 "GET /en-us/send-money/us/mx HTTP/11" 302 None
+2025-03-11 00:17:07,829 DEBUG https://www.xoom.com:443 "GET /sign-in HTTP/11" 200 None
+DEBUG 2025-03-11 00:17:07,829 connectionpool 89721 8316897344 https://www.xoom.com:443 "GET /sign-in HTTP/11" 200 None
+2025-03-11 00:17:08,078 DEBUG https://www.xoom.com:443 "GET / HTTP/11" 200 None
+DEBUG 2025-03-11 00:17:08,078 connectionpool 89721 8316897344 https://www.xoom.com:443 "GET / HTTP/11" 200 None
+2025-03-11 00:17:08,267 DEBUG https://www.xoom.com:443 "GET /segment/settings.json HTTP/11" 404 None
+DEBUG 2025-03-11 00:17:08,267 connectionpool 89721 8316897344 https://www.xoom.com:443 "GET /segment/settings.json HTTP/11" 404 None
+2025-03-11 00:17:08,429 DEBUG https://www.xoom.com:443 "GET /pa/gdpr HTTP/11" 302 None
+DEBUG 2025-03-11 00:17:08,429 connectionpool 89721 8316897344 https://www.xoom.com:443 "GET /pa/gdpr HTTP/11" 302 None
+2025-03-11 00:17:08,628 DEBUG https://www.xoom.com:443 "GET /sign-in HTTP/11" 200 None
+DEBUG 2025-03-11 00:17:08,628 connectionpool 89721 8316897344 https://www.xoom.com:443 "GET /sign-in HTTP/11" 200 None
+2025-03-11 00:17:08,631 DEBUG Starting new HTTPS connection (1): www.remitbee.com:443
+DEBUG 2025-03-11 00:17:08,631 connectionpool 89721 8316897344 Starting new HTTPS connection (1): www.remitbee.com:443
+2025-03-11 00:17:08,875 DEBUG https://www.remitbee.com:443 "GET / HTTP/11" 200 None
+DEBUG 2025-03-11 00:17:08,875 connectionpool 89721 8316897344 https://www.remitbee.com:443 "GET / HTTP/11" 200 None
+2025-03-11 00:17:08,878 DEBUG Starting new HTTPS connection (1): api.remitbee.com:443
+DEBUG 2025-03-11 00:17:08,878 connectionpool 89721 8316897344 Starting new HTTPS connection (1): api.remitbee.com:443
+2025-03-11 00:17:09,030 DEBUG https://api.remitbee.com:443 "GET /public-services/online-rates-multi-currency HTTP/11" 200 None
+DEBUG 2025-03-11 00:17:09,030 connectionpool 89721 8316897344 https://api.remitbee.com:443 "GET /public-services/online-rates-multi-currency HTTP/11" 200 None
+2025-03-11 00:17:09,032 DEBUG Starting new HTTPS connection (1): www.wirebarley.com:443
+DEBUG 2025-03-11 00:17:09,032 connectionpool 89721 8316897344 Starting new HTTPS connection (1): www.wirebarley.com:443
+2025-03-11 00:17:09,276 DEBUG https://www.wirebarley.com:443 "GET / HTTP/11" 200 None
+DEBUG 2025-03-11 00:17:09,276 connectionpool 89721 8316897344 https://www.wirebarley.com:443 "GET / HTTP/11" 200 None
+2025-03-11 00:17:09,428 DEBUG https://www.wirebarley.com:443 "GET / HTTP/11" 200 None
+DEBUG 2025-03-11 00:17:09,428 connectionpool 89721 8316897344 https://www.wirebarley.com:443 "GET / HTTP/11" 200 None
+2025-03-11 00:17:09,429 DEBUG Starting new HTTPS connection (1): www.remitguru.com:443
+DEBUG 2025-03-11 00:17:09,429 connectionpool 89721 8316897344 Starting new HTTPS connection (1): www.remitguru.com:443
+2025-03-11 00:17:10,509 DEBUG https://www.remitguru.com:443 "GET / HTTP/11" 200 None
+DEBUG 2025-03-11 00:17:10,509 connectionpool 89721 8316897344 https://www.remitguru.com:443 "GET / HTTP/11" 200 None
+2025-03-11 00:17:12,110 DEBUG Added a stderr logging handler to logger: urllib3
+DEBUG 2025-03-11 00:17:12,110 __init__ 89747 8316897344 Added a stderr logging handler to logger: urllib3
+2025-03-11 00:17:12,123 DEBUG Starting new HTTPS connection (1): public.riamoneytransfer.com:443
+DEBUG 2025-03-11 00:17:12,123 connectionpool 89747 8316897344 Starting new HTTPS connection (1): public.riamoneytransfer.com:443
+2025-03-11 00:17:12,445 DEBUG https://public.riamoneytransfer.com:443 "GET /Authorization/session HTTP/11" 200 2063
+DEBUG 2025-03-11 00:17:12,445 connectionpool 89747 8316897344 https://public.riamoneytransfer.com:443 "GET /Authorization/session HTTP/11" 200 2063
+2025-03-11 00:17:12,563 DEBUG https://public.riamoneytransfer.com:443 "GET /Calculator/Initialize HTTP/11" 200 26464
+DEBUG 2025-03-11 00:17:12,563 connectionpool 89747 8316897344 https://public.riamoneytransfer.com:443 "GET /Calculator/Initialize HTTP/11" 200 26464
+2025-03-11 00:17:12,717 DEBUG Starting new HTTPS connection (1): www.xoom.com:443
+DEBUG 2025-03-11 00:17:12,717 connectionpool 89747 8316897344 Starting new HTTPS connection (1): www.xoom.com:443
+2025-03-11 00:17:12,777 DEBUG https://www.xoom.com:443 "GET / HTTP/11" 200 54448
+DEBUG 2025-03-11 00:17:12,777 connectionpool 89747 8316897344 https://www.xoom.com:443 "GET / HTTP/11" 200 54448
+2025-03-11 00:17:12,940 DEBUG https://www.xoom.com:443 "GET /en-us/send-money HTTP/11" 302 None
+DEBUG 2025-03-11 00:17:12,940 connectionpool 89747 8316897344 https://www.xoom.com:443 "GET /en-us/send-money HTTP/11" 302 None
+2025-03-11 00:17:13,101 DEBUG https://www.xoom.com:443 "GET /sign-in HTTP/11" 200 None
+DEBUG 2025-03-11 00:17:13,101 connectionpool 89747 8316897344 https://www.xoom.com:443 "GET /sign-in HTTP/11" 200 None
+WARNING 2025-03-11 00:17:13,102 integration 89747 8316897344 Redirected to sign-in page. Using anonymous mode.
+2025-03-11 00:17:13,248 DEBUG https://www.xoom.com:443 "GET /en-us/send-money/us/mx HTTP/11" 302 None
+DEBUG 2025-03-11 00:17:13,248 connectionpool 89747 8316897344 https://www.xoom.com:443 "GET /en-us/send-money/us/mx HTTP/11" 302 None
+2025-03-11 00:17:13,398 DEBUG https://www.xoom.com:443 "GET /sign-in HTTP/11" 200 None
+DEBUG 2025-03-11 00:17:13,398 connectionpool 89747 8316897344 https://www.xoom.com:443 "GET /sign-in HTTP/11" 200 None
+2025-03-11 00:17:13,742 DEBUG https://www.xoom.com:443 "GET / HTTP/11" 200 None
+DEBUG 2025-03-11 00:17:13,742 connectionpool 89747 8316897344 https://www.xoom.com:443 "GET / HTTP/11" 200 None
+2025-03-11 00:17:13,926 DEBUG https://www.xoom.com:443 "GET /segment/settings.json HTTP/11" 404 None
+DEBUG 2025-03-11 00:17:13,926 connectionpool 89747 8316897344 https://www.xoom.com:443 "GET /segment/settings.json HTTP/11" 404 None
+2025-03-11 00:17:14,118 DEBUG https://www.xoom.com:443 "GET /pa/gdpr HTTP/11" 302 None
+DEBUG 2025-03-11 00:17:14,118 connectionpool 89747 8316897344 https://www.xoom.com:443 "GET /pa/gdpr HTTP/11" 302 None
+2025-03-11 00:17:14,319 DEBUG https://www.xoom.com:443 "GET /sign-in HTTP/11" 200 None
+DEBUG 2025-03-11 00:17:14,319 connectionpool 89747 8316897344 https://www.xoom.com:443 "GET /sign-in HTTP/11" 200 None
+2025-03-11 00:17:14,322 DEBUG Starting new HTTPS connection (1): www.remitbee.com:443
+DEBUG 2025-03-11 00:17:14,322 connectionpool 89747 8316897344 Starting new HTTPS connection (1): www.remitbee.com:443
+2025-03-11 00:17:14,574 DEBUG https://www.remitbee.com:443 "GET / HTTP/11" 200 None
+DEBUG 2025-03-11 00:17:14,574 connectionpool 89747 8316897344 https://www.remitbee.com:443 "GET / HTTP/11" 200 None
+2025-03-11 00:17:14,576 DEBUG Starting new HTTPS connection (1): api.remitbee.com:443
+DEBUG 2025-03-11 00:17:14,576 connectionpool 89747 8316897344 Starting new HTTPS connection (1): api.remitbee.com:443
+2025-03-11 00:17:14,726 DEBUG https://api.remitbee.com:443 "GET /public-services/online-rates-multi-currency HTTP/11" 200 None
+DEBUG 2025-03-11 00:17:14,726 connectionpool 89747 8316897344 https://api.remitbee.com:443 "GET /public-services/online-rates-multi-currency HTTP/11" 200 None
+2025-03-11 00:17:14,731 DEBUG Starting new HTTPS connection (1): www.wirebarley.com:443
+DEBUG 2025-03-11 00:17:14,731 connectionpool 89747 8316897344 Starting new HTTPS connection (1): www.wirebarley.com:443
+2025-03-11 00:17:14,986 DEBUG https://www.wirebarley.com:443 "GET / HTTP/11" 200 None
+DEBUG 2025-03-11 00:17:14,986 connectionpool 89747 8316897344 https://www.wirebarley.com:443 "GET / HTTP/11" 200 None
+2025-03-11 00:17:15,179 DEBUG https://www.wirebarley.com:443 "GET / HTTP/11" 200 None
+DEBUG 2025-03-11 00:17:15,179 connectionpool 89747 8316897344 https://www.wirebarley.com:443 "GET / HTTP/11" 200 None
+2025-03-11 00:17:15,181 DEBUG Starting new HTTPS connection (1): www.remitguru.com:443
+DEBUG 2025-03-11 00:17:15,181 connectionpool 89747 8316897344 Starting new HTTPS connection (1): www.remitguru.com:443
+2025-03-11 00:17:16,119 DEBUG https://www.remitguru.com:443 "GET / HTTP/11" 200 None
+DEBUG 2025-03-11 00:17:16,119 connectionpool 89747 8316897344 https://www.remitguru.com:443 "GET / HTTP/11" 200 None
+Watching for file changes with StatReloader
+INFO 2025-03-11 00:17:17,302 autoreload 89747 8316897344 Watching for file changes with StatReloader
+Error: That port is already in use.

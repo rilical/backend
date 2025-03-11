@@ -26,20 +26,35 @@ INSTALLED_APPS = [
     'rest_framework',
     'django_celery_beat',
     'django_filters',
+    'corsheaders',  # Add CORS headers app
+    'django_extensions',  # Added for debugging
 
     # Local apps
     'apps.providers',  # Provider rate comparison
+    'apps.aggregator', # Aggregator service
+    'quotes',          # Quote storage and caching
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # Add CORS middleware
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+# CORS settings
+CORS_ALLOW_ALL_ORIGINS = True  # In production, specify the allowed origins
+
+# For production, use the following instead:
+# CORS_ALLOWED_ORIGINS = [
+#     "http://localhost:3000",  # React default port
+#     "http://localhost:8080",  # Vue default port
+#     "http://yourdomain.com",
+# ]
 
 ROOT_URLCONF = 'remit_scout.urls'
 
@@ -111,6 +126,47 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
+# Cache settings
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': os.getenv('REDIS_URL', "redis://127.0.0.1:6379/1"),
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            'SOCKET_CONNECT_TIMEOUT': 5,
+            'SOCKET_TIMEOUT': 5,
+            'COMPRESSOR': 'django_redis.compressors.zlib.ZlibCompressor',  # Use compression for larger values
+            'IGNORE_EXCEPTIONS': True,  # Don't crash on Redis connection issues
+            'CONNECTION_POOL_KWARGS': {
+                'max_connections': 100,
+                'retry_on_timeout': True
+            }
+        },
+        'KEY_PREFIX': 'remitscout',
+    },
+    'providers': {  # Specific cache for provider data (longer TTL)
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': os.getenv('REDIS_URL', "redis://127.0.0.1:6379/2"),
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            'IGNORE_EXCEPTIONS': True,
+        },
+        'KEY_PREFIX': 'provider',
+    }
+}
+
+# Cache timeout settings (TTL) in seconds
+QUOTE_CACHE_TTL = 60 * 30  # 30 minutes for quotes
+PROVIDER_CACHE_TTL = 60 * 60 * 24  # 24 hours for provider details
+CORRIDOR_CACHE_TTL = 60 * 60 * 12  # 12 hours for corridor availability
+CORRIDOR_RATE_CACHE_TTL = 60 * 60 * 3  # 3 hours for corridor rate data (exchange rates, fees)
+JITTER_MAX_SECONDS = 60  # Maximum jitter in seconds to prevent thundering herd
+
+# Enable the cache middleware
+CACHE_MIDDLEWARE_ALIAS = 'default'
+CACHE_MIDDLEWARE_SECONDS = 60 * 5  # 5 minutes
+CACHE_MIDDLEWARE_KEY_PREFIX = 'middleware'
+
 # REST Framework settings
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
@@ -118,32 +174,8 @@ REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
     ],
+    # No authentication classes required for public API
 }
-
-# Redis Cache settings
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": os.getenv('REDIS_URL', "redis://127.0.0.1:6379/1"),
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            "SOCKET_CONNECT_TIMEOUT": 5,
-            "SOCKET_TIMEOUT": 5,
-            "RETRY_ON_TIMEOUT": True,
-            "MAX_CONNECTIONS": 1000,
-            "IGNORE_EXCEPTIONS": True,
-            "PARSER_CLASS": "redis.connection.HiredisParser",  # For better performance
-            "CONNECTION_POOL_CLASS": "redis.BlockingConnectionPool",
-            "CONNECTION_POOL_CLASS_KWARGS": {
-                "max_connections": 50,
-                "timeout": 20,
-            }
-        }
-    }
-}
-
-# Cache time to live is 1 day (24 hours = 86400 seconds)
-CACHE_TTL = 60 * 60 * 24  # 1 day in seconds
 
 # Logging configuration
 LOGGING = {

@@ -1,78 +1,55 @@
+"""
+Views for the aggregator API.
+"""
+from decimal import Decimal
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from decimal import Decimal, InvalidOperation
-from django.utils import timezone
-from django.conf import settings
 
-from .aggregator import get_cached_aggregated_rates
+from apps.aggregator.aggregator import Aggregator
 
 class AggregatorRatesView(APIView):
     """
-    Single endpoint to get aggregated rates from all providers
+    API endpoint that allows querying the aggregator for remittance rates.
     """
-    def get(self, request, *args, **kwargs):
+    def get(self, request, format=None):
         """
-        Get aggregated rates from all providers with caching
-        
-        Query Parameters:
-            amount: Decimal amount to send
-            from_currency: Source currency code (e.g. 'USD')
-            to_country: Destination country code (e.g. 'MX')
-            force_refresh: Optional boolean to force cache refresh
-            
-        Returns:
-            JSON response with aggregated quotes from all providers
+        Get remittance rates from the aggregator service.
         """
-        amount = request.query_params.get("amount")
-        from_currency = request.query_params.get("from_currency")
-        to_country = request.query_params.get("to_country")
-        force_refresh = request.query_params.get("force_refresh", "").lower() == "true"
+        # Extract parameters from query string
+        source_country = request.query_params.get('source_country')
+        dest_country = request.query_params.get('dest_country')
+        source_currency = request.query_params.get('source_currency')
+        dest_currency = request.query_params.get('dest_currency')
+        amount_str = request.query_params.get('amount')
 
-        # Basic validation
-        if not all([amount, from_currency, to_country]):
+        # Validate parameters
+        if not all([source_country, dest_country, source_currency, dest_currency, amount_str]):
             return Response(
-                {"error": "Please provide 'amount', 'from_currency', and 'to_country'."},
+                {"error": "Missing required parameters. Please provide source_country, dest_country, source_currency, dest_currency, and amount."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         try:
-            send_amount = Decimal(amount)
-            if send_amount <= 0:
-                raise ValueError("Amount must be positive")
-        except (InvalidOperation, ValueError) as e:
+            amount = Decimal(amount_str)
+        except (ValueError, TypeError):
             return Response(
-                {"error": f"Invalid 'amount' provided: {str(e)}"},
+                {"error": "Invalid amount. Please provide a valid decimal number."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Call aggregator with cache timeout from settings
-        cache_timeout = getattr(settings, 'CACHE_TTL', 60 * 60 * 24)  # Default 1 day
-        if force_refresh:
-            cache_timeout = 0  # Forces cache refresh
-
-        results = get_cached_aggregated_rates(
-            send_amount=send_amount,
-            send_currency=from_currency.upper(),
-            receive_country=to_country.upper(),
-            cache_timeout=cache_timeout
-        )
-
-        # Return to client with cache information
-        response_data = {
-            "timestamp": timezone.now().isoformat(),
-            "request": {
-                "amount": float(send_amount),
-                "from_currency": from_currency.upper(),
-                "to_country": to_country.upper()
-            },
-            "cache": {
-                "ttl_seconds": cache_timeout,
-                "ttl_hours": round(cache_timeout / 3600, 1),
-                "force_refresh": force_refresh
-            },
-            "count": len(results),
-            "results": results
-        }
-
-        return Response(response_data) 
+        # Query the aggregator
+        try:
+            results = Aggregator.get_all_quotes(
+                source_country=source_country,
+                dest_country=dest_country,
+                source_currency=source_currency,
+                dest_currency=dest_currency,
+                amount=amount
+            )
+            return Response(results)
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to get rates: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) 
