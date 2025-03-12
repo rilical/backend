@@ -24,11 +24,7 @@ import requests
 import responses
 from bs4 import BeautifulSoup
 
-from apps.providers.xoom.exceptions import (
-    XoomAuthenticationError,
-    XoomError,
-    XoomValidationError,
-)
+from apps.providers.xoom.exceptions import XoomAuthenticationError, XoomError, XoomValidationError
 from apps.providers.xoom.integration import XoomProvider
 
 # Configure logging for tests
@@ -237,17 +233,13 @@ class TestXoomProvider(unittest.TestCase):
                     logger.info(f"SUCCESS for {country_code}:")
                     logger.info(f"  Rate: {result['exchange_rate']}")
                     logger.info(f"  Fee: {result['fee']} {result['send_currency']}")
-                    logger.info(
-                        f"  Send: {result['send_amount']} {result['send_currency']}"
-                    )
+                    logger.info(f"  Send: {result['send_amount']} {result['send_currency']}")
                     logger.info(
                         f"  Receive: {result['receive_amount']} {result['receive_currency']}"
                     )
 
                 except Exception as e:
-                    logger.error(
-                        f"Failed to get exchange rate for {country_code}: {str(e)}"
-                    )
+                    logger.error(f"Failed to get exchange rate for {country_code}: {str(e)}")
                     all_results.append(
                         {
                             "corridor": f"US-{country_code}",
@@ -266,12 +258,8 @@ class TestXoomProvider(unittest.TestCase):
         logger.info(f"Saved all test results to {all_results_path}")
 
         # Verify at least some tests passed
-        self.assertTrue(
-            success_count > 0, f"All {total_tests} exchange rate tests failed"
-        )
-        logger.info(
-            f"Successfully completed {success_count} out of {total_tests} tests"
-        )
+        self.assertTrue(success_count > 0, f"All {total_tests} exchange rate tests failed")
+        logger.info(f"Successfully completed {success_count} out of {total_tests} tests")
 
     @responses.activate
     def test_get_exchange_rate_fallback_to_fee_table(self):
@@ -395,9 +383,7 @@ class TestXoomProvider(unittest.TestCase):
                                 "disbursementType": "DEPOSIT",
                                 "paymentType": {"type": "DEBIT_CARD"},
                                 "feeAmount": {"rawValue": "3.9900"},
-                                "content": [
-                                    {"key": "feesFx.paymentType", "value": "Debit Card"}
-                                ],
+                                "content": [{"key": "feesFx.paymentType", "value": "Debit Card"}],
                             },
                         ]
                     }
@@ -500,9 +486,7 @@ class TestXoomIntegration:
                     )
 
                     # Save individual result to JSON
-                    file_prefix = (
-                        f"{corridor['source']}_{corridor['destination']}_{amount}"
-                    )
+                    file_prefix = f"{corridor['source']}_{corridor['destination']}_{amount}"
                     filename = f"xoom_exchange_rate_{file_prefix}_{timestamp}.json"
                     saved_path = save_test_result(filename, result)
                     logger.info(f"Saved result to {saved_path}")
@@ -549,9 +533,7 @@ class TestXoomIntegration:
         countries = self.provider.get_supported_countries()
 
         # Save to JSON
-        filename = (
-            f"xoom_supported_countries_live_{time.strftime('%Y%m%d-%H%M%S')}.json"
-        )
+        filename = f"xoom_supported_countries_live_{time.strftime('%Y%m%d-%H%M%S')}.json"
         saved_path = save_test_result(filename, countries)
         logger.info(f"Saved live supported countries to {saved_path}")
 

@@ -90,9 +90,7 @@ class TestWireBarleyAuthentication(TestWireBarleyBase):
         self.assertFalse(self.provider._validate_session())
 
         # Test 3: Exception during validation
-        self.provider.session.get.side_effect = requests.RequestException(
-            "Connection error"
-        )
+        self.provider.session.get.side_effect = requests.RequestException("Connection error")
         self.assertFalse(self.provider._validate_session())
 
 
@@ -109,9 +107,7 @@ class TestWireBarleyRates(TestWireBarleyBase):
             "target_currency": "PHP",
         }
 
-        with patch.object(
-            self.provider, "get_exchange_rate", return_value=mock_response
-        ):
+        with patch.object(self.provider, "get_exchange_rate", return_value=mock_response):
             result = self.provider.get_exchange_rate(
                 send_amount=Decimal("1000"), send_currency="USD", receive_currency="PHP"
             )
@@ -250,23 +246,17 @@ class TestWireBarleyFees(TestWireBarleyBase):
         corridor_obj = {"paymentFees": test_fees}
 
         # Test amount in first tier
-        fee = self.provider._calculate_fee(
-            corridor_obj=corridor_obj, amount=Decimal("750")
-        )
+        fee = self.provider._calculate_fee(corridor_obj=corridor_obj, amount=Decimal("750"))
         # With amount 750, it should use fee1 (10) since it's between min (500) and threshold2 (1000)
         self.assertEqual(fee, 10)
 
         # Test amount in second tier
-        fee = self.provider._calculate_fee(
-            corridor_obj=corridor_obj, amount=Decimal("3000")
-        )
+        fee = self.provider._calculate_fee(corridor_obj=corridor_obj, amount=Decimal("3000"))
         # With amount 3000, it should use fee2 (15) since it's between threshold2 (1000) and threshold3 (5000)
         self.assertEqual(fee, 15)
 
         # Test amount in third tier
-        fee = self.provider._calculate_fee(
-            corridor_obj=corridor_obj, amount=Decimal("7000")
-        )
+        fee = self.provider._calculate_fee(corridor_obj=corridor_obj, amount=Decimal("7000"))
         # With amount 7000, it should use fee3 (20) since it's above threshold3 (5000)
         self.assertEqual(fee, 20)
 

@@ -81,9 +81,7 @@ def test_corridor(
                     f"Available delivery methods: {len(result['available_delivery_methods'])}"
                 )
                 for method in result["available_delivery_methods"]:
-                    logger.info(
-                        f"  - {method['method_name']} ({method['standardized_name']})"
-                    )
+                    logger.info(f"  - {method['method_name']} ({method['standardized_name']})")
 
             # Check if payment methods are available
             if "available_payment_methods" in result:
@@ -91,9 +89,7 @@ def test_corridor(
                     f"Available payment methods: {len(result['available_payment_methods'])}"
                 )
                 for method in result["available_payment_methods"]:
-                    logger.info(
-                        f"  - {method['method_name']} ({method['standardized_name']})"
-                    )
+                    logger.info(f"  - {method['method_name']} ({method['standardized_name']})")
 
             return True
         else:
@@ -165,55 +161,37 @@ def test_error_handling(provider):
         )
 
         if not result["success"] and result["error_message"]:
-            logger.info(
-                f"✅ Correctly handled unsupported corridor: {result['error_message']}"
-            )
+            logger.info(f"✅ Correctly handled unsupported corridor: {result['error_message']}")
             return True
         else:
             logger.error("❌ Failed to handle unsupported corridor properly")
             return False
     except Exception as e:
-        logger.error(
-            f"❌ ERROR: Exception was raised instead of returning error response: {str(e)}"
-        )
+        logger.error(f"❌ ERROR: Exception was raised instead of returning error response: {str(e)}")
         return False
 
 
 def main():
     """Main function to run the tests"""
-    parser = argparse.ArgumentParser(
-        description="Test the SingX provider implementation"
-    )
+    parser = argparse.ArgumentParser(description="Test the SingX provider implementation")
     parser.add_argument("--amount", type=str, default="1000", help="Amount to send")
-    parser.add_argument(
-        "--source-country", type=str, default="SG", help="Source country code"
-    )
-    parser.add_argument(
-        "--source-currency", type=str, default="SGD", help="Source currency"
-    )
+    parser.add_argument("--source-country", type=str, default="SG", help="Source country code")
+    parser.add_argument("--source-currency", type=str, default="SGD", help="Source currency")
     parser.add_argument(
         "--destination-country", type=str, default="IN", help="Destination country code"
     )
     parser.add_argument(
         "--destination-currency", type=str, default="INR", help="Destination currency"
     )
-    parser.add_argument(
-        "--payment", type=str, help="Payment method (e.g., bank_transfer)"
-    )
-    parser.add_argument(
-        "--delivery", type=str, help="Delivery method (e.g., bank_deposit)"
-    )
-    parser.add_argument(
-        "--test-all", action="store_true", help="Test all supported corridors"
-    )
+    parser.add_argument("--payment", type=str, help="Payment method (e.g., bank_transfer)")
+    parser.add_argument("--delivery", type=str, help="Delivery method (e.g., bank_deposit)")
+    parser.add_argument("--test-all", action="store_true", help="Test all supported corridors")
     parser.add_argument(
         "--test-receive",
         action="store_true",
         help="Test with receive amount instead of send amount",
     )
-    parser.add_argument(
-        "--test-errors", action="store_true", help="Test error handling"
-    )
+    parser.add_argument("--test-errors", action="store_true", help="Test error handling")
 
     args = parser.parse_args()
 

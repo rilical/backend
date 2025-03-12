@@ -95,15 +95,11 @@ def test_get_exchange_rate():
                 continue
 
             if not quote.get("is_valid", False):
-                print(
-                    f"❌ Quote returned is invalid: {quote.get('error', 'Unknown error')}"
-                )
+                print(f"❌ Quote returned is invalid: {quote.get('error', 'Unknown error')}")
                 print(f"Raw response: {quote.get('raw_response')}")
                 continue
 
-            print(
-                f"✅ Receive amount: {quote['receive_amount']} {quote['receive_currency']}"
-            )
+            print(f"✅ Receive amount: {quote['receive_amount']} {quote['receive_currency']}")
             print(f"✅ Exchange rate: {quote['exchange_rate']}")
             print(f"✅ Fee: {quote['fee']} {quote['send_currency']}")
             print(f"✅ Is valid: {quote['is_valid']}")
@@ -121,15 +117,11 @@ def test_get_exchange_rate():
                 continue
 
             if not result.get("supported", False):
-                print(
-                    f"❌ Corridor not supported: {result.get('error', 'Unknown error')}"
-                )
+                print(f"❌ Corridor not supported: {result.get('error', 'Unknown error')}")
                 continue
 
             print(f"✅ Exchange rate: {result['exchange_rate']}")
-            print(
-                f"✅ Receive amount: {result['receive_amount']} {result['receive_currency']}"
-            )
+            print(f"✅ Receive amount: {result['receive_amount']} {result['receive_currency']}")
             print(f"✅ Fee: {result['fee']} {test_case['send_currency']}")
             print(f"✅ Delivery time: {result['delivery_time']} hours")
 

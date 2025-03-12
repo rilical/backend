@@ -26,10 +26,14 @@ repos:
         additional_dependencies: [flake8-docstrings]
         args: [--max-line-length=100]
         exclude: ^(migrations/|settings.py)
-# Uncomment when ready to enforce type checking
-# -   repo: https://github.com/pre-commit/mirrors-mypy
-#     rev: v1.3.0
-#     hooks:
-#     -   id: mypy
-#         args: [--ignore-missing-imports]
-#         additional_dependencies: [types-requests, types-tabulate]
+
+# Use a local hook for MyPy with custom configuration
+-   repo: local
+    hooks:
+    -   id: mypy-with-custom-config
+        name: mypy with custom configuration
+        entry: ./run_mypy.py
+        language: script
+        types: [python]
+        require_serial: true
+        pass_filenames: false

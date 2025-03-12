@@ -86,7 +86,7 @@ If you encounter issues:
 1. Ensure your ScrapeOps API key is valid and has sufficient credits
 2. Try increasing the timeout value
 3. Enable JavaScript rendering and residential proxies for better success rate
-4. Verify that ScrapeOps services are operational 
+4. Verify that ScrapeOps services are operational
 
 # RemitScout Backend
 
@@ -320,8 +320,10 @@ result = Aggregator.get_all_quotes(
 # Display the results
 for quote in result.get("results", []):
     if quote.get("success", False):
-        print(f"{quote.get('provider_id')}: rate={quote.get('exchange_rate')}, "
-              f"fee={quote.get('fee')}, delivery={quote.get('delivery_time_minutes')} min")
+        print(
+            f"{quote.get('provider_id')}: rate={quote.get('exchange_rate')}, "
+            f"fee={quote.get('fee')}, delivery={quote.get('delivery_time_minutes')} min"
+        )
 ```
 
 ### Filtering with Custom Criteria
@@ -384,7 +386,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Support for 20+ remittance providers
 - Multi-level caching system with automatic invalidation
 - RESTful API for quote retrieval
-- Flexible filtering and sorting options 
+- Flexible filtering and sorting options
 
 ## Development Setup
 
@@ -396,7 +398,7 @@ This project follows strict code style standards using several tools:
    ```bash
    pip install -r requirements-dev.txt
    ```
-   
+
    Or run the setup script to create a virtual environment and install all dependencies:
    ```bash
    ./setup_dev_env.sh
@@ -429,4 +431,4 @@ VSCode settings are provided in `.vscode/settings.json` to automatically:
 
 ### Pre-commit Hook
 
-The setup script installs a Git pre-commit hook that runs all code quality tools before each commit. 
+The setup script installs a Git pre-commit hook that runs all code quality tools before each commit.

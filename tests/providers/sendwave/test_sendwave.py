@@ -67,9 +67,7 @@ def test_corridor(
                     f"Available delivery methods: {len(result['available_delivery_methods'])}"
                 )
                 for method in result["available_delivery_methods"]:
-                    logger.info(
-                        f"  - {method['method_name']} ({method['standardized_name']})"
-                    )
+                    logger.info(f"  - {method['method_name']} ({method['standardized_name']})")
 
             # Check if promotions are available
             if "promotions" in result and result["promotions"]:
@@ -89,19 +87,13 @@ def test_corridor(
 
 def main():
     """Main function to run the tests"""
-    parser = argparse.ArgumentParser(
-        description="Test the Sendwave provider implementation"
-    )
+    parser = argparse.ArgumentParser(description="Test the Sendwave provider implementation")
     parser.add_argument("--amount", type=str, default="500", help="Amount to send")
     parser.add_argument("--currency", type=str, default="USD", help="Source currency")
-    parser.add_argument(
-        "--country", type=str, default="PH", help="Destination country code"
-    )
+    parser.add_argument("--country", type=str, default="PH", help="Destination country code")
     parser.add_argument("--payment", type=str, help="Payment method")
     parser.add_argument("--delivery", type=str, help="Delivery method")
-    parser.add_argument(
-        "--test-all", action="store_true", help="Test all supported corridors"
-    )
+    parser.add_argument("--test-all", action="store_true", help="Test all supported corridors")
     parser.add_argument(
         "--test-normalize",
         action="store_true",

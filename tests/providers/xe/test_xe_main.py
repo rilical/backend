@@ -260,9 +260,7 @@ def main():
 
     args = parser.parse_args()
 
-    print(
-        f"XE Money Transfer API Test - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-    )
+    print(f"XE Money Transfer API Test - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 80)
 
     # Always run midmarket rates test as it's the most basic

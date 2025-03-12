@@ -7,7 +7,7 @@ countries like Australia to destinations in Asia and Pacific regions.
 
 Example usage:
     from apps.providers.orbitremit import OrbitRemitProvider
-    
+
     provider = OrbitRemitProvider()
     result = provider.get_fee_info(
         send_currency="AUD",

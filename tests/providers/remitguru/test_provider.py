@@ -29,9 +29,7 @@ def test_get_quote():
         logger.info(f"Result: {result}")
 
         # Test unsupported corridor to verify error handling
-        logger.info(
-            "Testing US -> Pakistan corridor (EXPECTED TO FAIL - NOT SUPPORTED)"
-        )
+        logger.info("Testing US -> Pakistan corridor (EXPECTED TO FAIL - NOT SUPPORTED)")
         result = provider.get_quote(
             amount=Decimal("500"),
             source_currency="USD",
@@ -56,9 +54,7 @@ def test_get_exchange_rate():
         logger.info(f"Result: {result}")
 
         # Test unsupported corridor to verify error handling
-        logger.info(
-            "Testing USD -> PKR exchange rate (EXPECTED TO FAIL - NOT SUPPORTED)"
-        )
+        logger.info("Testing USD -> PKR exchange rate (EXPECTED TO FAIL - NOT SUPPORTED)")
         result = provider.get_exchange_rate(
             send_amount=Decimal("500"), send_currency="USD", target_currency="PKR"
         )
@@ -71,9 +67,7 @@ def test_supported_methods():
         countries = provider.get_supported_countries()
         currencies = provider.get_supported_currencies()
 
-        logger.info(
-            f"Supported countries: {countries} (Only GB->IN corridor is supported)"
-        )
+        logger.info(f"Supported countries: {countries} (Only GB->IN corridor is supported)")
         logger.info(f"Supported currencies: {currencies}")
 
 

@@ -23,9 +23,7 @@ logger = logging.getLogger("ria_tests")
 
 # Ensure we can import from the parent directory
 sys.path.append(
-    os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    )
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 )
 
 # Import the RIA provider
@@ -152,12 +150,8 @@ def test_get_quote() -> None:
             # For successful calls, verify key fields
             if result["success"]:
                 assert result["exchange_rate"] > 0, "Exchange rate should be positive"
-                assert (
-                    result["destination_amount"] > 0
-                ), "Destination amount should be positive"
-                assert (
-                    "destination_currency" in result
-                ), "Destination currency should be present"
+                assert result["destination_amount"] > 0, "Destination amount should be positive"
+                assert "destination_currency" in result, "Destination currency should be present"
                 assert result["fee"] is not None, "Fee should be present (even if 0)"
 
                 # Check for delivery methods
@@ -177,13 +171,9 @@ def test_get_quote() -> None:
                 if "available_payment_methods" in result:
                     logger.info(f"  Available payment methods for {corridor['name']}:")
                     for method in result["available_payment_methods"]:
-                        logger.info(
-                            f"  - {method['method_name']} ({method['standardized_name']})"
-                        )
+                        logger.info(f"  - {method['method_name']} ({method['standardized_name']})")
             else:
-                assert result[
-                    "error_message"
-                ], "Failed result should have an error message"
+                assert result["error_message"], "Failed result should have an error message"
 
 
 def test_get_exchange_rate() -> None:
@@ -208,13 +198,9 @@ def test_get_exchange_rate() -> None:
             logger.info(f"{formatted_result} (took {elapsed:.2f}s)")
 
             # Verify result
-            assert (
-                result["success"] == True
-            ), f"Expected success=True but got {result['success']}"
+            assert result["success"] == True, f"Expected success=True but got {result['success']}"
             assert result["exchange_rate"] > 0, "Exchange rate should be positive"
-            assert (
-                result["destination_amount"] > 0
-            ), "Destination amount should be positive"
+            assert result["destination_amount"] > 0, "Destination amount should be positive"
 
 
 def test_provider_details() -> None:
@@ -286,9 +272,7 @@ def test_delivery_methods() -> None:
 
             if result["success"] and "available_delivery_methods" in result:
                 methods = result["available_delivery_methods"]
-                logger.info(
-                    f"Found {len(methods)} delivery methods for {corridor['name']}"
-                )
+                logger.info(f"Found {len(methods)} delivery methods for {corridor['name']}")
 
                 if methods:
                     # Print details of each delivery method
@@ -355,9 +339,7 @@ def test_delivery_methods() -> None:
                             f"  {idx}. {method['method_name']} ({method['method_code']}) → {method['standardized_name']}"
                         )
                 else:
-                    logger.warning(
-                        f"Still no delivery methods found with BankAccount payment"
-                    )
+                    logger.warning(f"Still no delivery methods found with BankAccount payment")
 
 
 def test_error_handling() -> None:

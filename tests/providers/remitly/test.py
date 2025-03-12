@@ -11,9 +11,7 @@ from decimal import Decimal
 from typing import Any, Dict, List
 
 # Add the project root to the Python path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
 
 from apps.providers.remitly.integration import RemitlyProvider
 
@@ -194,17 +192,13 @@ def test_support_methods():
         currencies = provider.get_supported_currencies()
 
         logger.info(f"Supported countries ({len(countries)}): {', '.join(countries)}")
-        logger.info(
-            f"Supported currencies ({len(currencies)}): {', '.join(currencies)}"
-        )
+        logger.info(f"Supported currencies ({len(currencies)}): {', '.join(currencies)}")
 
         # Test currency mapping for different country formats
         sample_countries = ["PH", "IN", "MX", "CO", "SV"]
         logger.info("\nTesting currency mapping:")
         for country in sample_countries:
-            logger.info(
-                f"Currency for {country}: {provider._get_currency_for_country(country)}"
-            )
+            logger.info(f"Currency for {country}: {provider._get_currency_for_country(country)}")
             logger.info(
                 f"Currency for {provider._convert_country_code(country)}: {provider._get_currency_for_country(provider._convert_country_code(country))}"
             )

@@ -147,9 +147,7 @@ def test_all_corridors():
                         {
                             "exchange_rate": result.get("exchange_rate"),
                             "fee": result.get("fee"),
-                            "delivery_time_minutes": result.get(
-                                "delivery_time_minutes"
-                            ),
+                            "delivery_time_minutes": result.get("delivery_time_minutes"),
                         }
                     )
 
@@ -254,15 +252,9 @@ class TestXoomAggregatorFormat(unittest.TestCase):
 
         # Check success case specific validations
         self.assertTrue(result["success"], "Expected success=True")
-        self.assertIsNone(
-            result["error_message"], "Error message should be None on success"
-        )
-        self.assertGreater(
-            result["exchange_rate"], 0, "Exchange rate should be positive"
-        )
-        self.assertGreater(
-            result["destination_amount"], 0, "Destination amount should be positive"
-        )
+        self.assertIsNone(result["error_message"], "Error message should be None on success")
+        self.assertGreater(result["exchange_rate"], 0, "Exchange rate should be positive")
+        self.assertGreater(result["destination_amount"], 0, "Destination amount should be positive")
         self.assertIn("raw_response", result, "Raw response should be included")
 
     def test_error_response_format(self):
@@ -280,9 +272,7 @@ class TestXoomAggregatorFormat(unittest.TestCase):
 
         # Check error case specific validations
         self.assertFalse(result["success"], "Expected success=False")
-        self.assertIsNotNone(
-            result["error_message"], "Error message should be provided"
-        )
+        self.assertIsNotNone(result["error_message"], "Error message should be provided")
         self.assertIsNotNone(result["provider_id"], "Provider ID should be present")
         self.assertEqual(result["provider_id"], "Xoom", "Provider ID should be 'Xoom'")
 
@@ -291,16 +281,10 @@ def main():
     """Main entry point for the test script."""
     parser = argparse.ArgumentParser(description="Test Xoom Aggregator Provider")
     parser.add_argument("--amount", type=float, default=100.0, help="Amount to send")
-    parser.add_argument(
-        "--source-currency", type=str, default="USD", help="Source currency code"
-    )
-    parser.add_argument(
-        "--target-country", type=str, default="MX", help="Target country code"
-    )
+    parser.add_argument("--source-currency", type=str, default="USD", help="Source currency code")
+    parser.add_argument("--target-country", type=str, default="MX", help="Target country code")
     parser.add_argument("--test-all", action="store_true", help="Test all corridors")
-    parser.add_argument(
-        "--test-errors", action="store_true", help="Test error handling"
-    )
+    parser.add_argument("--test-errors", action="store_true", help="Test error handling")
     parser.add_argument("--unittest", action="store_true", help="Run unit tests")
     parser.add_argument("--output", type=str, help="Output file for results (JSON)")
 
@@ -317,9 +301,7 @@ def main():
 
         # Print summary
         success_count = sum(1 for r in results if r.get("success"))
-        logger.info(
-            f"Results: {success_count} successful out of {len(results)} corridors"
-        )
+        logger.info(f"Results: {success_count} successful out of {len(results)} corridors")
 
         # Output details
         if args.output:
@@ -330,19 +312,9 @@ def main():
             for result in results:
                 status = "✅" if result.get("success") else "❌"
                 format_status = "✅" if result.get("valid_format") else "❌"
-                error = (
-                    f": {result.get('error_message')}"
-                    if not result.get("success")
-                    else ""
-                )
-                rate = (
-                    f" (Rate: {result.get('exchange_rate')})"
-                    if result.get("success")
-                    else ""
-                )
-                print(
-                    f"{status} {result['corridor']}{rate} - Format: {format_status}{error}"
-                )
+                error = f": {result.get('error_message')}" if not result.get("success") else ""
+                rate = f" (Rate: {result.get('exchange_rate')})" if result.get("success") else ""
+                print(f"{status} {result['corridor']}{rate} - Format: {format_status}{error}")
 
     elif args.test_errors:
         logger.info("Testing error handling...")
@@ -384,8 +356,7 @@ def main():
             with open(args.output, "w") as f:
                 # Convert Decimal objects for JSON serialization
                 serializable_result = {
-                    k: (str(v) if isinstance(v, Decimal) else v)
-                    for k, v in result.items()
+                    k: (str(v) if isinstance(v, Decimal) else v) for k, v in result.items()
                 }
                 json.dump(serializable_result, f, indent=2)
 

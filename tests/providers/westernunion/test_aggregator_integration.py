@@ -2,7 +2,7 @@
 """
 Test script for the Western Union aggregator integration.
 
-This script tests the updated WesternUnionProvider to verify it works 
+This script tests the updated WesternUnionProvider to verify it works
 correctly with the aggregator pattern, returning standardized responses.
 
 Usage:
@@ -20,9 +20,7 @@ from decimal import Decimal
 from typing import Any, Dict
 
 # Add parent directory to path so we can import correctly
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
 
 # Import the provider
 from apps.providers.westernunion.integration import WesternUnionProvider
@@ -137,9 +135,7 @@ def pretty_print_result(result: Dict[str, Any], title: str = None) -> None:
             pprint.pprint(result)
 
 
-def test_corridor(
-    provider: WesternUnionProvider, params: Dict[str, Any]
-) -> Dict[str, Any]:
+def test_corridor(provider: WesternUnionProvider, params: Dict[str, Any]) -> Dict[str, Any]:
     """Test a single corridor with parameters."""
     source_country = params.get("source_country")
     dest_country = params.get("destination_country")
@@ -169,16 +165,10 @@ def test_corridor(
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Test Western Union aggregator integration"
-    )
+    parser = argparse.ArgumentParser(description="Test Western Union aggregator integration")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
-    parser.add_argument(
-        "--corridor", type=int, help="Test a specific corridor by index (0-7)"
-    )
-    parser.add_argument(
-        "--sleep", type=int, default=2, help="Sleep time between tests (seconds)"
-    )
+    parser.add_argument("--corridor", type=int, help="Test a specific corridor by index (0-7)")
+    parser.add_argument("--sleep", type=int, default=2, help="Sleep time between tests (seconds)")
     args = parser.parse_args()
 
     if args.debug:

@@ -55,9 +55,7 @@ class TestWiseProviderRealAPI(unittest.TestCase):
 
         file_handler = logging.FileHandler(log_file)
         file_handler.setLevel(logging.DEBUG)
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         file_handler.setFormatter(formatter)
 
         # Add the file handler to the logger
@@ -76,9 +74,7 @@ class TestWiseProviderRealAPI(unittest.TestCase):
 
         file_handler = logging.FileHandler(log_file)
         file_handler.setLevel(logging.DEBUG)
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         file_handler.setFormatter(formatter)
 
         # Add the file handler to the logger
@@ -131,9 +127,7 @@ class TestWiseProviderRealAPI(unittest.TestCase):
             # Log the results
             self.test_logger.info(f"Exchange rate: {rate_data['exchange_rate']}")
             self.test_logger.info(f"Fee: {rate_data['fee']}")
-            self.test_logger.info(
-                f"Destination amount: {rate_data['destination_amount']}"
-            )
+            self.test_logger.info(f"Destination amount: {rate_data['destination_amount']}")
 
         except Exception as e:
             self.test_logger.error(f"Error in test: {str(e)}")
@@ -219,13 +213,9 @@ class TestWiseProviderRealAPI(unittest.TestCase):
 
                 # Log the results
                 if rate_data["success"]:
-                    self.test_logger.info(
-                        f"Exchange rate: {rate_data['exchange_rate']}"
-                    )
+                    self.test_logger.info(f"Exchange rate: {rate_data['exchange_rate']}")
                     self.test_logger.info(f"Fee: {rate_data['fee']}")
-                    self.test_logger.info(
-                        f"Destination amount: {rate_data['destination_amount']}"
-                    )
+                    self.test_logger.info(f"Destination amount: {rate_data['destination_amount']}")
                 else:
                     self.test_logger.warning(
                         f"Failed to get rate: {rate_data.get('error_message')}"
@@ -247,9 +237,7 @@ class TestWiseProviderRealAPI(unittest.TestCase):
 
         # Save results to file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        results_file = os.path.join(
-            self.results_dir, f"WISE_CORRIDORS_{timestamp}.json"
-        )
+        results_file = os.path.join(self.results_dir, f"WISE_CORRIDORS_{timestamp}.json")
 
         with open(results_file, "w") as f:
             json.dump(results, f, indent=2)
@@ -307,20 +295,14 @@ class TestWiseProviderRealAPI(unittest.TestCase):
             send_country = corridor["send_country"]
             receive_country = corridor["receive_country"]
 
-            self.test_logger.info(
-                f"Testing corridor: {send_country}->{receive_country}"
-            )
+            self.test_logger.info(f"Testing corridor: {send_country}->{receive_country}")
 
             try:
                 # Get payment methods
-                payment_methods = self.get_payment_methods(
-                    send_country, receive_country
-                )
+                payment_methods = self.get_payment_methods(send_country, receive_country)
 
                 # Get delivery methods
-                delivery_methods = self.get_delivery_methods(
-                    send_country, receive_country
-                )
+                delivery_methods = self.get_delivery_methods(send_country, receive_country)
 
                 # Add to results
                 results.append(
@@ -353,9 +335,7 @@ class TestWiseProviderRealAPI(unittest.TestCase):
 
         # Save results to file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        results_file = os.path.join(
-            self.results_dir, f"WISE_DISCOVERY_SUMMARY_{timestamp}.json"
-        )
+        results_file = os.path.join(self.results_dir, f"WISE_DISCOVERY_SUMMARY_{timestamp}.json")
 
         with open(results_file, "w") as f:
             json.dump(results, f, indent=2)
@@ -365,9 +345,7 @@ class TestWiseProviderRealAPI(unittest.TestCase):
 
         # Print summary
         self.test_logger.info("\n=== METHOD DISCOVERY SUMMARY ===")
-        self.test_logger.info(
-            f"Tested {len(corridors)} corridors, {supported_count} supported"
-        )
+        self.test_logger.info(f"Tested {len(corridors)} corridors, {supported_count} supported")
         self.test_logger.info("\n=== END SUMMARY ===")
 
     def get_payment_methods(self, source_country: str, target_country: str) -> list:

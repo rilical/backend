@@ -270,12 +270,8 @@ def test_factory():
         test_corridors = list(TEST_CORRIDORS.keys())[:3]  # Test first 3 corridors
 
         for corridor in test_corridors:
-            logger.info(
-                f"\nTesting factory get_exchange_rate with corridor: {corridor}"
-            )
-            result = provider.get_exchange_rate(
-                source_country="US", corridor_val=corridor
-            )
+            logger.info(f"\nTesting factory get_exchange_rate with corridor: {corridor}")
+            result = provider.get_exchange_rate(source_country="US", corridor_val=corridor)
 
             logger.info(f"Exchange rate result: {result}")
 
@@ -490,9 +486,7 @@ def run_comprehensive_tests():
             )
 
             if rate_result.get("success"):
-                logger.info(
-                    f"✅ Direct exchange rate successful: {rate_result.get('rate')}"
-                )
+                logger.info(f"✅ Direct exchange rate successful: {rate_result.get('rate')}")
             else:
                 logger.warning(
                     f"⚠️ Direct exchange rate failed: {rate_result.get('error_message')}"
@@ -527,9 +521,7 @@ def run_comprehensive_tests():
                     )
 
         logger.info(f"\nComprehensive Tests: {success_count}/{total_tests} successful")
-        return (
-            success_count > 0
-        )  # Consider test passed if at least one quote was successful
+        return success_count > 0  # Consider test passed if at least one quote was successful
 
     except Exception as e:
         logger.error(f"Comprehensive test error: {str(e)}")
@@ -658,9 +650,7 @@ def test_error_handling():
         total_tests += len(quote_error_tests)
 
         for i, test in enumerate(quote_error_tests):
-            logger.info(
-                f"\nQuote Error Test {i+1}/{len(quote_error_tests)}: {test['test_name']}"
-            )
+            logger.info(f"\nQuote Error Test {i+1}/{len(quote_error_tests)}: {test['test_name']}")
 
             try:
                 result = provider.get_quote(**test["params"])
@@ -705,12 +695,8 @@ def main():
     parser.add_argument("--api", action="store_true", help="Run API tests")
     parser.add_argument("--factory", action="store_true", help="Run factory tests")
     parser.add_argument("--quote", action="store_true", help="Run quote tests")
-    parser.add_argument(
-        "--comprehensive", action="store_true", help="Run comprehensive tests"
-    )
-    parser.add_argument(
-        "--errors", action="store_true", help="Run error handling tests"
-    )
+    parser.add_argument("--comprehensive", action="store_true", help="Run comprehensive tests")
+    parser.add_argument("--errors", action="store_true", help="Run error handling tests")
     parser.add_argument("--all", action="store_true", help="Run all tests")
 
     args = parser.parse_args()

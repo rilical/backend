@@ -12,9 +12,7 @@ import sys
 from decimal import Decimal
 
 # Add the project root to the Python path to allow direct imports
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
 
 from apps.providers.instarem.exceptions import InstaRemApiError
 from apps.providers.instarem.integration import InstaRemProvider
@@ -49,9 +47,7 @@ def test_delivery_methods():
             assert "id" in method, "Method should have an ID"
             assert "name" in method, "Method should have a name"
             assert "type" in method, "Method should have a type"
-            assert (
-                "estimated_minutes" in method
-            ), "Method should have estimated delivery time"
+            assert "estimated_minutes" in method, "Method should have estimated delivery time"
             assert "description" in method, "Method should have a description"
             assert "is_default" in method, "Method should indicate if it's default"
 
@@ -111,9 +107,7 @@ def test_quotes():
             # Verify quote structure
             assert "send_amount" in quote, "Quote should have send amount"
             assert "source_currency" in quote, "Quote should have source currency"
-            assert (
-                quote.get("exchange_rate") is not None
-            ), "Quote should have exchange rate"
+            assert quote.get("exchange_rate") is not None, "Quote should have exchange rate"
             assert quote.get("fee") is not None, "Quote should have fee"
 
             if "destination_amount" in quote and quote["destination_amount"]:
@@ -142,9 +136,7 @@ def test_quotes():
                         f"Receive={quote_with_method.get('destination_amount')}"
                     )
                 else:
-                    logger.info(
-                        f"Quote failed: {quote_with_method.get('error_message')}"
-                    )
+                    logger.info(f"Quote failed: {quote_with_method.get('error_message')}")
 
 
 def test_exchange_rate():
@@ -163,9 +155,7 @@ def test_exchange_rate():
             source_country,
             target_country,
         ) in test_cases:
-            logger.info(
-                f"\nTesting exchange rate for {source_currency} to {target_currency}..."
-            )
+            logger.info(f"\nTesting exchange rate for {source_currency} to {target_currency}...")
 
             rate_info = provider.get_exchange_rate(
                 source_currency=source_currency,
@@ -177,9 +167,7 @@ def test_exchange_rate():
             logger.info(f"Exchange rate response: {json.dumps(rate_info, indent=2)}")
 
             if rate_info["success"]:
-                assert (
-                    rate_info.get("rate") is not None
-                ), "Exchange rate should have a rate value"
+                assert rate_info.get("rate") is not None, "Exchange rate should have a rate value"
                 assert (
                     rate_info.get("source_currency") == source_currency.upper()
                 ), "Source currency should match"

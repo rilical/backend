@@ -49,9 +49,7 @@ class TestAlAnsariLive(unittest.TestCase):
 
         # If the API is still returning HTTP 400, this test might be skipped
         if quote["error_message"] and "HTTP 400" in quote["error_message"]:
-            self.skipTest(
-                "API returning HTTP 400 error - possibly rate limited or blocked"
-            )
+            self.skipTest("API returning HTTP 400 error - possibly rate limited or blocked")
 
         self.assertTrue(
             quote["success"],
@@ -62,9 +60,7 @@ class TestAlAnsariLive(unittest.TestCase):
             0,
             "Destination amount should be greater than 0",
         )
-        self.assertGreater(
-            quote["exchange_rate"], 0, "Exchange rate should be greater than 0"
-        )
+        self.assertGreater(quote["exchange_rate"], 0, "Exchange rate should be greater than 0")
 
     def test_aed_to_lkr_300(self):
         """
@@ -82,9 +78,7 @@ class TestAlAnsariLive(unittest.TestCase):
 
         # If the API is still returning HTTP 400, this test might be skipped
         if quote["error_message"] and "HTTP 400" in quote["error_message"]:
-            self.skipTest(
-                "API returning HTTP 400 error - possibly rate limited or blocked"
-            )
+            self.skipTest("API returning HTTP 400 error - possibly rate limited or blocked")
 
         self.assertTrue(
             quote["success"],
@@ -130,9 +124,7 @@ class TestAlAnsariLive(unittest.TestCase):
         logger.info(f"Quote (0 AED -> INR): {json.dumps(quote, indent=2)}")
 
         self.assertFalse(quote["success"], "Zero amount should not be valid.")
-        self.assertIsNotNone(
-            quote["error_message"], "Expected an error_message for zero amount."
-        )
+        self.assertIsNotNone(quote["error_message"], "Expected an error_message for zero amount.")
 
     def test_negative_amount(self):
         """

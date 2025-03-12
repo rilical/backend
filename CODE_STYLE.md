@@ -1,4 +1,4 @@
-# Code Style Guide
+# Python Code Style Guide
 
 This document outlines the code style tools and practices used in this project.
 
@@ -80,4 +80,4 @@ For type annotation issues:
 1. **Run code style checks before committing**: This prevents style issues from being committed
 2. **Fix issues incrementally**: Focus on fixing one type of issue at a time
 3. **Keep configurations consistent**: Ensure all tools are configured to work together (e.g., line length)
-4. **Document exceptions**: If you need to ignore a specific rule, document why 
+4. **Document exceptions**: If you need to ignore a specific rule, document why

@@ -85,9 +85,7 @@ def test_corridor(
                     f"Available delivery methods: {len(result['available_delivery_methods'])}"
                 )
                 for method in result["available_delivery_methods"]:
-                    logger.info(
-                        f"  - {method['method_name']} ({method['standardized_name']})"
-                    )
+                    logger.info(f"  - {method['method_name']} ({method['standardized_name']})")
 
             # Check if payment methods are available
             if "available_payment_methods" in result:
@@ -95,9 +93,7 @@ def test_corridor(
                     f"Available payment methods: {len(result['available_payment_methods'])}"
                 )
                 for method in result["available_payment_methods"]:
-                    logger.info(
-                        f"  - {method['method_name']} ({method['standardized_name']})"
-                    )
+                    logger.info(f"  - {method['method_name']} ({method['standardized_name']})")
 
             return True
         else:
@@ -169,17 +165,13 @@ def test_error_handling(provider):
         )
 
         if not result["success"] and result["error_message"]:
-            logger.info(
-                f"✅ Correctly handled unsupported corridor: {result['error_message']}"
-            )
+            logger.info(f"✅ Correctly handled unsupported corridor: {result['error_message']}")
             return True
         else:
             logger.error("❌ Failed to handle unsupported corridor properly")
             return False
     except Exception as e:
-        logger.error(
-            f"❌ ERROR: Exception was raised instead of returning error response: {str(e)}"
-        )
+        logger.error(f"❌ ERROR: Exception was raised instead of returning error response: {str(e)}")
         return False
 
 
@@ -234,14 +226,10 @@ def test_cash_pickup(provider):
                         logger.info("✅ Cash pickup delivery method found in response")
                         return True
                     else:
-                        logger.warning(
-                            "⚠️ Cash pickup delivery method NOT found in response"
-                        )
+                        logger.warning("⚠️ Cash pickup delivery method NOT found in response")
                         return False
                 else:
-                    logger.warning(
-                        f"⚠️ Cash pickup test failed: {result['error_message']}"
-                    )
+                    logger.warning(f"⚠️ Cash pickup test failed: {result['error_message']}")
 
         except Exception as e:
             logger.error(f"Error testing cash pickup for {dest_country}: {str(e)}")
@@ -302,14 +290,10 @@ def test_mobile_wallet(provider):
                         logger.info("✅ Mobile wallet delivery method found in response")
                         return True
                     else:
-                        logger.warning(
-                            "⚠️ Mobile wallet delivery method NOT found in response"
-                        )
+                        logger.warning("⚠️ Mobile wallet delivery method NOT found in response")
                         return False
                 else:
-                    logger.warning(
-                        f"⚠️ Mobile wallet test failed: {result['error_message']}"
-                    )
+                    logger.warning(f"⚠️ Mobile wallet test failed: {result['error_message']}")
 
         except Exception as e:
             logger.error(f"Error testing mobile wallet for {dest_country}: {str(e)}")
@@ -333,9 +317,7 @@ def test_popular_corridors(provider, max_tests=5):
 
     success_count = 0
     for src_country, src_currency, dst_country, dst_currency in test_corridors:
-        if test_corridor(
-            provider, "1000", src_country, src_currency, dst_country, dst_currency
-        ):
+        if test_corridor(provider, "1000", src_country, src_currency, dst_country, dst_currency):
             success_count += 1
 
     logger.info(f"✅ {success_count}/{len(test_corridors)} popular corridors successful")
@@ -353,9 +335,7 @@ def test_random_corridors(provider, count=3):
     success_count = 0
     attempts = 0
 
-    while (
-        success_count < count and attempts < 10
-    ):  # limit attempts to avoid infinite loop
+    while success_count < count and attempts < 10:  # limit attempts to avoid infinite loop
         attempts += 1
 
         # Pick a random source country
@@ -412,45 +392,27 @@ def test_random_corridors(provider, count=3):
 
 def main():
     """Main function to run the tests"""
-    parser = argparse.ArgumentParser(
-        description="Test the TransferGo provider implementation"
-    )
+    parser = argparse.ArgumentParser(description="Test the TransferGo provider implementation")
     parser.add_argument("--amount", type=str, default="1000", help="Amount to send")
-    parser.add_argument(
-        "--source-country", type=str, default="DE", help="Source country code"
-    )
-    parser.add_argument(
-        "--source-currency", type=str, default="EUR", help="Source currency"
-    )
+    parser.add_argument("--source-country", type=str, default="DE", help="Source country code")
+    parser.add_argument("--source-currency", type=str, default="EUR", help="Source currency")
     parser.add_argument(
         "--destination-country", type=str, default="UA", help="Destination country code"
     )
     parser.add_argument(
         "--destination-currency", type=str, default="UAH", help="Destination currency"
     )
-    parser.add_argument(
-        "--payment", type=str, help="Payment method (e.g., bank_transfer)"
-    )
-    parser.add_argument(
-        "--delivery", type=str, help="Delivery method (e.g., bank_deposit)"
-    )
-    parser.add_argument(
-        "--test-all", action="store_true", help="Test all supported corridors"
-    )
-    parser.add_argument(
-        "--test-popular", action="store_true", help="Test popular corridors"
-    )
-    parser.add_argument(
-        "--test-random", action="store_true", help="Test random corridors"
-    )
+    parser.add_argument("--payment", type=str, help="Payment method (e.g., bank_transfer)")
+    parser.add_argument("--delivery", type=str, help="Delivery method (e.g., bank_deposit)")
+    parser.add_argument("--test-all", action="store_true", help="Test all supported corridors")
+    parser.add_argument("--test-popular", action="store_true", help="Test popular corridors")
+    parser.add_argument("--test-random", action="store_true", help="Test random corridors")
     parser.add_argument(
         "--test-receive",
         action="store_true",
         help="Test with receive amount instead of send amount",
     )
-    parser.add_argument(
-        "--test-errors", action="store_true", help="Test error handling"
-    )
+    parser.add_argument("--test-errors", action="store_true", help="Test error handling")
     parser.add_argument(
         "--test-cash-pickup",
         action="store_true",
@@ -461,9 +423,7 @@ def main():
         action="store_true",
         help="Test mobile wallet delivery method",
     )
-    parser.add_argument(
-        "--comprehensive", action="store_true", help="Run all test types"
-    )
+    parser.add_argument("--comprehensive", action="store_true", help="Run all test types")
 
     args = parser.parse_args()
 

@@ -1,7 +1,7 @@
 """
 Cache utility functions for the quotes app.
 
-This module provides functions for manual cache operations, 
+This module provides functions for manual cache operations,
 such as invalidating caches by pattern, preloading caches, etc.
 """
 import logging

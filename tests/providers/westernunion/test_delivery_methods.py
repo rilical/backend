@@ -13,9 +13,7 @@ from decimal import Decimal
 from pprint import pprint
 
 # Add parent directory to path for imports
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
 
 # Import the provider
 from apps.providers.westernunion.integration import WesternUnionProvider
@@ -71,9 +69,7 @@ def test_delivery_methods():
     if result["success"]:
         print(f"✅ SUCCESS: Exchange Rate = {result['exchange_rate']}")
         print(f"Fee: {result['fee']}")
-        print(
-            f"Receive Amount: {result['destination_amount']} {result['destination_currency']}"
-        )
+        print(f"Receive Amount: {result['destination_amount']} {result['destination_currency']}")
         print(f"Delivery Method: {result['delivery_method']}")
     else:
         print(f"❌ FAILED: {result['error_message']}")
@@ -95,9 +91,7 @@ def test_delivery_methods():
     if result["success"]:
         print(f"✅ SUCCESS: Exchange Rate = {result['exchange_rate']}")
         print(f"Fee: {result['fee']}")
-        print(
-            f"Receive Amount: {result['destination_amount']} {result['destination_currency']}"
-        )
+        print(f"Receive Amount: {result['destination_amount']} {result['destination_currency']}")
         print(f"Delivery Method: {result['delivery_method']}")
     else:
         print(f"❌ FAILED: {result['error_message']}")
@@ -116,9 +110,7 @@ def test_delivery_methods():
     if result["success"]:
         print(f"✅ SUCCESS: Exchange Rate = {result['exchange_rate']}")
         print(f"Fee: {result['fee']}")
-        print(
-            f"Receive Amount: {result['destination_amount']} {result['destination_currency']}"
-        )
+        print(f"Receive Amount: {result['destination_amount']} {result['destination_currency']}")
         print(f"Delivery Method: {result['delivery_method']}")
     else:
         print(f"❌ FAILED: {result['error_message']}")
@@ -136,9 +128,7 @@ def test_delivery_methods():
     if result["success"]:
         print(f"✅ SUCCESS: Exchange Rate = {result['exchange_rate']}")
         print(f"Fee: {result['fee']}")
-        print(
-            f"Receive Amount: {result['destination_amount']} {result['destination_currency']}"
-        )
+        print(f"Receive Amount: {result['destination_amount']} {result['destination_currency']}")
         print(f"Delivery Method: {result['delivery_method']}")
     else:
         print(f"❌ FAILED: {result['error_message']}")

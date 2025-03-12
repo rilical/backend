@@ -60,9 +60,7 @@ def test_get_quote():
         if quote["success"]:
             print(f"Exchange rate: {quote['exchange_rate']}")
             print(f"Send amount: {quote['send_amount']} {quote['source_currency']}")
-            print(
-                f"Receive amount: {quote['destination_amount']} {quote['destination_currency']}"
-            )
+            print(f"Receive amount: {quote['destination_amount']} {quote['destination_currency']}")
             print(f"Delivery time: {quote['delivery_time_minutes'] / 60} hours")
         else:
             print(f"Error: {quote['error_message']}")

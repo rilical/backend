@@ -17,9 +17,7 @@ from apps.providers.singx.exceptions import SingXError
 from apps.providers.singx.integration import SingXProvider
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # Test corridors with specific rates and fees
@@ -69,9 +67,7 @@ PAYMENT_METHODS = [
 ]
 
 
-def validate_rate(
-    actual: Decimal, expected: Decimal, tolerance: Decimal = Decimal("0.01")
-) -> bool:
+def validate_rate(actual: Decimal, expected: Decimal, tolerance: Decimal = Decimal("0.01")) -> bool:
     """
     Validate if the actual rate is within tolerance of expected rate.
 
@@ -116,9 +112,7 @@ async def test_exchange_rates() -> None:
 
                 if expected_rate:
                     if validate_rate(actual_rate, expected_rate):
-                        logger.info(
-                            f"{rate_info} ✓ (matches expected rate {expected_rate})"
-                        )
+                        logger.info(f"{rate_info} ✓ (matches expected rate {expected_rate})")
                     else:
                         logger.warning(
                             f"{rate_info} ⚠ (differs from expected rate {expected_rate}, "
@@ -178,10 +172,7 @@ async def test_quotes() -> None:
                     )
 
             except Exception as e:
-                logger.error(
-                    f"{corridor['name']} ({payment_method['name']}): "
-                    f"Error - {str(e)}"
-                )
+                logger.error(f"{corridor['name']} ({payment_method['name']}): " f"Error - {str(e)}")
 
 
 async def test_fees() -> None:

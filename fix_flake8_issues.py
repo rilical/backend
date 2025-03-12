@@ -81,9 +81,7 @@ def fix_unused_imports(file_path: str) -> List[Tuple[int, str, str]]:
                     # from module import x
                     elif re.search(rf"\bfrom\s+\S+\s+import\s+.*\b{name}\b", line):
                         if "," in line:  # Multiple imports on the same line
-                            fixes.append(
-                                (lineno, line, f"Remove unused import: {name} from line")
-                            )
+                            fixes.append((lineno, line, f"Remove unused import: {name} from line"))
                         else:
                             fixes.append((lineno, line, f"Remove entire line: {line.strip()}"))
                     # import module as name
@@ -107,9 +105,7 @@ def fix_trailing_whitespace(file_path: str) -> List[Tuple[int, str, str]]:
 
         for i, line in enumerate(lines):
             if line.rstrip() != line[:-1] if line.endswith("\n") else line:
-                fixes.append(
-                    (i + 1, line, f"Remove trailing whitespace: {repr(line)}")
-                )
+                fixes.append((i + 1, line, f"Remove trailing whitespace: {repr(line)}"))
     except Exception as e:
         print(f"Error processing {file_path}: {e}")
 
@@ -127,22 +123,20 @@ def fix_unused_variables(file_path: str) -> List[Tuple[int, str, str]]:
         # This is a simplified approach and won't catch all cases
         pattern = r"^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=.*$"
         lines = source.splitlines()
-        
+
         for i, line in enumerate(lines):
             match = re.match(pattern, line)
             if match:
                 var_name = match.group(1)
                 # Check if the variable is used in subsequent lines
                 is_used = False
-                for next_line in lines[i+1:]:
+                for next_line in lines[i + 1 :]:
                     if re.search(rf"\b{var_name}\b", next_line):
                         is_used = True
                         break
-                
+
                 if not is_used:
-                    fixes.append(
-                        (i + 1, line, f"Unused variable: {var_name}")
-                    )
+                    fixes.append((i + 1, line, f"Unused variable: {var_name}"))
     except Exception as e:
         print(f"Error processing {file_path}: {e}")
 
@@ -161,9 +155,7 @@ def fix_fstring_issues(file_path: str) -> List[Tuple[int, str, str]]:
         for i, line in enumerate(lines):
             matches = re.findall(pattern, line)
             for match in matches:
-                fixes.append(
-                    (i + 1, line, f"f-string without placeholders: {match}")
-                )
+                fixes.append((i + 1, line, f"f-string without placeholders: {match}"))
     except Exception as e:
         print(f"Error processing {file_path}: {e}")
 
@@ -176,9 +168,9 @@ def process_file(file_path: str) -> None:
     whitespace_issues = fix_trailing_whitespace(file_path)
     unused_vars = fix_unused_variables(file_path)
     fstring_issues = fix_fstring_issues(file_path)
-    
+
     all_issues = unused_imports + whitespace_issues + unused_vars + fstring_issues
-    
+
     if all_issues:
         print(f"\n{file_path}:")
         for lineno, line, suggestion in all_issues:
@@ -211,4 +203,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main() 
+    main()

@@ -53,7 +53,9 @@ def test_direct_api_call():
         }
     )
 
-    api_url = f"https://www.wirebarley.com/my/remittance/api/v1/exrate/{source_country}/{source_currency}"
+    api_url = (
+        f"https://www.wirebarley.com/my/remittance/api/v1/exrate/{source_country}/{source_currency}"
+    )
     print(f"URL: {api_url}")
 
     api_response = session.get(api_url, timeout=10)

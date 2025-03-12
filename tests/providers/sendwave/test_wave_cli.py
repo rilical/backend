@@ -27,12 +27,8 @@ logger = logging.getLogger("wave_test")
 def main():
     parser = argparse.ArgumentParser(description="Test Wave (Sendwave) Provider")
     parser.add_argument("--amount", type=float, default=500, help="Send amount")
-    parser.add_argument(
-        "--currency", type=str, default="USD", help="Send currency code (e.g. USD)"
-    )
-    parser.add_argument(
-        "--country", type=str, default="PH", help="Receive country code (e.g. PH)"
-    )
+    parser.add_argument("--currency", type=str, default="USD", help="Send currency code (e.g. USD)")
+    parser.add_argument("--country", type=str, default="PH", help="Receive country code (e.g. PH)")
     parser.add_argument(
         "--segment", type=str, default="ph_gcash", help="Segment name e.g. ph_gcash"
     )

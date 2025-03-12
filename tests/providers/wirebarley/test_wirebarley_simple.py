@@ -128,9 +128,7 @@ def get_wirebarley_quotes():
                 for dest in common_destinations:
                     for rate in ex_rates:
                         if rate.get("currency") == dest:
-                            print(
-                                f"  {source_currency} to {dest}: {rate.get('wbRate', 0)}"
-                            )
+                            print(f"  {source_currency} to {dest}: {rate.get('wbRate', 0)}")
                             break
 
                 # Store the results
@@ -219,9 +217,7 @@ def test_calculate_quotes():
                     "timestamp",
                 ]
 
-                missing = [
-                    field for field in required_fields if field not in quote_result
-                ]
+                missing = [field for field in required_fields if field not in quote_result]
                 if missing:
                     print(f"WARNING: Missing required fields: {missing}")
                 else:
@@ -231,17 +227,13 @@ def test_calculate_quotes():
                 print(f"  Provider: {quote_result['provider_id']}")
                 print(f"  Exchange rate: {quote_result['exchange_rate']}")
                 print(f"  Fee: {quote_result['fee']} {quote_result['send_currency']}")
-                print(
-                    f"  Send: {quote_result['send_amount']} {quote_result['send_currency']}"
-                )
+                print(f"  Send: {quote_result['send_amount']} {quote_result['send_currency']}")
                 print(
                     f"  Receive: {quote_result['receive_amount']} {quote_result['receive_currency']}"
                 )
                 print(f"  Payment method: {quote_result['payment_method']}")
                 print(f"  Delivery method: {quote_result['delivery_method']}")
-                print(
-                    f"  Delivery time: {quote_result['delivery_time_minutes']} minutes"
-                )
+                print(f"  Delivery time: {quote_result['delivery_time_minutes']} minutes")
             else:
                 print(f"  Error: {quote_result.get('error_message', 'Unknown error')}")
 
@@ -284,10 +276,7 @@ def test_calculate_quotes():
                 threshold_key = f"threshold{i if i > 0 else ''}"
                 rate_key = f"wbRate{i if i > 0 else ''}"
 
-                if (
-                    threshold_key in wb_rate_data
-                    and wb_rate_data[threshold_key] is not None
-                ):
+                if threshold_key in wb_rate_data and wb_rate_data[threshold_key] is not None:
                     threshold = float(wb_rate_data[threshold_key])
                     rate = float(wb_rate_data[rate_key])
                     thresholds.append((threshold, rate))
@@ -317,10 +306,7 @@ def test_calculate_quotes():
                     fee = float(fee_struct.get("fee1", 0))
 
                     # Check thresholds
-                    if (
-                        "threshold1" in fee_struct
-                        and fee_struct["threshold1"] is not None
-                    ):
+                    if "threshold1" in fee_struct and fee_struct["threshold1"] is not None:
                         threshold1 = float(fee_struct["threshold1"])
                         if (
                             amount >= threshold1
@@ -329,10 +315,7 @@ def test_calculate_quotes():
                         ):
                             fee = float(fee_struct["fee2"])
 
-                    if (
-                        "threshold2" in fee_struct
-                        and fee_struct["threshold2"] is not None
-                    ):
+                    if "threshold2" in fee_struct and fee_struct["threshold2"] is not None:
                         threshold2 = float(fee_struct["threshold2"])
                         if (
                             amount >= threshold2
@@ -361,9 +344,7 @@ if __name__ == "__main__":
     if not exchange_rates:
         print("\nFailed to get any exchange rates.")
     else:
-        print(
-            f"\nSuccessfully retrieved exchange rates for {len(exchange_rates)} currencies."
-        )
+        print(f"\nSuccessfully retrieved exchange rates for {len(exchange_rates)} currencies.")
         print("See the JSON files for complete data.")
 
         # Test calculating actual quotes

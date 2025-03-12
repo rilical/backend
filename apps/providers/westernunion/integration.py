@@ -19,7 +19,7 @@ Each delivery method supports specific payment methods, which vary by corridor.
 
 PAYMENT METHODS (fund_in types):
 -------------------------------
-- BANKACCOUNT: Bank account 
+- BANKACCOUNT: Bank account
 - CREDITCARD: Credit card payment
 - DEBITCARD: Debit card payment
 - CASH: Cash payment at agent location

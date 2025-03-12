@@ -285,22 +285,16 @@ class TestPaysendProvider(unittest.TestCase):
                 )
 
                 # Verify we got mock data
-                self.assertTrue(
-                    result.get("is_mock"), "Response should be marked as mock data"
-                )
+                self.assertTrue(result.get("is_mock"), "Response should be marked as mock data")
                 self.assertEqual(result["provider"], "Paysend")
                 self.assertEqual(result["send_amount"], 1000.0)
                 self.assertEqual(result["send_currency"], from_currency)
                 self.assertEqual(result["receive_currency"], to_currency)
 
                 # Check for realistic mock data
-                self.assertGreater(
-                    result["exchange_rate"], 0, "Exchange rate should be positive"
-                )
+                self.assertGreater(result["exchange_rate"], 0, "Exchange rate should be positive")
                 self.assertGreater(result["fee"], 0, "Fee should be positive")
-                self.assertGreater(
-                    result["receive_amount"], 0, "Receive amount should be positive"
-                )
+                self.assertGreater(result["receive_amount"], 0, "Receive amount should be positive")
 
                 print(
                     f"Mock data for {from_currency}-{to_currency}: {json.dumps(result, indent=2, default=str)}"
@@ -538,14 +532,9 @@ class TestPaysendProvider(unittest.TestCase):
         print("\n==== CHECKING WEBSITE ====")
         try:
             home_url = self.provider.base_url
-            response = requests.get(
-                home_url, headers=self.provider.session.headers, timeout=10
-            )
+            response = requests.get(home_url, headers=self.provider.session.headers, timeout=10)
             print(f"Homepage status: {response.status_code}")
-            if (
-                "calculator" in response.text.lower()
-                or "quote" in response.text.lower()
-            ):
+            if "calculator" in response.text.lower() or "quote" in response.text.lower():
                 print("The website seems to have a calculator or quote functionality")
             else:
                 print("No obvious calculator on homepage")
@@ -567,14 +556,10 @@ class TestPaysendProvider(unittest.TestCase):
             print("\n==== LIVE EXCHANGE RATE RESPONSE ====")
             print(f"Provider: {result['provider_id']}")
             print(f"Send: {result['source_amount']} {result['source_currency']}")
-            print(
-                f"Receive: {result['destination_amount']} {result['destination_currency']}"
-            )
+            print(f"Receive: {result['destination_amount']} {result['destination_currency']}")
             print(f"Exchange Rate: {result['exchange_rate']}")
             print(f"Fee: {result['fee']}")
-            print(
-                f"Raw API Response: {json.dumps(result['details']['raw_response'], indent=2)}"
-            )
+            print(f"Raw API Response: {json.dumps(result['details']['raw_response'], indent=2)}")
             print("==== END LIVE EXCHANGE RATE RESPONSE ====\n")
 
         except Exception as e:

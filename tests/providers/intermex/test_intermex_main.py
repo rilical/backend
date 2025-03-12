@@ -128,9 +128,7 @@ def test_different_amounts():
             if payment_methods:
                 logger.info("\nAvailable Payment Methods:")
                 for method in payment_methods:
-                    logger.info(
-                        f"- {method['senderPaymentMethodName']}: ${method['feeAmount']}"
-                    )
+                    logger.info(f"- {method['senderPaymentMethodName']}: ${method['feeAmount']}")
         else:
             logger.error(f"Failed to get quote for amount {amount}: {result['error']}")
 

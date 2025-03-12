@@ -37,9 +37,7 @@ except ImportError:
     logger.error(
         "Failed to import OrbitRemit provider. Make sure you're running this from the project root."
     )
-    logger.error(
-        "Try: PYTHONPATH=/path/to/project python apps/providers/orbitremit/tests.py"
-    )
+    logger.error("Try: PYTHONPATH=/path/to/project python apps/providers/orbitremit/tests.py")
     sys.exit(1)
 
 # API endpoints for direct testing
@@ -47,9 +45,7 @@ BASE_URL = "https://www.orbitremit.com"
 FEES_ENDPOINT = "/api/fees"
 
 # Ensure the test output directory exists
-TEST_OUTPUT_DIR = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "test_output"
-)
+TEST_OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_output")
 os.makedirs(TEST_OUTPUT_DIR, exist_ok=True)
 
 
@@ -164,9 +160,7 @@ def test_factory():
             logger.info("✅ Successful fee for AUD→PHP: %s", result["fee"])
             return True
         else:
-            logger.error(
-                "❌ Failed to get fee for AUD→PHP: %s", result.get("error_message")
-            )
+            logger.error("❌ Failed to get fee for AUD→PHP: %s", result.get("error_message"))
             return False
 
     except ImportError:
@@ -379,9 +373,7 @@ def test_error_handling():
                 result.get("error_message"),
             )
 
-    logger.info(
-        "\nError Handling Tests: %d/%d successful", success_count, len(error_tests)
-    )
+    logger.info("\nError Handling Tests: %d/%d successful", success_count, len(error_tests))
     return success_count == len(error_tests)
 
 
@@ -392,9 +384,7 @@ def main():
     parser.add_argument("--factory", action="store_true", help="Run factory tests")
     parser.add_argument("--fee", action="store_true", help="Run fee info tests")
     parser.add_argument("--quote", action="store_true", help="Run quote tests")
-    parser.add_argument(
-        "--errors", action="store_true", help="Run error handling tests"
-    )
+    parser.add_argument("--errors", action="store_true", help="Run error handling tests")
     parser.add_argument("--all", action="store_true", help="Run all tests")
     args = parser.parse_args()
 

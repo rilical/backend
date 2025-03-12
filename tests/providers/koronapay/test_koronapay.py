@@ -24,9 +24,7 @@ from apps.providers.koronapay.mapping import (
 )
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -72,9 +70,7 @@ class TestKoronaPayIntegration(unittest.TestCase):
     def test_different_amounts(self):
         """Test quotes with different amounts."""
         for amount in self.test_amounts:
-            quote = self.provider.get_quote(
-                send_amount=float(amount), **self.working_corridor
-            )
+            quote = self.provider.get_quote(send_amount=float(amount), **self.working_corridor)
 
             self.assertTrue(quote["success"])
             self.assertEqual(quote["send_amount"], float(amount))
@@ -182,9 +178,7 @@ class TestKoronaPayIntegration(unittest.TestCase):
         ]
 
         for corridor in unsupported_corridors:
-            quote = self.provider.get_quote(
-                send_amount=float(self.test_amount), **corridor
-            )
+            quote = self.provider.get_quote(send_amount=float(self.test_amount), **corridor)
 
             self.assertFalse(quote["success"])
             self.assertIsNotNone(quote["error_message"])
@@ -201,9 +195,7 @@ class TestKoronaPayIntegration(unittest.TestCase):
 
         self.assertTrue(quote1["success"])
         self.assertTrue(quote2["success"])
-        self.assertAlmostEqual(
-            quote1["exchange_rate"], quote2["exchange_rate"], places=4
-        )
+        self.assertAlmostEqual(quote1["exchange_rate"], quote2["exchange_rate"], places=4)
 
     def test_amount_validation(self):
         """Test amount validation."""
@@ -214,9 +206,7 @@ class TestKoronaPayIntegration(unittest.TestCase):
         ]
 
         for amount in invalid_amounts:
-            quote = self.provider.get_quote(
-                send_amount=float(amount), **self.working_corridor
-            )
+            quote = self.provider.get_quote(send_amount=float(amount), **self.working_corridor)
 
             self.assertFalse(quote["success"])
             self.assertIsNotNone(quote["error_message"])

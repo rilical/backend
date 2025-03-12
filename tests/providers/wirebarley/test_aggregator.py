@@ -237,9 +237,7 @@ def get_exchange_rate_direct(
     Returns:
         Dict containing the exchange rate data or error
     """
-    logger.info(
-        f"Getting direct exchange rate for {source_currency} to {destination_currency}"
-    )
+    logger.info(f"Getting direct exchange rate for {source_currency} to {destination_currency}")
 
     def get_currency_data(currency_code):
         """Find currency data in sample data"""
@@ -264,9 +262,7 @@ def get_exchange_rate_direct(
             "Lang": "en",
         }
 
-        response = requests.get(
-            url, headers=headers, cookies={"lang": "en"}, timeout=10
-        )
+        response = requests.get(url, headers=headers, cookies={"lang": "en"}, timeout=10)
         logger.info(f"API Response status: {response.status_code}")
 
         if response.status_code == 200:
@@ -287,13 +283,10 @@ def get_exchange_rate_direct(
                                 "success": True,
                                 "exchange_rate": float(rate_data["wbRate"]),
                                 "fee": fee,
-                                "destination_amount": float(amount)
-                                * float(rate_data["wbRate"]),
+                                "destination_amount": float(amount) * float(rate_data["wbRate"]),
                             }
 
-                logger.warning(
-                    "Currency not found in API response, falling back to sample data"
-                )
+                logger.warning("Currency not found in API response, falling back to sample data")
             except Exception as e:
                 logger.error(f"Error parsing API response: {str(e)}")
         else:
@@ -346,9 +339,7 @@ def get_wirebarley_cookies_via_selenium(email=None, password=None) -> Dict[str, 
         driver.get("https://www.wirebarley.com/en/login")
 
         # Wait for the login form and fill it
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.ID, "userEmail"))
-        )
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "userEmail")))
 
         # Input email and password
         driver.find_element(By.ID, "userEmail").send_keys(email)
@@ -462,9 +453,7 @@ def test_corridor_direct(
         decimal_amount = Decimal(amount)
 
         # Get exchange rates directly from the API
-        exchange_data = get_exchange_rate_direct(
-            source_currency, destination_currency, amount
-        )
+        exchange_data = get_exchange_rate_direct(source_currency, destination_currency, amount)
         logger.debug(
             f"Exchange data keys: {list(exchange_data.keys() if isinstance(exchange_data, dict) else [])}"
         )
@@ -478,9 +467,7 @@ def test_corridor_direct(
             }
 
         if "exchange_rate" not in exchange_data or "fee" not in exchange_data:
-            logger.error(
-                f"Missing 'exchange_rate' or 'fee' field in response: {exchange_data}"
-            )
+            logger.error(f"Missing 'exchange_rate' or 'fee' field in response: {exchange_data}")
             return {
                 "provider_id": "wirebarley",
                 "success": False,
@@ -596,9 +583,7 @@ def run_various_currency_tests():
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Test WireBarley aggregator functionality"
-    )
+    parser = argparse.ArgumentParser(description="Test WireBarley aggregator functionality")
     parser.add_argument(
         "--direct",
         action="store_true",
@@ -613,9 +598,7 @@ def main():
         run_various_currency_tests()
     else:
         logger.error("This script requires --direct flag to run with sample data")
-        logger.error(
-            "Example: python -m apps.providers.wirebarley.test_aggregator --direct"
-        )
+        logger.error("Example: python -m apps.providers.wirebarley.test_aggregator --direct")
         sys.exit(1)
 
 

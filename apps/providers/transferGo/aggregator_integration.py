@@ -2,8 +2,8 @@
 TransferGo provider implementation - aggregator-ready version.
 
 This module implements a provider for TransferGo that follows the aggregator pattern.
-It does not use any fallback or mock data: if the TransferGo API call fails or the corridor 
-is unsupported, it returns success=False with an error_message. Otherwise, it returns real 
+It does not use any fallback or mock data: if the TransferGo API call fails or the corridor
+is unsupported, it returns success=False with an error_message. Otherwise, it returns real
 data from TransferGo in the standard aggregator format.
 """
 

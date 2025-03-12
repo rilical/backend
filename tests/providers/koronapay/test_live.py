@@ -13,9 +13,7 @@ from datetime import datetime
 from decimal import Decimal
 
 # Add the project root to Python path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
 
 from apps.providers.koronapay.exceptions import KoronaPayError
 from apps.providers.koronapay.integration import KoronaPayProvider
@@ -302,21 +300,15 @@ def test_tariffs():
         logger.info(
             f"Corridor: {case['sending_country']} ({case['sending_currency']}) -> {case['receiving_country']} ({case['receiving_currency']})"
         )
-        logger.info(
-            f"Amount: {format_currency(case['amount'], case['sending_currency'])}"
-        )
+        logger.info(f"Amount: {format_currency(case['amount'], case['sending_currency'])}")
 
         try:
-            result = provider.get_tariffs(
-                **{k: v for k, v in case.items() if k != "description"}
-            )
+            result = provider.get_tariffs(**{k: v for k, v in case.items() if k != "description"})
             if result["success"]:
                 logger.info("✓ SUCCESS")
                 logger.info("-" * 30)
                 logger.info(f"Exchange Rate: {result['exchange_rate']:.4f}")
-                logger.info(
-                    f"Fee: {format_currency(result['fee'], case['sending_currency'])}"
-                )
+                logger.info(f"Fee: {format_currency(result['fee'], case['sending_currency'])}")
                 logger.info(
                     f"Send Amount: {format_currency(result['sending_amount'], case['sending_currency'])}"
                 )
@@ -391,9 +383,7 @@ def test_quotes():
         logger.info(f"Amount: {format_currency(amount, currency)}")
 
         try:
-            result = provider.get_quote(
-                **{k: v for k, v in case.items() if k != "description"}
-            )
+            result = provider.get_quote(**{k: v for k, v in case.items() if k != "description"})
             if result["success"]:
                 logger.info("✓ SUCCESS")
                 logger.info("-" * 30)
@@ -404,9 +394,7 @@ def test_quotes():
                     f"Receive Amount: {format_currency(result['receive_amount'], result['receive_currency'])}"
                 )
                 logger.info(f"Exchange Rate: {result['rate']:.4f}")
-                logger.info(
-                    f"Fee: {format_currency(result['fee'], result['send_currency'])}"
-                )
+                logger.info(f"Fee: {format_currency(result['fee'], result['send_currency'])}")
                 logger.info(
                     f"Total Cost: {format_currency(result['total_cost'], result['send_currency'])}"
                 )
@@ -482,9 +470,7 @@ def test_exchange_rates():
                 logger.info("✓ SUCCESS")
                 logger.info("-" * 30)
                 logger.info(f"Rate: {result['rate']:.4f}")
-                logger.info(
-                    f"Fee: {format_currency(result['fee'], case['send_currency'])}"
-                )
+                logger.info(f"Fee: {format_currency(result['fee'], case['send_currency'])}")
                 logger.info(f"Timestamp: {result['timestamp']}")
             else:
                 logger.error("✗ FAILED")

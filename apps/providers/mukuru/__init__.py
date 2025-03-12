@@ -2,12 +2,12 @@
 Mukuru integration module.
 
 This module provides integration with the Mukuru money transfer service,
-which focuses on remittances from South Africa to various African countries 
+which focuses on remittances from South Africa to various African countries
 and beyond.
 
 Example usage:
     from apps.providers.factory import ProviderFactory
-    
+
     provider = ProviderFactory.get_provider('mukuru')
     rate_info = provider.get_exchange_rate(
         send_amount=Decimal('900'),

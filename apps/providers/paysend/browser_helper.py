@@ -10,7 +10,7 @@ USAGE GUIDE:
 
 2. Development Environment: Run the helper with headless=False to manually solve captchas
    and store cookies for future requests:
-   
+
    ```python
    helper = PaysendBrowserHelper(headless=False, visible_for_seconds=30)
    result = await helper.get_quote("USD", "INR", 1000)
@@ -19,7 +19,7 @@ USAGE GUIDE:
 
 3. Production Environment:
    - Schedule a job to refresh cookies periodically during low-traffic hours
-   - Consider integration with captcha-solving service APIs 
+   - Consider integration with captcha-solving service APIs
    - For scale, implement more sophisticated solutions with proxy rotation and
      multiple browser instances
 

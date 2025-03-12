@@ -71,9 +71,7 @@ def run_comprehensive_tests(html_file=None):
     print(f"Loaded {len(countries)} countries from Remitbee data\n")
 
     if not countries:
-        print(
-            "No country data available. Please provide an HTML file with country data."
-        )
+        print("No country data available. Please provide an HTML file with country data.")
         return
 
     # Summary tables for results

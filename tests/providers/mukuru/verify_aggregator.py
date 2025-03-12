@@ -12,9 +12,7 @@ from datetime import datetime
 from decimal import Decimal
 
 # Add the project root to Python path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
 
 from apps.providers.mukuru.integration import MukuruProvider
 
@@ -47,9 +45,7 @@ def print_response(title, response):
 
     # Print common fields
     if "send_amount" in response and "source_currency" in response:
-        print(
-            f"Send: {format_currency(response['send_amount'], response['source_currency'])}"
-        )
+        print(f"Send: {format_currency(response['send_amount'], response['source_currency'])}")
 
     if "destination_amount" in response and "destination_currency" in response:
         print(
@@ -67,9 +63,7 @@ def print_response(title, response):
             print(f"Rate Field Validation: OK ✓")
 
     if "fee" in response:
-        print(
-            f"Fee: {format_currency(response['fee'], response.get('source_currency', 'ZAR'))}"
-        )
+        print(f"Fee: {format_currency(response['fee'], response.get('source_currency', 'ZAR'))}")
 
     # Currency field validation
     if "destination_currency" in response and "target_currency" in response:

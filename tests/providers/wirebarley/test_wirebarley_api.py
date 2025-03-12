@@ -55,9 +55,7 @@ class TestWireBarleyPublicAPI(unittest.TestCase):
         url = "https://www.wirebarley.com/my/remittance/api/v1/exrate/US/USD"
 
         print(f"\nTesting USD API endpoint: {url}")
-        response = requests.get(
-            url, headers=self.headers, cookies={"lang": "en"}, timeout=10
-        )
+        response = requests.get(url, headers=self.headers, cookies={"lang": "en"}, timeout=10)
 
         # Check the status code
         print(f"Status code: {response.status_code}")
@@ -70,9 +68,7 @@ class TestWireBarleyPublicAPI(unittest.TestCase):
         url = "https://www.wirebarley.com/my/remittance/api/v1/exrate/NZ/NZD"
 
         print(f"\nTesting NZD API endpoint: {url}")
-        response = requests.get(
-            url, headers=self.headers, cookies={"lang": "en"}, timeout=10
-        )
+        response = requests.get(url, headers=self.headers, cookies={"lang": "en"}, timeout=10)
 
         # Check the status code
         print(f"Status code: {response.status_code}")

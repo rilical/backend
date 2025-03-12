@@ -16,9 +16,7 @@ from decimal import Decimal
 import requests
 
 # Add the project root to sys.path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
 
 # Now import can work
 from apps.providers.wirebarley.integration import WireBarleyProvider
@@ -75,9 +73,7 @@ class TestWireBarleyLive(unittest.TestCase):
             print(f"Cookies: {cookies}")
 
             # Save the HTML for debugging
-            with open(
-                "api_responses/wirebarley_homepage.html", "w", encoding="utf-8"
-            ) as f:
+            with open("api_responses/wirebarley_homepage.html", "w", encoding="utf-8") as f:
                 f.write(homepage_response.text)
 
             return homepage_response.status_code == 200
@@ -115,9 +111,7 @@ class TestWireBarleyLive(unittest.TestCase):
             cls.session.headers.update(
                 {
                     "Request-ID": str(uuid.uuid4()),
-                    "Request-Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[
-                        :-3
-                    ],
+                    "Request-Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
                 }
             )
 
@@ -132,9 +126,7 @@ class TestWireBarleyLive(unittest.TestCase):
                     data = api_response.json()
 
                     # Save response to a file for debugging
-                    with open(
-                        f"api_responses/wirebarley_{source_currency.lower()}.json", "w"
-                    ) as f:
+                    with open(f"api_responses/wirebarley_{source_currency.lower()}.json", "w") as f:
                         json.dump(data, f, indent=2)
 
                     # Store the data in our cache
@@ -147,9 +139,7 @@ class TestWireBarleyLive(unittest.TestCase):
                         and "exRates" in data["data"]
                     ):
                         ex_rates = data["data"]["exRates"]
-                        print(
-                            f"Found {len(ex_rates)} exchange rates for {source_currency}"
-                        )
+                        print(f"Found {len(ex_rates)} exchange rates for {source_currency}")
 
                         # Print first 3 for verification
                         for i, rate in enumerate(ex_rates[:3]):
@@ -168,9 +158,7 @@ class TestWireBarleyLive(unittest.TestCase):
         print("\nTesting API access...")
 
         # Check if we have exchange rates for at least one currency
-        self.assertTrue(
-            len(self.exchange_rates) > 0, "Failed to fetch any exchange rates"
-        )
+        self.assertTrue(len(self.exchange_rates) > 0, "Failed to fetch any exchange rates")
 
         # Check USD specifically as it's the most common
         if "USD" in self.exchange_rates:
@@ -236,10 +224,7 @@ class TestWireBarleyLive(unittest.TestCase):
                 threshold_key = f"threshold{i if i else ''}"
                 rate_key = f"wbRate{i if i else ''}"
 
-                if (
-                    threshold_key in wb_rate_data
-                    and wb_rate_data[threshold_key] is not None
-                ):
+                if threshold_key in wb_rate_data and wb_rate_data[threshold_key] is not None:
                     threshold = Decimal(str(wb_rate_data[threshold_key]))
                     if amount <= threshold:
                         best_rate = Decimal(str(wb_rate_data[rate_key]))
@@ -259,10 +244,7 @@ class TestWireBarleyLive(unittest.TestCase):
                         fee = Decimal(str(fee_struct.get("fee1", 0)))
 
                         # Check threshold1
-                        if (
-                            "threshold1" in fee_struct
-                            and fee_struct["threshold1"] is not None
-                        ):
+                        if "threshold1" in fee_struct and fee_struct["threshold1"] is not None:
                             threshold1 = Decimal(str(fee_struct["threshold1"]))
                             if (
                                 amount >= threshold1
@@ -272,10 +254,7 @@ class TestWireBarleyLive(unittest.TestCase):
                                 fee = Decimal(str(fee_struct["fee2"]))
 
                         # Check threshold2
-                        if (
-                            "threshold2" in fee_struct
-                            and fee_struct["threshold2"] is not None
-                        ):
+                        if "threshold2" in fee_struct and fee_struct["threshold2"] is not None:
                             threshold2 = Decimal(str(fee_struct["threshold2"]))
                             if (
                                 amount >= threshold2
@@ -298,9 +277,7 @@ class TestWireBarleyLive(unittest.TestCase):
             self.assertGreater(destination_amount, 0)
 
             # Final verification
-            self.assertTrue(
-                best_rate > 30, f"USD to PHP rate should be > 30, got {best_rate}"
-            )
+            self.assertTrue(best_rate > 30, f"USD to PHP rate should be > 30, got {best_rate}")
 
     def test_provider_corridors(self):
         """Test the provider's get_corridors method."""
@@ -317,9 +294,7 @@ class TestWireBarleyLive(unittest.TestCase):
             corridors = self.provider.get_corridors(source_currency="USD")
 
             if corridors["success"]:
-                print(
-                    f"Success! Provider returned {len(corridors['corridors'])} corridors"
-                )
+                print(f"Success! Provider returned {len(corridors['corridors'])} corridors")
 
                 # Print a few for verification
                 for i, corridor in enumerate(corridors["corridors"][:3]):
@@ -332,9 +307,7 @@ class TestWireBarleyLive(unittest.TestCase):
                 self.assertEqual(corridors["provider_id"], "wirebarley")
                 self.assertGreater(len(corridors["corridors"]), 0)
             else:
-                print(
-                    f"Provider returned error: {corridors.get('error_message', 'Unknown error')}"
-                )
+                print(f"Provider returned error: {corridors.get('error_message', 'Unknown error')}")
         except Exception as e:
             print(f"Error testing provider corridors: {str(e)}")
 

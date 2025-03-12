@@ -50,12 +50,8 @@ class TestDahabshiilLive(unittest.TestCase):
             )
 
         if quote["success"]:
-            self.assertGreater(
-                quote["exchange_rate"], 0.0, "Exchange rate should be > 0"
-            )
-            self.assertGreater(
-                quote["destination_amount"], 0.0, "Destination amount should be > 0"
-            )
+            self.assertGreater(quote["exchange_rate"], 0.0, "Exchange rate should be > 0")
+            self.assertGreater(quote["destination_amount"], 0.0, "Destination amount should be > 0")
         else:
             self.fail(f"Quote failed: {quote.get('error_message')}")
 
@@ -83,9 +79,7 @@ class TestDahabshiilLive(unittest.TestCase):
         logger.info("USD->KES Exchange Rate:\n%s", json.dumps(exchange_rate, indent=2))
 
         # Check if we received a 403 error (expected in test environments without API access)
-        if not exchange_rate["success"] and "403" in exchange_rate.get(
-            "error_message", ""
-        ):
+        if not exchange_rate["success"] and "403" in exchange_rate.get("error_message", ""):
             self.skipTest(
                 "Skipping test because of 403 Forbidden response - API access is restricted"
             )

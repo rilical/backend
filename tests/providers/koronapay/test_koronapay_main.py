@@ -232,9 +232,7 @@ class TestKoronaPayRates(TestKoronaPayBase):
 
         self.mock_session.get.return_value = mock_response
 
-        result = self.provider.get_exchange_rate(
-            send_currency="EUR", receive_currency="USD"
-        )
+        result = self.provider.get_exchange_rate(send_currency="EUR", receive_currency="USD")
 
         self.assertTrue(result["success"])
         self.assertEqual(result["source_currency"], "EUR")
@@ -249,9 +247,7 @@ class TestKoronaPayRates(TestKoronaPayBase):
 
         self.mock_session.get.return_value = mock_response
 
-        result = self.provider.get_exchange_rate(
-            send_currency="EUR", receive_currency="USD"
-        )
+        result = self.provider.get_exchange_rate(send_currency="EUR", receive_currency="USD")
 
         self.assertFalse(result["success"])
         self.assertIn("error", result)
@@ -279,12 +275,8 @@ class TestKoronaPayValidation(TestKoronaPayBase):
 
     def test_validate_payment_method(self):
         """Test payment method validation."""
-        self.assertEqual(
-            self.provider._validate_payment_method("debit_card"), "debitCard"
-        )
-        self.assertEqual(
-            self.provider._validate_payment_method("bank_account"), "bankAccount"
-        )
+        self.assertEqual(self.provider._validate_payment_method("debit_card"), "debitCard")
+        self.assertEqual(self.provider._validate_payment_method("bank_account"), "bankAccount")
 
         with self.assertRaises(KoronaPayPaymentMethodError):
             self.provider._validate_payment_method("invalid_method")

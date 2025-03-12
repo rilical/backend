@@ -180,9 +180,7 @@ class TestIntermexIntegration(unittest.TestCase):
         ]
 
         for corridor in unsupported_corridors:
-            quote = self.provider.get_quote(
-                send_amount=float(self.test_amount), **corridor
-            )
+            quote = self.provider.get_quote(send_amount=float(self.test_amount), **corridor)
             self.assertFalse(quote["success"])
             self.assertIsNotNone(quote["error_message"])
 

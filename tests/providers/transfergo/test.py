@@ -10,9 +10,7 @@ import sys
 from decimal import Decimal
 
 # Add the project root to the Python path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
 
 from apps.providers.transferGo.integration import TransferGoProvider
 
@@ -102,9 +100,7 @@ def test_exchange_rate():
             )
 
             # Print formatted result
-            print(
-                f"Source amount: {result['source_amount']} {result['source_currency']}"
-            )
+            print(f"Source amount: {result['source_amount']} {result['source_currency']}")
             print(
                 f"Destination amount: {result['destination_amount']} {result['destination_currency']}"
             )
@@ -122,9 +118,7 @@ def test_exchange_rate():
                 # Print booking token if available
                 booking_token = result.get("details", {}).get("booking_token")
                 if booking_token:
-                    print(
-                        f"Booking token: {booking_token[:15]}..."
-                    )  # Show first 15 chars
+                    print(f"Booking token: {booking_token[:15]}...")  # Show first 15 chars
 
             # Print delivery time if available
             delivery_time_minutes = result.get("delivery_time_minutes")
@@ -133,9 +127,7 @@ def test_exchange_rate():
                 minutes = delivery_time_minutes % 60
 
                 if hours > 0:
-                    print(
-                        f"Estimated delivery time: {hours} hour(s) {minutes} minute(s)"
-                    )
+                    print(f"Estimated delivery time: {hours} hour(s) {minutes} minute(s)")
                 else:
                     print(f"Estimated delivery time: {minutes} minute(s)")
 
@@ -247,9 +239,7 @@ def test_new_countries_and_currencies():
             )
 
             # Print formatted result
-            print(
-                f"Source amount: {result['source_amount']} {result['source_currency']}"
-            )
+            print(f"Source amount: {result['source_amount']} {result['source_currency']}")
             print(
                 f"Destination amount: {result['destination_amount']} {result['destination_currency']}"
             )
@@ -354,9 +344,7 @@ def test_multi_currency_countries():
             # Check if preferred currency is specified
             kwargs = {}
             if "preferred_receive_currency" in test_case:
-                kwargs["preferred_receive_currency"] = test_case[
-                    "preferred_receive_currency"
-                ]
+                kwargs["preferred_receive_currency"] = test_case["preferred_receive_currency"]
 
             result = transfergo.get_exchange_rate(
                 send_amount=test_case["send_amount"],
@@ -366,9 +354,7 @@ def test_multi_currency_countries():
             )
 
             # Print formatted result
-            print(
-                f"Source amount: {result['source_amount']} {result['source_currency']}"
-            )
+            print(f"Source amount: {result['source_amount']} {result['source_currency']}")
             print(
                 f"Destination amount: {result['destination_amount']} {result['destination_currency']}"
             )
@@ -378,10 +364,7 @@ def test_multi_currency_countries():
 
             # Check if the preferred currency was used
             if "preferred_receive_currency" in test_case:
-                if (
-                    result["destination_currency"]
-                    == test_case["preferred_receive_currency"]
-                ):
+                if result["destination_currency"] == test_case["preferred_receive_currency"]:
                     print(
                         f"✅ Preferred currency ({test_case['preferred_receive_currency']}) was used successfully"
                     )
@@ -424,9 +407,7 @@ def test_supported_countries_and_currencies():
         set([curr for curr_list in countries_currencies.values() for curr in curr_list])
     )
     multi_currency_countries = [
-        country
-        for country, currencies in countries_currencies.items()
-        if len(currencies) > 1
+        country for country, currencies in countries_currencies.items() if len(currencies) > 1
     ]
 
     print(f"Total supported receiving countries: {total_countries}")

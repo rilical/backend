@@ -55,9 +55,7 @@ def run_test():
             data = response.json()
             print("Delivery Methods:")
             for method in data.get("deliveryMethodsList", []):
-                print(
-                    f"- {method.get('tranTypeName')} (ID: {method.get('tranTypeId')})"
-                )
+                print(f"- {method.get('tranTypeName')} (ID: {method.get('tranTypeId')})")
 
             print("\nPayment Methods:")
             for method in data.get("paymentMethods", []):
@@ -105,9 +103,7 @@ def run_test():
         if quote["success"]:
             print(f"Exchange Rate: {quote['exchange_rate']}")
             print(f"Send: {quote['send_amount']} {quote['source_currency']}")
-            print(
-                f"Receive: {quote['destination_amount']} {quote['destination_currency']}"
-            )
+            print(f"Receive: {quote['destination_amount']} {quote['destination_currency']}")
             print(f"Fee: ${quote['fee']}")
 
             if "available_payment_methods" in quote:

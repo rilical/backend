@@ -134,9 +134,7 @@ class TestPangeaProviderRealAPI(unittest.TestCase):
         )
 
         file_handler = logging.FileHandler(test_method_log)
-        file_handler.setFormatter(
-            logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-        )
+        file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
         test_logger = logging.getLogger(f"{__name__}.{self._testMethodName}")
         test_logger.addHandler(file_handler)
         test_logger.setLevel(logging.DEBUG)
@@ -181,9 +179,7 @@ class TestPangeaProviderRealAPI(unittest.TestCase):
         )
 
         file_handler = logging.FileHandler(test_method_log)
-        file_handler.setFormatter(
-            logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-        )
+        file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
         test_logger = logging.getLogger(f"{__name__}.{self._testMethodName}")
         test_logger.addHandler(file_handler)
         test_logger.setLevel(logging.DEBUG)
@@ -199,9 +195,7 @@ class TestPangeaProviderRealAPI(unittest.TestCase):
 
             for case in test_cases:
                 corridor_label = f"{case['from']}({case['send']})->{case['to']}"
-                test_logger.info(
-                    f"Testing corridor: {corridor_label} with amount {case['amount']}"
-                )
+                test_logger.info(f"Testing corridor: {corridor_label} with amount {case['amount']}")
 
                 try:
                     result = self.provider.get_exchange_rate(
@@ -224,14 +218,10 @@ class TestPangeaProviderRealAPI(unittest.TestCase):
                         )
                         test_logger.info(f"Response data saved to: {saved_file}")
                     else:
-                        test_logger.warning(
-                            f"No exchange rate data returned for {corridor_label}"
-                        )
+                        test_logger.warning(f"No exchange rate data returned for {corridor_label}")
 
                 except Exception as e:
-                    test_logger.error(
-                        f"Error testing corridor {corridor_label}: {str(e)}"
-                    )
+                    test_logger.error(f"Error testing corridor {corridor_label}: {str(e)}")
                     test_logger.error(traceback.format_exc())
 
         except Exception as e:
@@ -256,9 +246,7 @@ class TestPangeaProviderRealAPI(unittest.TestCase):
         )
 
         file_handler = logging.FileHandler(test_method_log)
-        file_handler.setFormatter(
-            logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-        )
+        file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
         test_logger = logging.getLogger(f"{__name__}.{self._testMethodName}")
         test_logger.addHandler(file_handler)
         test_logger.setLevel(logging.DEBUG)
@@ -304,9 +292,7 @@ class TestPangeaProviderRealAPI(unittest.TestCase):
                     exchange_rates = response.get("ExchangeRates", [])
 
                     if not exchange_rates:
-                        test_logger.warning(
-                            f"No exchange rate options for {corridor_name}"
-                        )
+                        test_logger.warning(f"No exchange rate options for {corridor_name}")
                         continue
 
                     test_logger.info(
@@ -334,15 +320,11 @@ class TestPangeaProviderRealAPI(unittest.TestCase):
                     all_methods[corridor_name] = methods_data
 
                     # Save to file
-                    methods_file = self.save_response_data(
-                        methods_data, f"methods_{corridor_name}"
-                    )
+                    methods_file = self.save_response_data(methods_data, f"methods_{corridor_name}")
                     test_logger.info(f"Saved methods data to {methods_file}")
 
                 except Exception as e:
-                    test_logger.error(
-                        f"Error discovering methods for {corridor_name}: {str(e)}"
-                    )
+                    test_logger.error(f"Error discovering methods for {corridor_name}: {str(e)}")
                     test_logger.error(traceback.format_exc())
 
             # Save combined results

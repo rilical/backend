@@ -115,18 +115,14 @@ def test_supported_corridors(sample_size=None):
                         {
                             "exchange_rate": result.get("exchange_rate"),
                             "fee": result.get("fee"),
-                            "delivery_time_minutes": result.get(
-                                "delivery_time_minutes"
-                            ),
+                            "delivery_time_minutes": result.get("delivery_time_minutes"),
                             "delivery_method": result.get("delivery_method"),
                         }
                     )
 
                 results.append(summary)
             except Exception as e:
-                logger.error(
-                    f"Error testing {source_currency} -> {target_country}: {str(e)}"
-                )
+                logger.error(f"Error testing {source_currency} -> {target_country}: {str(e)}")
                 results.append(
                     {
                         "corridor": f"{source_currency} -> {target_country}",
@@ -181,9 +177,7 @@ def test_new_country(source_currency="USD", sample_size=3):
                         {
                             "exchange_rate": result.get("exchange_rate"),
                             "fee": result.get("fee"),
-                            "delivery_time_minutes": result.get(
-                                "delivery_time_minutes"
-                            ),
+                            "delivery_time_minutes": result.get("delivery_time_minutes"),
                         }
                     )
 
@@ -213,9 +207,7 @@ def test_currency_country_mapping():
     # Test known corridors
     with XEAggregatorProvider() as provider:
         for source_currency, target_country in random.sample(XE_SUPPORTED_CORRIDORS, 3):
-            is_supported = provider.is_corridor_supported(
-                source_currency, target_country
-            )
+            is_supported = provider.is_corridor_supported(source_currency, target_country)
 
             results.append(
                 {
@@ -240,9 +232,7 @@ def test_currency_country_mapping():
                         "corridor": f"{source} -> {target}",
                         "type": "random",
                         "is_supported": is_supported,
-                        "expected": True
-                        if source in XE_COMMON_SOURCE_CURRENCIES
-                        else "Unknown",
+                        "expected": True if source in XE_COMMON_SOURCE_CURRENCIES else "Unknown",
                     }
                 )
 
@@ -308,9 +298,7 @@ def test_aggregator_format():
                 "valid_format": is_valid,
                 "missing_fields": missing,
                 "fields_present": list(success_result.keys()) if success_result else [],
-                "success": success_result.get("success", False)
-                if success_result
-                else False,
+                "success": success_result.get("success", False) if success_result else False,
             }
         )
 
@@ -343,9 +331,7 @@ def test_aggregator_format():
                 "test_case": "Failure case (negative amount)",
                 "valid_format": is_valid,
                 "missing_fields": missing,
-                "fields_present": list(fail_amount_result.keys())
-                if fail_amount_result
-                else [],
+                "fields_present": list(fail_amount_result.keys()) if fail_amount_result else [],
                 "success": fail_amount_result.get("success", False)
                 if fail_amount_result
                 else False,
@@ -375,12 +361,8 @@ def test_error_handling():
             {
                 "test_case": "Missing required param",
                 "valid_format": missing_param_result.get("success") is False,
-                "error_message": missing_param_result.get(
-                    "error_message", "No error message"
-                ),
-                "fields_present": list(missing_param_result.keys())
-                if missing_param_result
-                else [],
+                "error_message": missing_param_result.get("error_message", "No error message"),
+                "fields_present": list(missing_param_result.keys()) if missing_param_result else [],
             }
         )
 
@@ -392,12 +374,8 @@ def test_error_handling():
             {
                 "test_case": "Zero amount",
                 "valid_format": zero_amount_result.get("success") is False,
-                "error_message": zero_amount_result.get(
-                    "error_message", "No error message"
-                ),
-                "fields_present": list(zero_amount_result.keys())
-                if zero_amount_result
-                else [],
+                "error_message": zero_amount_result.get("error_message", "No error message"),
+                "fields_present": list(zero_amount_result.keys()) if zero_amount_result else [],
             }
         )
 
@@ -425,15 +403,9 @@ class TestXEAggregatorFormat(unittest.TestCase):
 
         # Check success case specific validations
         self.assertTrue(result["success"], "Expected success=True")
-        self.assertIsNone(
-            result["error_message"], "Error message should be None on success"
-        )
-        self.assertGreater(
-            result["exchange_rate"], 0, "Exchange rate should be positive"
-        )
-        self.assertGreater(
-            result["destination_amount"], 0, "Destination amount should be positive"
-        )
+        self.assertIsNone(result["error_message"], "Error message should be None on success")
+        self.assertGreater(result["exchange_rate"], 0, "Exchange rate should be positive")
+        self.assertGreater(result["destination_amount"], 0, "Destination amount should be positive")
         self.assertIn("raw_response", result, "Raw response should be included")
 
     def test_error_response_format(self):
@@ -451,9 +423,7 @@ class TestXEAggregatorFormat(unittest.TestCase):
 
         # Check error case specific validations
         self.assertFalse(result["success"], "Expected success=False")
-        self.assertIsNotNone(
-            result["error_message"], "Error message should be provided"
-        )
+        self.assertIsNotNone(result["error_message"], "Error message should be provided")
         self.assertIsNotNone(result["provider_id"], "Provider ID should be present")
         self.assertEqual(result["provider_id"], "XE", "Provider ID should be 'XE'")
 
@@ -465,12 +435,8 @@ class TestXEAggregatorFormat(unittest.TestCase):
             receive_country="DE",
         )
 
-        self.assertFalse(
-            result["success"], "Negative amount should result in success=False"
-        )
-        self.assertIsNotNone(
-            result["error_message"], "Error message should be provided"
-        )
+        self.assertFalse(result["success"], "Negative amount should result in success=False")
+        self.assertIsNotNone(result["error_message"], "Error message should be provided")
         self.assertTrue(
             "amount" in result["error_message"].lower(),
             "Error should mention amount issue",
@@ -481,33 +447,17 @@ def main():
     """Main function to run XE Aggregator tests."""
     parser = argparse.ArgumentParser(description="Test XE Aggregator Provider")
     parser.add_argument("--amount", type=float, default=100.0, help="Amount to send")
-    parser.add_argument(
-        "--source-currency", type=str, default="USD", help="Source currency code"
-    )
-    parser.add_argument(
-        "--target-country", type=str, default="IN", help="Target country code"
-    )
-    parser.add_argument(
-        "--user-country", type=str, default="US", help="User's country code"
-    )
-    parser.add_argument(
-        "--test-all", action="store_true", help="Test all supported corridors"
-    )
-    parser.add_argument(
-        "--sample", type=int, default=5, help="Number of random corridors to test"
-    )
-    parser.add_argument(
-        "--test-new", action="store_true", help="Test new/untested countries"
-    )
-    parser.add_argument(
-        "--test-mapping", action="store_true", help="Test currency/country mapping"
-    )
+    parser.add_argument("--source-currency", type=str, default="USD", help="Source currency code")
+    parser.add_argument("--target-country", type=str, default="IN", help="Target country code")
+    parser.add_argument("--user-country", type=str, default="US", help="User's country code")
+    parser.add_argument("--test-all", action="store_true", help="Test all supported corridors")
+    parser.add_argument("--sample", type=int, default=5, help="Number of random corridors to test")
+    parser.add_argument("--test-new", action="store_true", help="Test new/untested countries")
+    parser.add_argument("--test-mapping", action="store_true", help="Test currency/country mapping")
     parser.add_argument(
         "--test-format", action="store_true", help="Test aggregator format compliance"
     )
-    parser.add_argument(
-        "--test-errors", action="store_true", help="Test error handling"
-    )
+    parser.add_argument("--test-errors", action="store_true", help="Test error handling")
     parser.add_argument("--unittest", action="store_true", help="Run unit tests")
     parser.add_argument("--output", type=str, help="Output file for results (JSON)")
 
@@ -561,9 +511,7 @@ def main():
 
         # Print summary
         success_count = sum(1 for r in results if r.get("success"))
-        logger.info(
-            f"Results: {success_count} successful out of {len(results)} corridors"
-        )
+        logger.info(f"Results: {success_count} successful out of {len(results)} corridors")
 
         # Output details
         if args.output:
@@ -573,29 +521,17 @@ def main():
             print("\nSummary of results:")
             for result in results:
                 status = "✅" if result.get("success") else "❌"
-                error = (
-                    f": {result.get('error_message')}"
-                    if not result.get("success")
-                    else ""
-                )
-                rate = (
-                    f" (Rate: {result.get('exchange_rate')})"
-                    if result.get("success")
-                    else ""
-                )
+                error = f": {result.get('error_message')}" if not result.get("success") else ""
+                rate = f" (Rate: {result.get('exchange_rate')})" if result.get("success") else ""
                 print(f"{status} {result['corridor']}{rate}{error}")
 
     elif args.test_new:
-        logger.info(
-            f"Testing {args.sample} new countries with {args.source_currency}..."
-        )
+        logger.info(f"Testing {args.sample} new countries with {args.source_currency}...")
         results = test_new_country(args.source_currency, args.sample)
 
         # Print summary
         success_count = sum(1 for r in results if r.get("success"))
-        logger.info(
-            f"Results: {success_count} successful out of {len(results)} corridors"
-        )
+        logger.info(f"Results: {success_count} successful out of {len(results)} corridors")
 
         # Output details
         if args.output:
@@ -605,11 +541,7 @@ def main():
             print("\nNew country test results:")
             for result in results:
                 status = "✅" if result.get("success") else "❌"
-                error = (
-                    f": {result.get('error_message')}"
-                    if not result.get("success")
-                    else ""
-                )
+                error = f": {result.get('error_message')}" if not result.get("success") else ""
                 currency = f" ({result.get('currency')})"
                 print(f"{status} {result['corridor']}{currency}{error}")
 
@@ -625,9 +557,7 @@ def main():
             for result in results:
                 status = "✅" if result.get("is_supported") else "❌"
                 expected = f" (Expected: {result.get('expected')})"
-                print(
-                    f"{status} {result['corridor']} - Type: {result['type']}{expected}"
-                )
+                print(f"{status} {result['corridor']} - Type: {result['type']}{expected}")
 
     else:
         # Test single corridor
@@ -651,8 +581,7 @@ def main():
             with open(args.output, "w") as f:
                 # Convert to dict for JSON serialization
                 serializable_result = {
-                    k: str(v) if isinstance(v, Decimal) else v
-                    for k, v in result.items()
+                    k: str(v) if isinstance(v, Decimal) else v for k, v in result.items()
                 }
                 json.dump(serializable_result, f, indent=2)
 

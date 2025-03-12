@@ -6,7 +6,7 @@ python_version=$(python3 --version 2>&1 | awk '{print $2}')
 required_version="3.9.0"
 
 echo "Checking Python version..."
-if [[ "$(printf '%s\n' "$required_version" "$python_version" | sort -V | head -n1)" != "$required_version" ]]; then 
+if [[ "$(printf '%s\n' "$required_version" "$python_version" | sort -V | head -n1)" != "$required_version" ]]; then
     echo "Error: Python 3.9 or higher required, you have $python_version"
     exit 1
 fi
@@ -62,4 +62,4 @@ chmod +x "$PRE_COMMIT_HOOK"
 
 echo "Development environment setup complete!"
 echo "Run 'source .venv/bin/activate' to activate the virtual environment."
-echo "Use 'black .', 'isort .', 'flake8', and 'mypy .' to manually run the tools." 
+echo "Use 'black .', 'isort .', 'flake8', and 'mypy .' to manually run the tools."

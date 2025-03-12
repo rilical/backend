@@ -29,9 +29,7 @@ from apps.providers.factory import ProviderFactory
 from apps.providers.mukuru.integration import MukuruProvider
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("mukuru_test")
 
 # Define API endpoints directly for direct API testing
@@ -237,9 +235,7 @@ def test_factory():
 
         # Get and print supported countries
         countries = provider.get_supported_countries()
-        print(
-            f"Supported countries: {list(countries.keys())[:5]}... ({len(countries)} total)"
-        )
+        print(f"Supported countries: {list(countries.keys())[:5]}... ({len(countries)} total)")
 
         # Test ZA -> ZW corridor
         rate = provider.get_exchange_rate(
@@ -319,12 +315,8 @@ def main():
     """Main function to run the tests"""
     parser = argparse.ArgumentParser(description="Test Mukuru provider integration")
     parser.add_argument("--api", action="store_true", help="Run direct API tests")
-    parser.add_argument(
-        "--factory", action="store_true", help="Run tests through provider factory"
-    )
-    parser.add_argument(
-        "--quote", action="store_true", help="Run tests for the get_quote method"
-    )
+    parser.add_argument("--factory", action="store_true", help="Run tests through provider factory")
+    parser.add_argument("--quote", action="store_true", help="Run tests for the get_quote method")
     parser.add_argument("--all", action="store_true", help="Run all tests")
 
     args = parser.parse_args()

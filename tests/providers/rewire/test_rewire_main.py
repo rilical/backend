@@ -15,11 +15,7 @@ import sys
 from decimal import Decimal
 from typing import Any, Dict
 
-from apps.providers.rewire.exceptions import (
-    RewireConnectionError,
-    RewireError,
-    RewireResponseError,
-)
+from apps.providers.rewire.exceptions import RewireConnectionError, RewireError, RewireResponseError
 from apps.providers.rewire.integration import RewireProvider
 
 # Configure logging
@@ -218,9 +214,7 @@ def test_provider_details():
 
         # Test corridor support
         for corridor in TEST_CORRIDORS[:4]:  # First 4 should be supported
-            supported = provider.is_corridor_supported(
-                corridor["source"], corridor["dest"]
-            )
+            supported = provider.is_corridor_supported(corridor["source"], corridor["dest"])
             logger.info(
                 f"Corridor {corridor['source']} → {corridor['dest']}: {'Supported' if supported else 'Not supported'}"
             )

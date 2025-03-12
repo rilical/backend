@@ -55,9 +55,7 @@ class TestWireBarleyBrowser(unittest.TestCase):
         print(f"Cookies after homepage: {self.session.cookies.get_dict()}")
 
         # Save the HTML to a file
-        with open(
-            "api_responses/wirebarley_homepage_browser.html", "w", encoding="utf-8"
-        ) as f:
+        with open("api_responses/wirebarley_homepage_browser.html", "w", encoding="utf-8") as f:
             f.write(homepage_response.text)
 
         # Step 2: Visit the calculator page which has the exchange rates
@@ -72,9 +70,7 @@ class TestWireBarleyBrowser(unittest.TestCase):
         self.assertEqual(calculator_response.status_code, 200)
 
         # Save the HTML to a file
-        with open(
-            "api_responses/wirebarley_calculator.html", "w", encoding="utf-8"
-        ) as f:
+        with open("api_responses/wirebarley_calculator.html", "w", encoding="utf-8") as f:
             f.write(calculator_response.text)
 
         # Step 3: Make the API request for exchange rates with the session cookies
@@ -99,9 +95,7 @@ class TestWireBarleyBrowser(unittest.TestCase):
                     "Sec-Fetch-Mode": "cors",
                     "Sec-Fetch-Site": "same-origin",
                     "Request-ID": str(uuid.uuid4()),
-                    "Request-Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[
-                        :-3
-                    ],
+                    "Request-Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
                     "Device-Type": "WEB",
                     "Device-Model": "Safari",
                     "Device-Version": "605.1.15",

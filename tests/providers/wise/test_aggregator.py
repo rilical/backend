@@ -116,9 +116,7 @@ def get_exchange_rate_direct(
     Returns:
         Exchange rate data in aggregator-standard format
     """
-    logger.info(
-        f"Getting direct exchange rate for {source_currency} to {target_currency}"
-    )
+    logger.info(f"Getting direct exchange rate for {source_currency} to {target_currency}")
 
     # Create a Wise provider instance
     wise = WiseProvider()
@@ -175,9 +173,7 @@ def run_tests(use_live_api: bool = False):
     else:
         # Check for API key when using live API with authentication
         if not os.environ.get("WISE_API_KEY"):
-            logger.error(
-                "WISE_API_KEY environment variable is required for live API tests"
-            )
+            logger.error("WISE_API_KEY environment variable is required for live API tests")
             sys.exit(1)
         logger.info("===== RUNNING TESTS WITH AUTHENTICATED API =====")
 
@@ -211,9 +207,7 @@ def run_tests(use_live_api: bool = False):
                 logger.info(f"  Destination amount: {result['destination_amount']}")
                 logger.info(f"  Delivery method: {result['delivery_method']}")
                 logger.info(f"  Payment method: {result['payment_method']}")
-                logger.info(
-                    f"  Delivery time (minutes): {result['delivery_time_minutes']}"
-                )
+                logger.info(f"  Delivery time (minutes): {result['delivery_time_minutes']}")
             else:
                 logger.info(f"❌ FAILED: {source} {amount} -> {target}")
                 logger.info(f"  Error: {result['error_message']}")
@@ -238,9 +232,7 @@ def run_tests(use_live_api: bool = False):
     logger.info("\nTesting invalid amount:")
     wise = WiseProvider()
     wise._create_quote = wise._create_unauthenticated_quote
-    result = wise.get_quote(
-        amount=Decimal("0"), source_currency="USD", destination_currency="EUR"
-    )
+    result = wise.get_quote(amount=Decimal("0"), source_currency="USD", destination_currency="EUR")
     wise.close()
 
     if not result["success"]:
@@ -253,9 +245,7 @@ def run_tests(use_live_api: bool = False):
     logger.info("\nTesting missing amount:")
     wise = WiseProvider()
     wise._create_quote = wise._create_unauthenticated_quote
-    result = wise.get_quote(
-        amount=None, source_currency="USD", destination_currency="EUR"
-    )
+    result = wise.get_quote(amount=None, source_currency="USD", destination_currency="EUR")
     wise.close()
 
     if not result["success"]:
@@ -268,9 +258,7 @@ def run_tests(use_live_api: bool = False):
     logger.info("\nTesting missing currency:")
     wise = WiseProvider()
     wise._create_quote = wise._create_unauthenticated_quote
-    result = wise.get_quote(
-        amount=Decimal("100"), source_currency="USD", destination_currency=None
-    )
+    result = wise.get_quote(amount=Decimal("100"), source_currency="USD", destination_currency=None)
     wise.close()
 
     if not result["success"]:
