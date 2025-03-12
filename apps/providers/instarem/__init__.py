@@ -2,4 +2,4 @@
 InstaRem provider integration.
 """
 
-from apps.providers.instarem.integration import InstaRemProvider 
+from apps.providers.instarem.integration import InstaRemProvider

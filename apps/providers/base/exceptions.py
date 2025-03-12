@@ -1,5 +1,5 @@
 """Provider-specific exceptions module."""
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 
 class ProviderError(Exception):
@@ -10,7 +10,7 @@ class ProviderError(Exception):
         message: str,
         provider: str,
         error_code: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         self.provider = provider
         self.error_code = error_code

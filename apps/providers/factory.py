@@ -3,38 +3,40 @@ Factory for creating remittance provider instances.
 """
 from typing import Dict, Type
 
+from .alansari.integration import AlAnsariProvider
 from .base.provider import RemittanceProvider
+from .dahabshiil.integration import DahabshiilProvider
+from .mukuru.integration import MukuruProvider
+from .orbitremit.integration import OrbitRemitProvider
+from .paysend.integration import PaysendProvider
+from .placid.integration import PlacidProvider
+
 # Import only the providers we have confirmed are implemented
 from .remitbee.integration import RemitbeeProvider
 from .remitguru.integration import RemitGuruProvider
-from .xe.integration import XEProvider
-from .sendwave.integration import WaveProvider as SendwaveProvider
 from .rewire.integration import RewireProvider
-from .mukuru.integration import MukuruProvider
-from .dahabshiil.integration import DahabshiilProvider
-from .alansari.integration import AlAnsariProvider
-from .placid.integration import PlacidProvider
-from .orbitremit.integration import OrbitRemitProvider
+from .sendwave.integration import WaveProvider as SendwaveProvider
 from .wirebarley.integration import WireBarleyProvider
-from .paysend.integration import PaysendProvider
+from .xe.integration import XEProvider
+
 
 class ProviderFactory:
     """Factory for creating and managing remittance provider instances."""
 
     _providers: Dict[str, Type[RemittanceProvider]] = {
         # Include only the providers we've implemented and confirmed
-        'remitbee': RemitbeeProvider,
-        'remitguru': RemitGuruProvider,
-        'xe': XEProvider,
-        'sendwave': SendwaveProvider,
-        'rewire': RewireProvider,
-        'mukuru': MukuruProvider,
-        'dahabshiil': DahabshiilProvider,
-        'alansari': AlAnsariProvider,
-        'placid': PlacidProvider,
-        'orbitremit': OrbitRemitProvider,
-        'wirebarley': WireBarleyProvider,
-        'paysend': PaysendProvider,
+        "remitbee": RemitbeeProvider,
+        "remitguru": RemitGuruProvider,
+        "xe": XEProvider,
+        "sendwave": SendwaveProvider,
+        "rewire": RewireProvider,
+        "mukuru": MukuruProvider,
+        "dahabshiil": DahabshiilProvider,
+        "alansari": AlAnsariProvider,
+        "placid": PlacidProvider,
+        "orbitremit": OrbitRemitProvider,
+        "wirebarley": WireBarleyProvider,
+        "paysend": PaysendProvider,
         # Add more providers as they are implemented and confirmed
     }
 
@@ -55,7 +57,7 @@ class ProviderFactory:
         """
         if provider_name not in cls._providers:
             raise ValueError(f"Unsupported provider: {provider_name}")
-        
+
         provider_class = cls._providers[provider_name]
         return provider_class(**kwargs)
 

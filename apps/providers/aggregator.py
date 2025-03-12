@@ -1,23 +1,25 @@
 import logging
 from decimal import Decimal
-from django.core.cache import cache
+
 from django.conf import settings
+from django.core.cache import cache
 from django.utils import timezone
 
-from .factory import ProviderFactory
 from .base.provider import RemittanceProvider
+from .factory import ProviderFactory
 from .models import ExchangeRate
 from .utils.country_currency_standards import validate_corridor
 
 logger = logging.getLogger(__name__)
 
+
 def get_cached_aggregated_rates(
     send_amount: Decimal,
-    source_country: str,      # ISO-3166-1 alpha-2 (e.g., "AE")
-    source_currency: str,     # ISO-4217 (e.g., "AED")
-    dest_country: str,        # ISO-3166-1 alpha-2 (e.g., "IN")
-    dest_currency: str,       # ISO-4217 (e.g., "INR")
-    cache_timeout: int = 60 * 60 * 24  # 1 day in seconds
+    source_country: str,  # ISO-3166-1 alpha-2 (e.g., "AE")
+    source_currency: str,  # ISO-4217 (e.g., "AED")
+    dest_country: str,  # ISO-3166-1 alpha-2 (e.g., "IN")
+    dest_currency: str,  # ISO-4217 (e.g., "INR")
+    cache_timeout: int = 60 * 60 * 24,  # 1 day in seconds
 ) -> list:
     """
     Main aggregator function that:
@@ -25,7 +27,7 @@ def get_cached_aggregated_rates(
     2. If not in cache, calls each provider with ISO standard codes
     3. Stores aggregated results in cache with 1-day expiry
     4. Returns the final list of quotes
-    
+
     Args:
         send_amount: Amount to send
         source_country: Source country code (ISO-3166-1 alpha-2)
@@ -33,7 +35,7 @@ def get_cached_aggregated_rates(
         dest_country: Destination country code (ISO-3166-1 alpha-2)
         dest_currency: Destination currency code (ISO-4217)
         cache_timeout: Cache timeout in seconds (default: 1 day)
-        
+
     Returns:
         List of quotes from all available providers
     """
@@ -42,15 +44,15 @@ def get_cached_aggregated_rates(
     source_currency = source_currency.upper()
     dest_country = dest_country.upper()
     dest_currency = dest_currency.upper()
-    
+
     # Validate corridor using ISO standards
     is_valid, error_msg = validate_corridor(
         source_country=source_country,
         source_currency=source_currency,
         dest_country=dest_country,
-        dest_currency=dest_currency
+        dest_currency=dest_currency,
     )
-    
+
     if not is_valid:
         logger.error(f"Invalid corridor: {error_msg}")
         return []
@@ -82,9 +84,9 @@ def get_cached_aggregated_rates(
                 source_country=source_country,
                 source_currency=source_currency,
                 dest_country=dest_country,
-                dest_currency=dest_currency
+                dest_currency=dest_currency,
             )
-            
+
             if quote and quote.get("success", False):
                 # Format the quote to ensure consistent structure
                 formatted_quote = {
@@ -100,7 +102,7 @@ def get_cached_aggregated_rates(
                     "fee": float(quote.get("fee", 0)),
                     "delivery_time_minutes": quote.get("delivery_time_minutes"),
                     "error": None,
-                    "quote_timestamp": timestamp.isoformat()
+                    "quote_timestamp": timestamp.isoformat(),
                 }
                 results.append(formatted_quote)
 
@@ -112,41 +114,47 @@ def get_cached_aggregated_rates(
                     receive_country=dest_country,
                     exchange_rate=Decimal(str(formatted_quote["exchange_rate"])),
                     transfer_fee=Decimal(str(formatted_quote.get("fee", 0))),
-                    delivery_time=f"{formatted_quote['delivery_time_minutes']} minutes" if formatted_quote.get("delivery_time_minutes") else "N/A",
-                    timestamp=timestamp
+                    delivery_time=f"{formatted_quote['delivery_time_minutes']} minutes"
+                    if formatted_quote.get("delivery_time_minutes")
+                    else "N/A",
+                    timestamp=timestamp,
                 )
             else:
                 error_msg = quote.get("error_message") if quote else "No quote available"
                 logger.warning(f"Provider {provider_name} returned no quote: {error_msg}")
-                results.append({
+                results.append(
+                    {
+                        "success": False,
+                        "provider": provider_name,
+                        "source_country": source_country,
+                        "dest_country": dest_country,
+                        "source_currency": source_currency,
+                        "dest_currency": dest_currency,
+                        "error": error_msg,
+                        "quote_timestamp": timestamp.isoformat(),
+                    }
+                )
+        except Exception as e:
+            logger.error(f"Error calling {provider_name}: {str(e)}", exc_info=True)
+            results.append(
+                {
                     "success": False,
                     "provider": provider_name,
                     "source_country": source_country,
                     "dest_country": dest_country,
                     "source_currency": source_currency,
                     "dest_currency": dest_currency,
-                    "error": error_msg,
-                    "quote_timestamp": timestamp.isoformat()
-                })
-        except Exception as e:
-            logger.error(f"Error calling {provider_name}: {str(e)}", exc_info=True)
-            results.append({
-                "success": False,
-                "provider": provider_name,
-                "source_country": source_country,
-                "dest_country": dest_country,
-                "source_currency": source_currency,
-                "dest_currency": dest_currency,
-                "error": str(e),
-                "quote_timestamp": timestamp.isoformat()
-            })
+                    "error": str(e),
+                    "quote_timestamp": timestamp.isoformat(),
+                }
+            )
 
     # 3. Sort results by total cost (fee + exchange rate markup)
     def total_cost(quote):
         if not quote.get("success"):
-            return float('inf')
+            return float("inf")
         return quote.get("fee", 0)
-    
+
     results.sort(key=total_cost)
 
     # 4. Cache the final result with metadata
@@ -159,10 +167,10 @@ def get_cached_aggregated_rates(
             "dest_country": dest_country,
             "source_currency": source_currency,
             "dest_currency": dest_currency,
-            "amount": float(send_amount)
-        }
+            "amount": float(send_amount),
+        },
     }
-    
+
     # Use pipeline to set cache atomically
     pipe = cache.client.pipeline()
     pipe.set(cache_key, cache_data, timeout=cache_timeout)

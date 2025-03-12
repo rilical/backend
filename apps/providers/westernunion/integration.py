@@ -37,13 +37,13 @@ For more details, see the test_discover_supported_methods test method in tests.p
 import json
 import logging
 import os
+import pprint
 import random
 import time
 import uuid
-import pprint
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Dict, Optional, Any
+from typing import Any, Dict, Optional
 from urllib.parse import urljoin
 
 import requests
@@ -51,38 +51,46 @@ import requests
 # Import base provider class and exceptions
 from apps.providers.base.provider import RemittanceProvider
 from apps.providers.westernunion.exceptions import (
-    WUError,
     WUAuthenticationError,
+    WUConnectionError,
+    WUError,
     WUValidationError,
-    WUConnectionError
 )
+
 # Import mappings
 from apps.providers.westernunion.westernunion_mappings import (
-    COUNTRY_CURRENCY_MAP,
     API_CONFIG,
+    COUNTRY_CURRENCY_MAP,
     DEFAULT_VALUES,
     DELIVERY_METHOD_TO_AGGREGATOR,
     PAYMENT_METHOD_TO_AGGREGATOR,
     get_delivery_methods_for_country,
-    get_service_code_for_delivery_method,
     get_payment_code_for_payment_method,
-    is_corridor_supported
+    get_service_code_for_delivery_method,
+    is_corridor_supported,
 )
 
 logger = logging.getLogger(__name__)
 
-def log_request_details(logger, method: str, url: str, headers: Dict,
-                        params: Dict = None, data: Dict = None):
+
+def log_request_details(
+    logger, method: str, url: str, headers: Dict, params: Dict = None, data: Dict = None
+):
     """Utility to log outgoing request details."""
     logger.debug("\n" + "=" * 80 + f"\nOUTGOING REQUEST:\n{'=' * 80}")
     logger.debug(f"Method: {method}")
     logger.debug(f"URL: {url}")
-    sensitive_keys = {'Authorization', 'Cookie', 'X-WU-Correlation-ID', 'X-WU-Transaction-ID'}
+    sensitive_keys = {
+        "Authorization",
+        "Cookie",
+        "X-WU-Correlation-ID",
+        "X-WU-Transaction-ID",
+    }
 
     safe_headers = {}
     for k, v in headers.items():
         if k in sensitive_keys:
-            safe_headers[k] = '***MASKED***'
+            safe_headers[k] = "***MASKED***"
         else:
             safe_headers[k] = v
 
@@ -95,6 +103,7 @@ def log_request_details(logger, method: str, url: str, headers: Dict,
     if data:
         logger.debug("\nData:")
         logger.debug(pprint.pformat(data))
+
 
 def log_response_details(logger, response):
     """Utility to log incoming response details."""
@@ -111,18 +120,19 @@ def log_response_details(logger, response):
     except ValueError:
         body = response.text
         logger.debug("\nRaw Body:")
-        logger.debug(body[:1000] + '...' if len(body) > 1000 else body)
+        logger.debug(body[:1000] + "..." if len(body) > 1000 else body)
 
     logger.debug("=" * 80)
+
 
 class WesternUnionProvider(RemittanceProvider):
     """
     Western Union money transfer integration (aggregator-ready).
-    
+
     This provider is fully compliant with the aggregator pattern:
     - No mock/fallback data: fails with "success": false, "error_message" on error.
     - On success, returns real WU data in standard aggregator fields.
-    
+
     Example usage:
         provider = WesternUnionProvider()
         result = provider.get_quote(
@@ -133,19 +143,20 @@ class WesternUnionProvider(RemittanceProvider):
             destination_country="MX"
         )
     """
+
     BASE_URL = API_CONFIG["BASE_URL"]
     START_PAGE_URL = API_CONFIG["START_PAGE_URL"]
     CATALOG_URL = API_CONFIG["CATALOG_URL"]
 
     DEFAULT_USER_AGENT = API_CONFIG["DEFAULT_USER_AGENT"]
-    
+
     # Provider ID for aggregator system
     provider_id = "westernunion"
 
     def __init__(self, timeout: int = 30, user_agent: Optional[str] = None):
         """
         Initialize the Western Union provider.
-        
+
         Args:
             timeout: Request timeout in seconds
             user_agent: Custom user agent string, or default if None
@@ -154,12 +165,12 @@ class WesternUnionProvider(RemittanceProvider):
         self.logger = logger
         self.timeout = timeout
         self.user_agent = user_agent or self.DEFAULT_USER_AGENT
-        
+
         self._session = requests.Session()
         self.correlation_id = ""
         self.transaction_id = ""
         self._configured = False  # tracks if session init done
-        
+
         # Default values for aggregator standard response
         self.DEFAULT_DELIVERY_TIME = DEFAULT_VALUES["DEFAULT_DELIVERY_TIME_MINUTES"]
         self.logger.debug("WU provider init complete.")
@@ -179,7 +190,7 @@ class WesternUnionProvider(RemittanceProvider):
             return {
                 "provider_id": self.name,
                 "success": False,
-                "error_message": error_msg or "Unknown error"
+                "error_message": error_msg or "Unknown error",
             }
 
         # If success, fill aggregator fields
@@ -187,21 +198,18 @@ class WesternUnionProvider(RemittanceProvider):
             "provider_id": self.name,
             "success": True,
             "error_message": None,
-
             "send_amount": raw.get("send_amount", 0.0),
             "source_currency": raw.get("send_currency", "").upper(),
             "destination_amount": raw.get("receive_amount", 0.0),
             "destination_currency": raw.get("receive_currency", ""),
             "exchange_rate": raw.get("exchange_rate", 0.0),
             "fee": raw.get("fee", 0.0),
-
             "payment_method": DEFAULT_VALUES["DEFAULT_PAYMENT_METHOD"],
             "delivery_method": DEFAULT_VALUES["DEFAULT_DELIVERY_METHOD"],
             "delivery_time_minutes": raw.get("delivery_time_minutes", self.DEFAULT_DELIVERY_TIME),
-
             "timestamp": raw.get("timestamp", now_str),
             # pass along raw data if you want debug info
-            "raw_response": raw.get("raw_response")
+            "raw_response": raw.get("raw_response"),
         }
 
     def _initialize_session(self) -> bool:
@@ -213,61 +221,67 @@ class WesternUnionProvider(RemittanceProvider):
             True if session was initialized successfully, False otherwise
         """
         logger.info("Initializing Western Union session...")
-        
+
         if not self._session:
             self._session = requests.Session()
-            
+
             # Set up user agent and other default headers that match browser behavior
-            self._session.headers.update({
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15',
-                'Accept': '*/*',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Content-Type': 'text/plain;charset=UTF-8',
-                'Origin': 'https://www.westernunion.com',
-                'Referer': 'https://www.westernunion.com/us/en/home.html',
-                'Sec-Fetch-Dest': 'empty',
-                'Sec-Fetch-Mode': 'cors',
-                'Sec-Fetch-Site': 'same-origin',
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache',
-                'Priority': 'u=3, i'
-            })
-        
+            self._session.headers.update(
+                {
+                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15",
+                    "Accept": "*/*",
+                    "Accept-Language": "en-US,en;q=0.9",
+                    "Accept-Encoding": "gzip, deflate, br",
+                    "Content-Type": "text/plain;charset=UTF-8",
+                    "Origin": "https://www.westernunion.com",
+                    "Referer": "https://www.westernunion.com/us/en/home.html",
+                    "Sec-Fetch-Dest": "empty",
+                    "Sec-Fetch-Mode": "cors",
+                    "Sec-Fetch-Site": "same-origin",
+                    "Cache-Control": "no-cache",
+                    "Pragma": "no-cache",
+                    "Priority": "u=3, i",
+                }
+            )
+
         # Skip further initialization if we already have a valid session
         if self._is_token_valid():
             logger.debug("Using existing valid WU session")
             return True
-            
+
         # Generate a session ID and transaction ID
         # These help with correlation but don't need to be real GUIDs
         session_id = str(uuid.uuid4())
         transaction_id = str(uuid.uuid4())
-        
-        self._session.headers.update({
-            'X-WU-Correlation-ID': session_id,
-            'X-WU-Transaction-ID': transaction_id,
-        })
-        
+
+        self._session.headers.update(
+            {
+                "X-WU-Correlation-ID": session_id,
+                "X-WU-Transaction-ID": transaction_id,
+            }
+        )
+
         # Visit the start page to get initial cookies
         logger.debug(f"Accessing start page: {self.START_PAGE_URL}")
-        
+
         try:
             response = self._session.get(self.START_PAGE_URL, timeout=30)
-            
+
             if response.status_code != 200:
                 logger.error(f"Failed to load start page: {response.status_code}")
                 return False
-                
-            logger.debug(f"Successfully loaded cookies from start page. Status: {response.status_code}")
+
+            logger.debug(
+                f"Successfully loaded cookies from start page. Status: {response.status_code}"
+            )
             cookies = [c.name for c in self._session.cookies]
             logger.debug(f"Cookies received: {cookies}")
-            
+
             # Don't bother with the OPTIONS request - the curl example doesn't do it and it's failing
             # Just mark the session as configured
             self._configured = True
             return True
-            
+
         except requests.RequestException as e:
             logger.error(f"Failed to initialize session: {str(e)}")
             return False
@@ -282,41 +296,43 @@ class WesternUnionProvider(RemittanceProvider):
         destination_country: str = None,
         payment_method: Optional[str] = None,
         delivery_method: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ) -> Dict[str, Any]:
         """
         Get a money transfer quote from Western Union.
-        
+
         Args:
             amount: Amount to send (in source currency)
             receive_amount: Amount to receive (if specified, used instead of send amount)
             source_currency: Currency to send (default: USD)
             destination_currency: Currency to receive
-            source_country: Country sending from (default: US) 
+            source_country: Country sending from (default: US)
             destination_country: Country sending to
             payment_method: Optional payment method code
             delivery_method: Optional delivery method code
-            
+
         Returns:
             Dictionary with quote details
         """
         # Check for dest_country/dest_currency in kwargs (for compatibility)
-        if 'dest_country' in kwargs and not destination_country:
-            destination_country = kwargs.get('dest_country')
-        if 'dest_currency' in kwargs and not destination_currency:
-            destination_currency = kwargs.get('dest_currency')
-            
-        logger.debug(f"Western Union get_quote called with amount={amount}, destination_country={destination_country}, source_country={source_country}, source_currency={source_currency}, destination_currency={destination_currency}")
-        
+        if "dest_country" in kwargs and not destination_country:
+            destination_country = kwargs.get("dest_country")
+        if "dest_currency" in kwargs and not destination_currency:
+            destination_currency = kwargs.get("dest_currency")
+
+        logger.debug(
+            f"Western Union get_quote called with amount={amount}, destination_country={destination_country}, source_country={source_country}, source_currency={source_currency}, destination_currency={destination_currency}"
+        )
+
         # Validate required parameters
         if not destination_country:
             logger.debug("Western Union - destination country is required")
             return {
                 "provider_id": "Western Union",
                 "success": False,
-                "error_message": "Destination country is required"
+                "error_message": "Destination country is required",
             }
-            
+
         # Get exchange rate
         return self.get_exchange_rate(
             send_amount=amount,
@@ -337,7 +353,7 @@ class WesternUnionProvider(RemittanceProvider):
         service_code: Optional[str] = None,
         payment_code: Optional[str] = None,
         receive_currency: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ) -> Dict[str, Any]:
         """
         Get exchange rate between source and destination currencies.
@@ -383,7 +399,9 @@ class WesternUnionProvider(RemittanceProvider):
             }
             receive_currency = COUNTRY_TO_CURRENCY.get(receive_country)
             if not receive_currency:
-                result["error_message"] = f"Could not determine currency for country {receive_country}"
+                result[
+                    "error_message"
+                ] = f"Could not determine currency for country {receive_country}"
                 return result
             result["destination_currency"] = receive_currency
 
@@ -394,19 +412,21 @@ class WesternUnionProvider(RemittanceProvider):
                 send_currency=send_currency,
                 receive_country=receive_country,
                 receive_currency=receive_currency,
-                sender_country=send_country
+                sender_country=send_country,
             )
 
             # Check if catalog call was successful
             if not catalog_data.get("success", True):
-                result["error_message"] = catalog_data.get("error", "Failed to retrieve catalog data")
+                result["error_message"] = catalog_data.get(
+                    "error", "Failed to retrieve catalog data"
+                )
                 return result
 
             # Find the best exchange option from the catalog data
             best_option = self._find_best_exchange_option(
                 catalog_data,
                 preferred_service=service_code,
-                preferred_payment=payment_code
+                preferred_payment=payment_code,
             )
 
             if not best_option:
@@ -417,7 +437,7 @@ class WesternUnionProvider(RemittanceProvider):
             result["exchange_rate"] = best_option.get("fx_rate")
             result["fee"] = best_option.get("fee")
             result["destination_amount"] = best_option.get("receive_amount")
-            
+
             # Add additional information
             result["delivery_method"] = best_option.get("service_name")
             result["payment_method"] = best_option.get("payment_code")
@@ -465,26 +485,25 @@ class WesternUnionProvider(RemittanceProvider):
 
         # Update the payload to match Western Union's expected format
         payload = {
-            "header_request": {
-                "version": "0.5",
-                "request_type": "PRICECATALOG"
-            },
+            "header_request": {"version": "0.5", "request_type": "PRICECATALOG"},
             "sender": {
                 "client": "WUCOM",
                 "channel": "WWEB",
                 "funds_in": "*",
                 "curr_iso3": send_currency,
                 "cty_iso2_ext": sender_country,
-                "send_amount": str(send_amount)
+                "send_amount": str(send_amount),
             },
             "receiver": {
                 "curr_iso3": receive_currency,
                 "cty_iso2_ext": receive_country,
-                "cty_iso2": receive_country
-            }
+                "cty_iso2": receive_country,
+            },
         }
 
-        logger.info(f"WU get_catalog_data: Preparing request for {sender_country} to {receive_country}, {send_currency}{send_amount} -> {receive_currency}")
+        logger.info(
+            f"WU get_catalog_data: Preparing request for {sender_country} to {receive_country}, {send_currency}{send_amount} -> {receive_currency}"
+        )
         logger.debug(f"WU get_catalog_data payload: {json.dumps(payload, indent=2)}")
 
         url = f"{self.CATALOG_URL}"
@@ -495,10 +514,7 @@ class WesternUnionProvider(RemittanceProvider):
 
         try:
             response = self._session.post(
-                url,
-                json=payload,
-                headers=self._session.headers,
-                timeout=30
+                url, json=payload, headers=self._session.headers, timeout=30
             )
 
             # Log response details
@@ -519,14 +535,14 @@ class WesternUnionProvider(RemittanceProvider):
                     return {"success": False, "error": error_text}
 
             response_data = response.json()
-            
+
             # Check if the response contains errors
             response_status = response_data.get("response_status", {})
             if response_status.get("status") != 0:
                 message = response_status.get("message", "Unknown error")
                 logger.error(f"WU API returned error: {message}")
                 return {"success": False, "error": message}
-                
+
             return response_data
         except Exception as e:
             logger.error(f"Unexpected error in get_catalog_data: {str(e)}")
@@ -536,7 +552,7 @@ class WesternUnionProvider(RemittanceProvider):
     def _normalize_delivery_method(self, service_type: str) -> str:
         """Normalize the service type to a standard delivery method."""
         service_type = service_type.upper() if service_type else ""
-        
+
         if "CASH" in service_type:
             return "Cash Pickup"
         elif "BANK" in service_type or "ACCOUNT" in service_type:
@@ -545,33 +561,36 @@ class WesternUnionProvider(RemittanceProvider):
             return "Mobile Money"
         else:
             return service_type
-            
+
     def _parse_delivery_time(self, time_str: Optional[str]) -> int:
         """Parse delivery time string into minutes."""
         if not time_str:
             return 1440  # Default to 24 hours
-            
+
         time_str = time_str.lower()
-        
+
         if "minutes" in time_str:
-            match = re.search(r'(\d+)\s*minutes', time_str)
+            match = re.search(r"(\d+)\s*minutes", time_str)
             if match:
                 return int(match.group(1))
         elif "hour" in time_str:
-            match = re.search(r'(\d+)\s*hour', time_str)
+            match = re.search(r"(\d+)\s*hour", time_str)
             if match:
                 return int(match.group(1)) * 60
         elif "day" in time_str:
-            match = re.search(r'(\d+)\s*day', time_str)
+            match = re.search(r"(\d+)\s*day", time_str)
             if match:
                 return int(match.group(1)) * 1440
-                
+
         # If we can't parse, return 24 hours as default
         return 1440
 
-    def _find_best_exchange_option(self, catalog_data: Dict[str, Any], 
-                               preferred_service: Optional[str] = None,
-                               preferred_payment: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def _find_best_exchange_option(
+        self,
+        catalog_data: Dict[str, Any],
+        preferred_service: Optional[str] = None,
+        preferred_payment: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
         """
         Finds the best exchange rate option from the catalog data.
 
@@ -604,22 +623,22 @@ class WesternUnionProvider(RemittanceProvider):
         # Iterate through service groups
         for service_group in services_groups:
             current_service_code = service_group.get("service")
-            
+
             # Skip if we're looking for a specific service and this isn't it
             if service_code and current_service_code != service_code:
                 continue
-                
+
             pay_groups = service_group.get("pay_groups", [])
-            
+
             for pay_group in pay_groups:
                 current_payment_code = pay_group.get("fund_in")
-                
+
                 # Skip if we're looking for a specific payment method and this isn't it
                 if payment_code and current_payment_code != payment_code:
                     continue
-                    
+
                 fx_rate = pay_group.get("fx_rate")
-                
+
                 # If this is a valid rate and better than what we've seen so far
                 if fx_rate and (best_option is None or fx_rate > best_rate):
                     best_rate = fx_rate
@@ -643,7 +662,7 @@ class WesternUnionProvider(RemittanceProvider):
                     if services:
                         # Take the first one as the best FX rate (they should be sorted)
                         best_service = services[0]
-                        
+
                         # Find the corresponding service group and pay group to get all details
                         for service_group in services_groups:
                             if service_group.get("service") == best_service.get("pay_out"):
@@ -662,7 +681,7 @@ class WesternUnionProvider(RemittanceProvider):
                                         break
                                 if best_option:
                                     break
-                        
+
                         if best_option:
                             break
 
@@ -681,27 +700,29 @@ class WesternUnionProvider(RemittanceProvider):
                             "name": group.get("service_name", "Unknown"),
                             "fee": float(pay_group.get("gross_fee", 0)),
                             "receive_amount": float(pay_group.get("receive_amount", 0)),
-                            "delivery_time": group.get('speed_days', 1)                             
+                            "delivery_time": group.get("speed_days", 1),
                         }
         return None
 
     def _get_service_name_for_code(self, service_code: str) -> str:
         """Map WU service code to internal delivery method name."""
         from apps.providers.westernunion.westernunion_mappings import DELIVERY_SERVICE_CODES
+
         return DELIVERY_SERVICE_CODES.get(service_code, "ACCOUNT_DEPOSIT")
-    
+
     def _get_payment_name_for_code(self, payment_code: str) -> str:
         """Map WU payment code to internal payment method name."""
         from apps.providers.westernunion.westernunion_mappings import PAYMENT_METHOD_CODES
+
         return PAYMENT_METHOD_CODES.get(payment_code, "BANKACCOUNT")
-    
+
     # Maintain these methods for backward compatibility
     def _is_token_valid(self) -> bool:
         return True
-    
+
     def _refresh_token(self):
         pass
-        
+
     def close(self):
         """Close requests session if needed."""
         if self._session:

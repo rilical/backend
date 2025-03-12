@@ -4,23 +4,22 @@ CLI tool to test the Wave (Sendwave) provider integration.
 """
 
 import argparse
+import json
 import logging
 import sys
-import json
 from decimal import Decimal
 
-from apps.providers.sendwave.integration import WaveProvider
 from apps.providers.sendwave.exceptions import (
-    SendwaveError, 
-    SendwaveConnectionError,
     SendwaveApiError,
+    SendwaveConnectionError,
+    SendwaveCorridorUnsupportedError,
+    SendwaveError,
     SendwaveResponseError,
-    SendwaveCorridorUnsupportedError
 )
+from apps.providers.sendwave.integration import WaveProvider
 
 logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger("wave_test")
 
@@ -28,10 +27,21 @@ logger = logging.getLogger("wave_test")
 def main():
     parser = argparse.ArgumentParser(description="Test Wave (Sendwave) Provider")
     parser.add_argument("--amount", type=float, default=500, help="Send amount")
-    parser.add_argument("--currency", type=str, default="USD", help="Send currency code (e.g. USD)")
-    parser.add_argument("--country", type=str, default="PH", help="Receive country code (e.g. PH)")
-    parser.add_argument("--segment", type=str, default="ph_gcash", help="Segment name e.g. ph_gcash")
-    parser.add_argument("--sendCountryIso2", type=str, default="us", help="2-letter code where money is sent from (e.g. us)")
+    parser.add_argument(
+        "--currency", type=str, default="USD", help="Send currency code (e.g. USD)"
+    )
+    parser.add_argument(
+        "--country", type=str, default="PH", help="Receive country code (e.g. PH)"
+    )
+    parser.add_argument(
+        "--segment", type=str, default="ph_gcash", help="Segment name e.g. ph_gcash"
+    )
+    parser.add_argument(
+        "--sendCountryIso2",
+        type=str,
+        default="us",
+        help="2-letter code where money is sent from (e.g. us)",
+    )
     args = parser.parse_args()
 
     wave = WaveProvider()
@@ -42,7 +52,7 @@ def main():
     rcy = args.country.upper()
 
     logger.info(f"Testing Wave with {amount} {scy} to {rcy}, segment={args.segment}")
-    
+
     try:
         # We can pass segment_name / send_country_iso2 in kwargs
         quote = wave.get_exchange_rate(
@@ -50,9 +60,9 @@ def main():
             send_currency=scy,
             receive_country=rcy,
             segment_name=args.segment,
-            send_country_iso2=args.sendCountryIso2
+            send_country_iso2=args.sendCountryIso2,
         )
-        
+
         print("Result:")
         print(json.dumps(quote, indent=2))
         return 0
@@ -83,4 +93,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main()) 
+    sys.exit(main())

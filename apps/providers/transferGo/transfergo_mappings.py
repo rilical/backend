@@ -4,16 +4,18 @@ Mapping file for TransferGo provider.
 This file centralizes all constants and utility functions related to the TransferGo provider.
 """
 
-from typing import Dict, List, Any, Optional, Tuple
 import logging
 from decimal import Decimal
+from typing import Any, Dict, List, Optional, Tuple
 
 # Import utility functions from core modules
+from apps.providers.utils.country_currency_standards import get_country_name
+from apps.providers.utils.country_currency_standards import (
+    get_default_currency_for_country as get_std_currency_for_country,
+)
 from apps.providers.utils.country_currency_standards import (
     normalize_country_code,
     validate_corridor,
-    get_country_name,
-    get_default_currency_for_country as get_std_currency_for_country
 )
 
 logger = logging.getLogger(__name__)
@@ -34,8 +36,8 @@ API_CONFIG = {
         "Cache-Control": "no-cache",
         "Pragma": "no-cache",
         "Origin": "https://www.transfergo.com",
-        "Referer": "https://www.transfergo.com/"
-    }
+        "Referer": "https://www.transfergo.com/",
+    },
 }
 
 # Delivery method mapping (TransferGo → aggregator naming)
@@ -49,14 +51,14 @@ DELIVERY_METHODS = {
 PAYMENT_METHODS = {
     "BANK_TRANSFER": "bank_transfer",
     "CARD": "card",
-    "WALLET": "e_wallet"
+    "WALLET": "e_wallet",
 }
 
 # Default values
 DEFAULT_VALUES = {
     "payment_method": "bank_transfer",
     "delivery_method": "bank_deposit",
-    "delivery_time_minutes": 1440  # 24 hours in minutes
+    "delivery_time_minutes": 1440,  # 24 hours in minutes
 }
 
 # Comprehensive country to currency mapping
@@ -97,7 +99,6 @@ COUNTRY_CURRENCIES = {
     "SE": ["SEK", "EUR"],  # Sweden
     "CH": ["CHF", "EUR"],  # Switzerland
     "GB": ["GBP", "EUR"],  # United Kingdom
-    
     # Other European countries
     "AL": "ALL",  # Albania
     "AD": "EUR",  # Andorra
@@ -115,7 +116,6 @@ COUNTRY_CURRENCIES = {
     "RS": "RSD",  # Serbia
     "TR": "TRY",  # Turkey
     "UA": ["UAH", "EUR", "USD"],  # Ukraine
-    
     # Asia
     "BD": "BDT",  # Bangladesh
     "BT": "BTN",  # Bhutan
@@ -145,7 +145,6 @@ COUNTRY_CURRENCIES = {
     "TM": "TMT",  # Turkmenistan
     "UZ": ["UZS", "USD", "EUR"],  # Uzbekistan
     "VN": "VND",  # Vietnam
-    
     # Middle East
     "BH": ["BHD", "USD"],  # Bahrain
     "IL": "ILS",  # Israel
@@ -158,7 +157,6 @@ COUNTRY_CURRENCIES = {
     "SA": ["SAR", "USD"],  # Saudi Arabia
     "AE": "AED",  # United Arab Emirates
     "YE": "YER",  # Yemen
-    
     # Africa
     "DZ": "DZD",  # Algeria
     "AO": "AOA",  # Angola
@@ -213,7 +211,6 @@ COUNTRY_CURRENCIES = {
     "UG": "UGX",  # Uganda
     "ZM": "ZMW",  # Zambia
     "ZW": "ZWL",  # Zimbabwe
-    
     # Americas
     "AR": "ARS",  # Argentina
     "BS": "BSD",  # Bahamas
@@ -263,7 +260,6 @@ COUNTRY_CURRENCIES = {
     "AW": "AWG",  # Aruba
     "KY": "KYD",  # Cayman Islands
     "CW": "ANG",  # Curaçao
-    
     # Oceania
     "AU": "AUD",  # Australia
     "CK": "NZD",  # Cook Islands
@@ -310,28 +306,23 @@ POPULAR_CORRIDORS = [
     ("DE", "EUR", "UA", "UAH"),
     ("ES", "EUR", "RO", "RON"),
     ("IT", "EUR", "RO", "RON"),
-    
     # Europe to Asia
     ("GB", "GBP", "IN", "INR"),
     ("GB", "GBP", "PH", "PHP"),
     ("DE", "EUR", "IN", "INR"),
     ("DE", "EUR", "PH", "PHP"),
-    
     # North America to Asia/Latin America
     ("US", "USD", "IN", "INR"),
     ("US", "USD", "PH", "PHP"),
     ("US", "USD", "MX", "MXN"),
     ("CA", "CAD", "IN", "INR"),
     ("CA", "CAD", "PH", "PHP"),
-    
     # Oceania to Asia
     ("AU", "AUD", "IN", "INR"),
     ("AU", "AUD", "PH", "PHP"),
-    
     # Asia to Asia
     ("SG", "SGD", "IN", "INR"),
     ("SG", "SGD", "PH", "PHP"),
-    
     # Additional popular corridors
     ("DE", "EUR", "TR", "TRY"),
     ("NL", "EUR", "TR", "TRY"),
@@ -347,95 +338,224 @@ POPULAR_CORRIDORS = [
 
 # List of country codes that support cash pickup
 CASH_PICKUP_COUNTRIES = [
-    "PH", "MX", "CO", "VN", "PK", "IN", "TR", "MA", "GH", "NG", "UA"
+    "PH",
+    "MX",
+    "CO",
+    "VN",
+    "PK",
+    "IN",
+    "TR",
+    "MA",
+    "GH",
+    "NG",
+    "UA",
 ]
 
 # List of country codes that support mobile wallet
-MOBILE_WALLET_COUNTRIES = [
-    "PH", "IN", "KE", "GH", "NG"
-]
+MOBILE_WALLET_COUNTRIES = ["PH", "IN", "KE", "GH", "NG"]
 
 # Country-specific available delivery methods
 COUNTRY_DELIVERY_METHODS = {
     "IN": [
-        {"method_code": "bank_deposit", "method_name": "Bank Deposit", "standardized_name": "bank_deposit"},
-        {"method_code": "mobile_wallet", "method_name": "Mobile Wallet", "standardized_name": "mobile_wallet"},
-        {"method_code": "cash_pickup", "method_name": "Cash Pickup", "standardized_name": "cash_pickup"}
+        {
+            "method_code": "bank_deposit",
+            "method_name": "Bank Deposit",
+            "standardized_name": "bank_deposit",
+        },
+        {
+            "method_code": "mobile_wallet",
+            "method_name": "Mobile Wallet",
+            "standardized_name": "mobile_wallet",
+        },
+        {
+            "method_code": "cash_pickup",
+            "method_name": "Cash Pickup",
+            "standardized_name": "cash_pickup",
+        },
     ],
     "PH": [
-        {"method_code": "bank_deposit", "method_name": "Bank Deposit", "standardized_name": "bank_deposit"},
-        {"method_code": "cash_pickup", "method_name": "Cash Pickup", "standardized_name": "cash_pickup"},
-        {"method_code": "mobile_wallet", "method_name": "Mobile Wallet", "standardized_name": "mobile_wallet"}
+        {
+            "method_code": "bank_deposit",
+            "method_name": "Bank Deposit",
+            "standardized_name": "bank_deposit",
+        },
+        {
+            "method_code": "cash_pickup",
+            "method_name": "Cash Pickup",
+            "standardized_name": "cash_pickup",
+        },
+        {
+            "method_code": "mobile_wallet",
+            "method_name": "Mobile Wallet",
+            "standardized_name": "mobile_wallet",
+        },
     ],
     "MX": [
-        {"method_code": "bank_deposit", "method_name": "Bank Deposit", "standardized_name": "bank_deposit"},
-        {"method_code": "cash_pickup", "method_name": "Cash Pickup", "standardized_name": "cash_pickup"}
+        {
+            "method_code": "bank_deposit",
+            "method_name": "Bank Deposit",
+            "standardized_name": "bank_deposit",
+        },
+        {
+            "method_code": "cash_pickup",
+            "method_name": "Cash Pickup",
+            "standardized_name": "cash_pickup",
+        },
     ],
     "UA": [
-        {"method_code": "bank_deposit", "method_name": "Bank Deposit", "standardized_name": "bank_deposit"},
-        {"method_code": "cash_pickup", "method_name": "Cash Pickup", "standardized_name": "cash_pickup"}
+        {
+            "method_code": "bank_deposit",
+            "method_name": "Bank Deposit",
+            "standardized_name": "bank_deposit",
+        },
+        {
+            "method_code": "cash_pickup",
+            "method_name": "Cash Pickup",
+            "standardized_name": "cash_pickup",
+        },
     ],
     "TR": [
-        {"method_code": "bank_deposit", "method_name": "Bank Deposit", "standardized_name": "bank_deposit"},
-        {"method_code": "cash_pickup", "method_name": "Cash Pickup", "standardized_name": "cash_pickup"}
+        {
+            "method_code": "bank_deposit",
+            "method_name": "Bank Deposit",
+            "standardized_name": "bank_deposit",
+        },
+        {
+            "method_code": "cash_pickup",
+            "method_name": "Cash Pickup",
+            "standardized_name": "cash_pickup",
+        },
     ],
     "PK": [
-        {"method_code": "bank_deposit", "method_name": "Bank Deposit", "standardized_name": "bank_deposit"},
-        {"method_code": "cash_pickup", "method_name": "Cash Pickup", "standardized_name": "cash_pickup"}
+        {
+            "method_code": "bank_deposit",
+            "method_name": "Bank Deposit",
+            "standardized_name": "bank_deposit",
+        },
+        {
+            "method_code": "cash_pickup",
+            "method_name": "Cash Pickup",
+            "standardized_name": "cash_pickup",
+        },
     ],
     "GH": [
-        {"method_code": "bank_deposit", "method_name": "Bank Deposit", "standardized_name": "bank_deposit"},
-        {"method_code": "mobile_wallet", "method_name": "Mobile Wallet", "standardized_name": "mobile_wallet"},
-        {"method_code": "cash_pickup", "method_name": "Cash Pickup", "standardized_name": "cash_pickup"}
+        {
+            "method_code": "bank_deposit",
+            "method_name": "Bank Deposit",
+            "standardized_name": "bank_deposit",
+        },
+        {
+            "method_code": "mobile_wallet",
+            "method_name": "Mobile Wallet",
+            "standardized_name": "mobile_wallet",
+        },
+        {
+            "method_code": "cash_pickup",
+            "method_name": "Cash Pickup",
+            "standardized_name": "cash_pickup",
+        },
     ],
     "NG": [
-        {"method_code": "bank_deposit", "method_name": "Bank Deposit", "standardized_name": "bank_deposit"},
-        {"method_code": "mobile_wallet", "method_name": "Mobile Wallet", "standardized_name": "mobile_wallet"},
-        {"method_code": "cash_pickup", "method_name": "Cash Pickup", "standardized_name": "cash_pickup"}
+        {
+            "method_code": "bank_deposit",
+            "method_name": "Bank Deposit",
+            "standardized_name": "bank_deposit",
+        },
+        {
+            "method_code": "mobile_wallet",
+            "method_name": "Mobile Wallet",
+            "standardized_name": "mobile_wallet",
+        },
+        {
+            "method_code": "cash_pickup",
+            "method_name": "Cash Pickup",
+            "standardized_name": "cash_pickup",
+        },
     ],
     "KE": [
-        {"method_code": "bank_deposit", "method_name": "Bank Deposit", "standardized_name": "bank_deposit"},
-        {"method_code": "mobile_wallet", "method_name": "Mobile Wallet", "standardized_name": "mobile_wallet"}
+        {
+            "method_code": "bank_deposit",
+            "method_name": "Bank Deposit",
+            "standardized_name": "bank_deposit",
+        },
+        {
+            "method_code": "mobile_wallet",
+            "method_name": "Mobile Wallet",
+            "standardized_name": "mobile_wallet",
+        },
     ],
     "default": [
-        {"method_code": "bank_deposit", "method_name": "Bank Deposit", "standardized_name": "bank_deposit"}
-    ]
+        {
+            "method_code": "bank_deposit",
+            "method_name": "Bank Deposit",
+            "standardized_name": "bank_deposit",
+        }
+    ],
 }
 
 # Country-specific available payment methods
 COUNTRY_PAYMENT_METHODS = {
     "GB": [
-        {"method_code": "bank_transfer", "method_name": "Bank Transfer", "standardized_name": "bank_transfer"},
-        {"method_code": "card", "method_name": "Card Payment", "standardized_name": "card"}
+        {
+            "method_code": "bank_transfer",
+            "method_name": "Bank Transfer",
+            "standardized_name": "bank_transfer",
+        },
+        {
+            "method_code": "card",
+            "method_name": "Card Payment",
+            "standardized_name": "card",
+        },
     ],
     "DE": [
-        {"method_code": "bank_transfer", "method_name": "Bank Transfer", "standardized_name": "bank_transfer"},
-        {"method_code": "card", "method_name": "Card Payment", "standardized_name": "card"}
+        {
+            "method_code": "bank_transfer",
+            "method_name": "Bank Transfer",
+            "standardized_name": "bank_transfer",
+        },
+        {
+            "method_code": "card",
+            "method_name": "Card Payment",
+            "standardized_name": "card",
+        },
     ],
     "US": [
-        {"method_code": "bank_transfer", "method_name": "Bank Transfer", "standardized_name": "bank_transfer"},
-        {"method_code": "card", "method_name": "Card Payment", "standardized_name": "card"}
+        {
+            "method_code": "bank_transfer",
+            "method_name": "Bank Transfer",
+            "standardized_name": "bank_transfer",
+        },
+        {
+            "method_code": "card",
+            "method_name": "Card Payment",
+            "standardized_name": "card",
+        },
     ],
     "default": [
-        {"method_code": "bank_transfer", "method_name": "Bank Transfer", "standardized_name": "bank_transfer"}
-    ]
+        {
+            "method_code": "bank_transfer",
+            "method_name": "Bank Transfer",
+            "standardized_name": "bank_transfer",
+        }
+    ],
 }
+
 
 def is_corridor_supported(
     source_country: str,
     source_currency: str,
     destination_country: str,
-    destination_currency: str
+    destination_currency: str,
 ) -> bool:
     """
     Check if a corridor is supported by TransferGo.
-    
+
     Args:
         source_country: ISO country code of the source country
         source_currency: ISO currency code of the source currency
         destination_country: ISO country code of the destination country
         destination_currency: ISO currency code of the destination currency
-        
+
     Returns:
         True if the corridor is supported, False otherwise
     """
@@ -446,7 +566,7 @@ def is_corridor_supported(
     except Exception as e:
         logger.error(f"Error normalizing country codes: {e}")
         return False
-    
+
     # Validate source currency for the source country
     source_valid = False
     if source_country in COUNTRY_CURRENCIES:
@@ -455,10 +575,10 @@ def is_corridor_supported(
             source_valid = source_currency in country_currencies
         else:
             source_valid = source_currency == country_currencies
-    
+
     if not source_valid:
         return False
-    
+
     # Validate destination currency for the destination country
     dest_valid = False
     if destination_country in COUNTRY_CURRENCIES:
@@ -467,29 +587,32 @@ def is_corridor_supported(
             dest_valid = destination_currency in country_currencies
         else:
             dest_valid = destination_currency == country_currencies
-    
+
     if not dest_valid:
         return False
-    
+
     # Check against popular corridors list first (these are known to work well)
-    for (src_country, src_currency, dst_country, dst_currency) in POPULAR_CORRIDORS:
-        if (source_country == src_country and 
-            source_currency == src_currency and 
-            destination_country == dst_country and 
-            destination_currency == dst_currency):
+    for src_country, src_currency, dst_country, dst_currency in POPULAR_CORRIDORS:
+        if (
+            source_country == src_country
+            and source_currency == src_currency
+            and destination_country == dst_country
+            and destination_currency == dst_currency
+        ):
             return True
-    
+
     # For other corridors, use more general validation
     # TransferGo generally supports most corridors if both country-currency pairs are valid
     return source_valid and dest_valid
 
+
 def get_delivery_methods_for_country(country_code: str) -> List[Dict[str, Any]]:
     """
     Get the available delivery methods for a specific country.
-    
+
     Args:
         country_code: ISO country code
-        
+
     Returns:
         List of delivery methods with their codes and names
     """
@@ -497,32 +620,49 @@ def get_delivery_methods_for_country(country_code: str) -> List[Dict[str, Any]]:
         normalized_code = normalize_country_code(country_code)
         if normalized_code in COUNTRY_DELIVERY_METHODS:
             return COUNTRY_DELIVERY_METHODS[normalized_code]
-        
+
         # If not explicitly in our mapping, but country supports cash pickup
         if normalized_code in CASH_PICKUP_COUNTRIES:
             return [
-                {"method_code": "bank_deposit", "method_name": "Bank Deposit", "standardized_name": "bank_deposit"},
-                {"method_code": "cash_pickup", "method_name": "Cash Pickup", "standardized_name": "cash_pickup"}
+                {
+                    "method_code": "bank_deposit",
+                    "method_name": "Bank Deposit",
+                    "standardized_name": "bank_deposit",
+                },
+                {
+                    "method_code": "cash_pickup",
+                    "method_name": "Cash Pickup",
+                    "standardized_name": "cash_pickup",
+                },
             ]
-        
+
         # If not explicitly in our mapping, but country supports mobile wallet
         if normalized_code in MOBILE_WALLET_COUNTRIES:
             return [
-                {"method_code": "bank_deposit", "method_name": "Bank Deposit", "standardized_name": "bank_deposit"},
-                {"method_code": "mobile_wallet", "method_name": "Mobile Wallet", "standardized_name": "mobile_wallet"}
+                {
+                    "method_code": "bank_deposit",
+                    "method_name": "Bank Deposit",
+                    "standardized_name": "bank_deposit",
+                },
+                {
+                    "method_code": "mobile_wallet",
+                    "method_name": "Mobile Wallet",
+                    "standardized_name": "mobile_wallet",
+                },
             ]
-        
+
         return COUNTRY_DELIVERY_METHODS["default"]
     except Exception:
         return COUNTRY_DELIVERY_METHODS["default"]
 
+
 def get_payment_methods_for_country(country_code: str) -> List[Dict[str, Any]]:
     """
     Get the available payment methods for a specific country.
-    
+
     Args:
         country_code: ISO country code
-        
+
     Returns:
         List of payment methods with their codes and names
     """
@@ -534,14 +674,15 @@ def get_payment_methods_for_country(country_code: str) -> List[Dict[str, Any]]:
     except Exception:
         return COUNTRY_PAYMENT_METHODS["default"]
 
+
 def get_default_currency_for_country(country_code: str) -> str:
     """
     Get the default currency for a country. First checks the TransferGo-specific mapping,
     then falls back to the standard mapping.
-    
+
     Args:
         country_code: ISO country code
-        
+
     Returns:
         ISO currency code or None if not found
     """
@@ -558,36 +699,40 @@ def get_default_currency_for_country(country_code: str) -> str:
     except Exception:
         return None
 
+
 def get_supported_source_countries() -> List[str]:
     """
     Get a list of supported source countries.
-    
+
     Returns:
         List of ISO country codes
     """
     source_countries = set()
-    
+
     # Add countries from popular corridors first
     for corridor in POPULAR_CORRIDORS:
         source_countries.add(corridor[0])
-    
+
     # Add other countries that have valid currencies
     for country, currencies in COUNTRY_CURRENCIES.items():
         if isinstance(currencies, list) and len(currencies) > 0:
             source_countries.add(country)
         elif currencies:
             source_countries.add(country)
-    
+
     return sorted(list(source_countries))
 
-def get_supported_destination_countries(source_country: Optional[str] = None) -> List[str]:
+
+def get_supported_destination_countries(
+    source_country: Optional[str] = None,
+) -> List[str]:
     """
     Get a list of supported destination countries for a given source country.
     If source_country is None, returns all destination countries.
-    
+
     Args:
         source_country: Optional ISO country code of the source country
-        
+
     Returns:
         List of ISO country codes
     """
@@ -595,12 +740,12 @@ def get_supported_destination_countries(source_country: Optional[str] = None) ->
         try:
             normalized_code = normalize_country_code(source_country)
             dest_countries = set()
-            
+
             # Check popular corridors first
             for src_country, _, dst_country, _ in POPULAR_CORRIDORS:
                 if src_country == normalized_code:
                     dest_countries.add(dst_country)
-            
+
             # If no specific destinations found, return all countries
             # that have valid currencies (TransferGo generally supports
             # transfers between any supported countries)
@@ -608,7 +753,7 @@ def get_supported_destination_countries(source_country: Optional[str] = None) ->
                 for country in COUNTRY_CURRENCIES.keys():
                     if country != normalized_code:
                         dest_countries.add(country)
-            
+
             return sorted(list(dest_countries))
         except Exception:
             return []
@@ -619,9 +764,10 @@ def get_supported_destination_countries(source_country: Optional[str] = None) ->
             dest_countries.add(country)
         return sorted(list(dest_countries))
 
+
 def parse_delivery_time(time_string: str) -> Optional[int]:
     """
-    Attempt to parse a human-readable time string into minutes. 
+    Attempt to parse a human-readable time string into minutes.
     Common patterns:
       - "1 hour"
       - "1-2 business days"
@@ -630,7 +776,7 @@ def parse_delivery_time(time_string: str) -> Optional[int]:
 
     Args:
         time_string: Human-readable time string
-        
+
     Returns:
         Integer minutes or None if unknown
     """
@@ -666,11 +812,11 @@ def parse_delivery_time(time_string: str) -> Optional[int]:
             # e.g. "1-2" days
             range_part = text.split("day")[0].strip()
             if range_part:
-                dash_idx = range_part.find('-')
+                dash_idx = range_part.find("-")
                 if dash_idx != -1:
                     try:
                         min_days = int(range_part[:dash_idx])
-                        max_days = int(range_part[dash_idx+1:])
+                        max_days = int(range_part[dash_idx + 1 :])
                         avg_days = (min_days + max_days) / 2
                         return int(avg_days * 1440)
                     except ValueError:
@@ -691,22 +837,23 @@ def parse_delivery_time(time_string: str) -> Optional[int]:
     # fallback
     return DEFAULT_VALUES["delivery_time_minutes"]
 
+
 def guess_country_for_currency(currency_code: str) -> str:
     """
     Guess a typical from_country for a given currency code.
     E.g., "USD" -> "US", "EUR" -> "DE".
-    
+
     Args:
         currency_code: ISO currency code
-        
+
     Returns:
         ISO country code
     """
     if not currency_code:
         return "GB"  # Default fallback
-        
+
     currency_code = currency_code.upper()
-    
+
     # Common direct mappings
     direct_mappings = {
         "EUR": "DE",
@@ -742,12 +889,12 @@ def guess_country_for_currency(currency_code: str) -> str:
         "SAR": "SA",
         "ILS": "IL",
         "KRW": "KR",
-        "CNY": "CN"
+        "CNY": "CN",
     }
-    
+
     if currency_code in direct_mappings:
         return direct_mappings[currency_code]
-    
+
     # Create a reverse mapping of currency to country
     reverse_map = {}
     for country, currencies in COUNTRY_CURRENCIES.items():
@@ -757,9 +904,9 @@ def guess_country_for_currency(currency_code: str) -> str:
                     reverse_map[currency] = country
         elif currencies not in reverse_map:
             reverse_map[currencies] = country
-    
+
     if currency_code in reverse_map:
         return reverse_map[currency_code]
-    
+
     # Fallback to GB
-    return "GB" 
+    return "GB"

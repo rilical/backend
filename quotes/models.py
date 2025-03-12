@@ -13,10 +13,11 @@ from django.utils import timezone
 class Provider(models.Model):
     """
     Model representing a remittance provider service.
-    
+
     Stores essential information about remittance providers, including
     their identification, name, website, logo, API details, and status.
     """
+
     id = models.CharField(max_length=50, primary_key=True)
     name = models.CharField(max_length=100)
     website = models.URLField(blank=True, null=True)
@@ -33,11 +34,12 @@ class Provider(models.Model):
 class FeeQuote(models.Model):
     """
     Model storing fee quotes from various providers for specific corridors.
-    
+
     Each quote represents a specific sending scenario with details about
     the fee structure, exchange rate, delivery options, and timing.
     """
-    provider = models.ForeignKey(Provider, on_delete=models.CASCADE, related_name='quotes')
+
+    provider = models.ForeignKey(Provider, on_delete=models.CASCADE, related_name="quotes")
     source_country = models.CharField(max_length=3)  # ISO 3166-1 alpha-3 country code
     destination_country = models.CharField(max_length=3)  # ISO 3166-1 alpha-3 country code
     source_currency = models.CharField(max_length=3)  # ISO 4217 currency code
@@ -54,18 +56,23 @@ class FeeQuote(models.Model):
     class Meta:
         unique_together = [
             [
-                'provider', 'source_country', 'destination_country', 
-                'source_currency', 'destination_currency', 'payment_method', 
-                'delivery_method', 'send_amount'
+                "provider",
+                "source_country",
+                "destination_country",
+                "source_currency",
+                "destination_currency",
+                "payment_method",
+                "delivery_method",
+                "send_amount",
             ]
         ]
         indexes = [
-            models.Index(fields=['provider', 'source_country', 'destination_country']),
-            models.Index(fields=['source_country', 'destination_country']),
-            models.Index(fields=['provider', 'payment_method', 'delivery_method']),
-            models.Index(fields=['last_updated']),
+            models.Index(fields=["provider", "source_country", "destination_country"]),
+            models.Index(fields=["source_country", "destination_country"]),
+            models.Index(fields=["provider", "payment_method", "delivery_method"]),
+            models.Index(fields=["last_updated"]),
         ]
-        ordering = ['-last_updated']
+        ordering = ["-last_updated"]
 
     def __str__(self):
         return f"{self.provider.name}: {self.source_currency} {self.send_amount} → {self.destination_currency}"
@@ -74,10 +81,11 @@ class FeeQuote(models.Model):
 class QuoteQueryLog(models.Model):
     """
     Log of user quote queries for analytics and caching optimization.
-    
+
     Tracks user query patterns to help optimize caching strategies and
     understand common corridors and amounts being requested.
     """
+
     source_country = models.CharField(max_length=3)
     destination_country = models.CharField(max_length=3)
     source_currency = models.CharField(max_length=3)
@@ -88,7 +96,7 @@ class QuoteQueryLog(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=['source_country', 'destination_country']),
-            models.Index(fields=['timestamp']),
+            models.Index(fields=["source_country", "destination_country"]),
+            models.Index(fields=["timestamp"]),
         ]
-        ordering = ['-timestamp'] 
+        ordering = ["-timestamp"]

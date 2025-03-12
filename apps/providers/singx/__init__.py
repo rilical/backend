@@ -5,25 +5,25 @@ This package provides integration with SingX, a digital remittance service
 that offers competitive exchange rates for various currency corridors.
 """
 
-from apps.providers.singx.integration import SingXProvider, SingXAggregatorProvider
 from apps.providers.singx.exceptions import (
-    SingXError,
-    SingXAuthError,
     SingXAPIError,
-    SingXValidationError,
+    SingXAuthError,
     SingXCorridorError,
+    SingXError,
     SingXQuoteError,
-    SingXRateError
+    SingXRateError,
+    SingXValidationError,
 )
+from apps.providers.singx.integration import SingXAggregatorProvider, SingXProvider
 
 __all__ = [
-    'SingXProvider',
-    'SingXAggregatorProvider',
-    'SingXError',
-    'SingXAuthError',
-    'SingXAPIError',
-    'SingXValidationError',
-    'SingXCorridorError',
-    'SingXQuoteError',
-    'SingXRateError'
-] 
+    "SingXProvider",
+    "SingXAggregatorProvider",
+    "SingXError",
+    "SingXAuthError",
+    "SingXAPIError",
+    "SingXValidationError",
+    "SingXCorridorError",
+    "SingXQuoteError",
+    "SingXRateError",
+]

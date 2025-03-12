@@ -1,54 +1,57 @@
-import logging
-import time
-from decimal import Decimal
-from typing import List, Dict, Any, Optional, Callable, Tuple
 import concurrent.futures
 import datetime
+import logging
 import random
+import time
+from decimal import Decimal
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from django.core.cache import cache
 from django.conf import settings
+from django.core.cache import cache
 
-from apps.providers.xe.integration import XEAggregatorProvider
-from apps.providers.remitly.integration import RemitlyProvider
-from apps.providers.ria.integration import RIAProvider
-from apps.providers.wise.integration import WiseProvider
-from apps.providers.transfergo.integration import TransferGoProvider
-from apps.providers.xoom.integration import XoomProvider
-from apps.providers.singx.integration import SingXProvider
-from apps.providers.paysend.integration import PaysendProvider
-from apps.providers.remitbee.integration import RemitbeeProvider
+from apps.providers.alansari.integration import AlAnsariProvider
+from apps.providers.dahabshiil.integration import DahabshiilProvider
 from apps.providers.instarem.integration import InstaRemProvider
-from apps.providers.pangea.integration import PangeaProvider
+from apps.providers.intermex.integration import IntermexProvider
 from apps.providers.koronapay.integration import KoronaPayProvider
 from apps.providers.mukuru.integration import MukuruProvider
-from apps.providers.rewire.integration import RewireProvider
-from apps.providers.sendwave.integration import SendwaveProvider
-from apps.providers.wirebarley.integration import WireBarleyProvider
 from apps.providers.orbitremit.integration import OrbitRemitProvider
-from apps.providers.dahabshiil.integration import DahabshiilProvider
-from apps.providers.intermex.integration import IntermexProvider
+from apps.providers.pangea.integration import PangeaProvider
+from apps.providers.paysend.integration import PaysendProvider
 from apps.providers.placid.integration import PlacidProvider
+from apps.providers.remitbee.integration import RemitbeeProvider
 from apps.providers.remitguru.integration import RemitGuruProvider
+from apps.providers.remitly.integration import RemitlyProvider
+from apps.providers.rewire.integration import RewireProvider
+from apps.providers.ria.integration import RIAProvider
+from apps.providers.sendwave.integration import SendwaveProvider
+from apps.providers.singx.integration import SingXProvider
+from apps.providers.transfergo.integration import TransferGoProvider
 from apps.providers.westernunion.integration import WesternUnionProvider
-from apps.providers.alansari.integration import AlAnsariProvider
+from apps.providers.wirebarley.integration import WireBarleyProvider
+from apps.providers.wise.integration import WiseProvider
+from apps.providers.xe.integration import XEAggregatorProvider
+from apps.providers.xoom.integration import XoomProvider
 
 logger = logging.getLogger(__name__)
 
+
 # Add cache key generator function at the top level
-def get_provider_quote_cache_key(provider_name, source_country, dest_country, source_currency, dest_currency, amount):
+def get_provider_quote_cache_key(
+    provider_name, source_country, dest_country, source_currency, dest_currency, amount
+):
     """Generate a cache key for individual provider quotes."""
     return f"provider_quote:{provider_name}:{source_country}:{dest_country}:{source_currency}:{dest_currency}:{float(amount)}"
 
-class Aggregator:
 
+class Aggregator:
     PROVIDERS = [
         XEAggregatorProvider(),
         RemitlyProvider(),
         RIAProvider(),
         WiseProvider(),
         TransferGoProvider(),
-        WesternUnionProvider(),        
+        WesternUnionProvider(),
         XoomProvider(),
         SingXProvider(),
         PaysendProvider(),
@@ -75,7 +78,7 @@ class Aggregator:
                 "source_currency": "source_currency",
                 "dest_currency": "dest_currency",
                 "source_country": "source_country",
-                "dest_country": "dest_country"
+                "dest_country": "dest_country",
             }
         },
         "RIAProvider": {
@@ -86,7 +89,7 @@ class Aggregator:
                 "source_country": "source_country",
                 "dest_country": "dest_country",
                 "payment_method": "debitCard",
-                "delivery_method": "bankDeposit"
+                "delivery_method": "bankDeposit",
             }
         },
         "WiseProvider": {
@@ -95,7 +98,7 @@ class Aggregator:
                 "source_currency": "source_currency",
                 "destination_currency": "dest_currency",
                 "source_country": "source_country",
-                "dest_country": "dest_country"
+                "dest_country": "dest_country",
             }
         },
         "TransferGoProvider": {
@@ -104,7 +107,7 @@ class Aggregator:
                 "source_currency": "source_currency",
                 "destination_currency": "dest_currency",
                 "source_country": "source_country",
-                "destination_country": "dest_country"
+                "destination_country": "dest_country",
             }
         },
         "WesternUnionProvider": {
@@ -113,7 +116,7 @@ class Aggregator:
                 "source_currency": "source_currency",
                 "dest_currency": "dest_currency",
                 "source_country": "source_country",
-                "dest_country": "dest_country"
+                "dest_country": "dest_country",
             }
         },
         "XoomProvider": {
@@ -122,7 +125,7 @@ class Aggregator:
                 "source_currency": "source_currency",
                 "dest_currency": "dest_currency",
                 "source_country": "source_country",
-                "dest_country": "dest_country"
+                "dest_country": "dest_country",
             }
         },
         "SingXProvider": {
@@ -131,7 +134,7 @@ class Aggregator:
                 "source_currency": "source_currency",
                 "destination_currency": "dest_currency",
                 "source_country": "source_country",
-                "destination_country": "dest_country"
+                "destination_country": "dest_country",
             }
         },
         "PaysendProvider": {
@@ -140,7 +143,7 @@ class Aggregator:
                 "to_currency": "dest_currency",
                 "from_country": "source_country",
                 "to_country": "dest_country",
-                "amount": "amount"
+                "amount": "amount",
             }
         },
         "AlAnsariProvider": {
@@ -149,7 +152,7 @@ class Aggregator:
                 "source_currency": "source_currency",
                 "dest_currency": "dest_currency",
                 "source_country": "source_country",
-                "dest_country": "dest_country"
+                "dest_country": "dest_country",
             }
         },
         "RemitbeeProvider": {
@@ -158,7 +161,7 @@ class Aggregator:
                 "source_currency": "source_currency",
                 "dest_currency": "dest_currency",
                 "source_country": "source_country",
-                "dest_country": "dest_country"
+                "dest_country": "dest_country",
             }
         },
         "InstaRemProvider": {
@@ -167,7 +170,7 @@ class Aggregator:
                 "source_currency": "source_currency",
                 "dest_currency": "dest_currency",
                 "source_country": "source_country",
-                "dest_country": "dest_country"
+                "dest_country": "dest_country",
             }
         },
         "PangeaProvider": {
@@ -176,7 +179,7 @@ class Aggregator:
                 "source_currency": "source_currency",
                 "target_currency": "dest_currency",
                 "source_country": "source_country",
-                "target_country": "dest_country"
+                "target_country": "dest_country",
             }
         },
         "KoronaPayProvider": {
@@ -185,7 +188,7 @@ class Aggregator:
                 "send_currency": "source_currency",
                 "receive_currency": "dest_currency",
                 "send_country": "source_country",
-                "receive_country": "dest_country"
+                "receive_country": "dest_country",
             }
         },
         "MukuruProvider": {
@@ -193,7 +196,7 @@ class Aggregator:
                 "amount": "amount",
                 "source_currency": "source_currency",
                 "target_country": "dest_country",
-                "from_country_code": "source_country"
+                "from_country_code": "source_country",
             }
         },
         "RewireProvider": {
@@ -202,7 +205,7 @@ class Aggregator:
                 "source_currency": "source_currency",
                 "dest_currency": "dest_currency",
                 "source_country": "source_country",
-                "dest_country": "dest_country"
+                "dest_country": "dest_country",
             }
         },
         "SendwaveProvider": {
@@ -211,7 +214,7 @@ class Aggregator:
                 "source_currency": "source_currency",
                 "dest_currency": "dest_currency",
                 "source_country": "source_country",
-                "dest_country": "dest_country"
+                "dest_country": "dest_country",
             }
         },
         "WireBarleyProvider": {
@@ -220,7 +223,7 @@ class Aggregator:
                 "send_currency": "source_currency",
                 "receive_currency": "dest_currency",
                 "send_country": "source_country",
-                "receive_country": "dest_country"
+                "receive_country": "dest_country",
             }
         },
         "OrbitRemitProvider": {
@@ -229,7 +232,7 @@ class Aggregator:
                 "source_currency": "source_currency",
                 "dest_currency": "dest_currency",
                 "source_country": "source_country",
-                "dest_country": "dest_country"
+                "dest_country": "dest_country",
             }
         },
         "DahabshiilProvider": {
@@ -238,7 +241,7 @@ class Aggregator:
                 "source_currency": "source_currency",
                 "dest_currency": "dest_currency",
                 "source_country": "source_country",
-                "dest_country": "dest_country"
+                "dest_country": "dest_country",
             }
         },
         "IntermexProvider": {
@@ -247,7 +250,7 @@ class Aggregator:
                 "send_currency": "source_currency",
                 "receive_currency": "dest_currency",
                 "send_country": "source_country",
-                "receive_country": "dest_country"
+                "receive_country": "dest_country",
             }
         },
         "PlacidProvider": {
@@ -256,7 +259,7 @@ class Aggregator:
                 "source_currency": "source_currency",
                 "dest_currency": "dest_currency",
                 "source_country": "source_country",
-                "dest_country": "dest_country"
+                "dest_country": "dest_country",
             }
         },
         "RemitGuruProvider": {
@@ -265,7 +268,7 @@ class Aggregator:
                 "source_currency": "source_currency",
                 "dest_currency": "dest_currency",
                 "source_country": "source_country",
-                "dest_country": "dest_country"
+                "dest_country": "dest_country",
             }
         },
     }
@@ -286,11 +289,9 @@ class Aggregator:
         max_fee: Optional[float] = None,
         use_cache: bool = True,  # New parameter to control caching
     ) -> Dict[str, Any]:
-
         exclude_providers = exclude_providers or []
         providers_to_call = [
-            p for p in cls.PROVIDERS
-            if p.__class__.__name__ not in exclude_providers
+            p for p in cls.PROVIDERS if p.__class__.__name__ not in exclude_providers
         ]
 
         logger.info(
@@ -305,6 +306,7 @@ class Aggregator:
 
         try:
             from apps.aggregator.configurator import get_configured_aggregator_params
+
             config_params = get_configured_aggregator_params()
             timeout = config_params.get("timeout", 20)
         except ImportError:
@@ -314,7 +316,7 @@ class Aggregator:
         def call_provider(provider):
             provider_name = provider.__class__.__name__
             provider_id = getattr(provider, "provider_id", provider_name)
-            
+
             # Check cache first if caching is enabled
             if use_cache:
                 cache_key = get_provider_quote_cache_key(
@@ -323,7 +325,7 @@ class Aggregator:
                     dest_country,
                     source_currency,
                     dest_currency,
-                    amount
+                    amount,
                 )
                 cached_result = cache.get(cache_key)
                 if cached_result:
@@ -331,18 +333,20 @@ class Aggregator:
                     if cached_result.get("success", False):
                         all_quotes.append(cached_result)
                     return cached_result
-            
+
             try:
                 provider_params = {
                     "amount": amount,
                     "source_currency": source_currency,
                     "dest_currency": dest_currency,
                     "source_country": source_country,
-                    "dest_country": dest_country
+                    "dest_country": dest_country,
                 }
 
-                if (provider_name in cls.PROVIDER_PARAMS and
-                    "get_quote" in cls.PROVIDER_PARAMS[provider_name]):
+                if (
+                    provider_name in cls.PROVIDER_PARAMS
+                    and "get_quote" in cls.PROVIDER_PARAMS[provider_name]
+                ):
                     param_map = cls.PROVIDER_PARAMS[provider_name]["get_quote"]
                     mapped_params = {}
                     for target_param, source_param in param_map.items():
@@ -363,21 +367,25 @@ class Aggregator:
                         dest_country,
                         source_currency,
                         dest_currency,
-                        amount
+                        amount,
                     )
                     try:
                         # Get TTL from settings or use default
-                        provider_ttl = getattr(settings, 'PROVIDER_CACHE_TTL', 60 * 60 * 24)  # 24 hours default
+                        provider_ttl = getattr(
+                            settings, "PROVIDER_CACHE_TTL", 60 * 60 * 24
+                        )  # 24 hours default
                         jitter = random.randint(
-                            -getattr(settings, 'JITTER_MAX_SECONDS', 60),
-                            getattr(settings, 'JITTER_MAX_SECONDS', 60)
+                            -getattr(settings, "JITTER_MAX_SECONDS", 60),
+                            getattr(settings, "JITTER_MAX_SECONDS", 60),
                         )
                         ttl = provider_ttl + jitter
-                        
+
                         cache.set(cache_key, result, timeout=ttl)
                         logger.info(f"Cached result for provider {provider_id} for {ttl} seconds")
                     except Exception as cache_error:
-                        logger.warning(f"Error caching result for {provider_id}: {str(cache_error)}")
+                        logger.warning(
+                            f"Error caching result for {provider_id}: {str(cache_error)}"
+                        )
 
                 if result.get("success", False):
                     all_quotes.append(result)
@@ -393,9 +401,9 @@ class Aggregator:
                     "destination_currency": dest_currency,
                     "source_country": source_country,
                     "dest_country": dest_country,
-                    "amount": float(amount)
+                    "amount": float(amount),
                 }
-                
+
                 # Cache failures briefly to prevent hammering APIs that are down
                 if use_cache:
                     try:
@@ -405,22 +413,23 @@ class Aggregator:
                             dest_country,
                             source_currency,
                             dest_currency,
-                            amount
+                            amount,
                         )
                         # Shorter TTL for failures
                         cache.set(cache_key, error_result, timeout=300)  # 5 minutes
                     except Exception:
                         pass  # Ignore caching errors for failures
-                
+
                 logger.exception(f"Error calling {provider_id}: {str(e)}")
                 return error_result
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=min(max_workers, len(providers_to_call))) as executor:
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(max_workers, len(providers_to_call))
+        ) as executor:
             future_to_provider = {
-                executor.submit(call_provider, provider): provider
-                for provider in providers_to_call
+                executor.submit(call_provider, provider): provider for provider in providers_to_call
             }
-            
+
             for future in concurrent.futures.as_completed(future_to_provider, timeout=timeout):
                 provider = future_to_provider[future]
                 provider_name = provider.__class__.__name__
@@ -429,7 +438,7 @@ class Aggregator:
                     if result:
                         if provider_name == "RemitGuruProvider":
                             logger.info(f"RemitGuru result from future: {result}")
-                        
+
                         all_provider_results.append(result)
                         if result.get("success", False):
                             all_quotes.append(result)
@@ -438,42 +447,43 @@ class Aggregator:
 
         if filter_fn:
             all_quotes = [q for q in all_quotes if filter_fn(q)]
-        
+
         if max_delivery_time_minutes is not None:
             all_quotes = [
-                q for q in all_quotes 
+                q
+                for q in all_quotes
                 if q.get("delivery_time_minutes", float("inf")) <= max_delivery_time_minutes
             ]
-            
+
         if max_fee is not None:
-            all_quotes = [
-                q for q in all_quotes 
-                if q.get("fee", float("inf")) <= max_fee
-            ]
-            
+            all_quotes = [q for q in all_quotes if q.get("fee", float("inf")) <= max_fee]
+
         if all_quotes and sort_by:
             if sort_by == "best_rate":
                 all_quotes.sort(key=lambda q: (-(q.get("exchange_rate", 0) or 0)))
             elif sort_by == "lowest_fee":
                 all_quotes.sort(key=lambda q: (q.get("fee", float("inf")) or float("inf")))
             elif sort_by == "fastest_time":
-                all_quotes.sort(key=lambda q: (q.get("delivery_time_minutes", float("inf")) or float("inf")))
+                all_quotes.sort(
+                    key=lambda q: (q.get("delivery_time_minutes", float("inf")) or float("inf"))
+                )
             elif sort_by == "best_value":
+
                 def value_score(quote):
                     rate_score = quote.get("exchange_rate", 0) or 0
                     fee_score = 100 - (quote.get("fee", 0) or 0) * 10
                     time_score = 100 - min(100, ((quote.get("delivery_time_minutes", 0) or 0) / 30))
                     return rate_score * 0.5 + fee_score * 0.3 + time_score * 0.2
-                
+
                 all_quotes.sort(key=value_score, reverse=True)
-                
+
         logger.info(f"Final quotes count: {len(all_quotes)}")
         for i, quote in enumerate(all_quotes):
             logger.info(f"Quote {i+1}: {quote.get('provider_id')} - {quote.get('success')}")
-            
+
         end_time = time.time()
         execution_time = end_time - start_time
-        
+
         return {
             "success": len(all_quotes) > 0,
             "results": all_quotes,
@@ -481,5 +491,5 @@ class Aggregator:
             "execution_time": execution_time,
             "providers_called": len(providers_to_call),
             "successful_providers": len(all_quotes),
-            "timestamp": datetime.datetime.now().isoformat()
+            "timestamp": datetime.datetime.now().isoformat(),
         }

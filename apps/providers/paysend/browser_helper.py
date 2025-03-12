@@ -29,31 +29,35 @@ those terms.
 """
 
 import asyncio
+import json
 import logging
 import os
-import json
 import time
-from typing import Dict, Optional, Any, Tuple
-from playwright.async_api import async_playwright, Browser, BrowserContext, Page, TimeoutError
+from typing import Any, Dict, Optional, Tuple
+
+from playwright.async_api import Browser, BrowserContext, Page, TimeoutError, async_playwright
 
 logger = logging.getLogger(__name__)
+
 
 class PaysendBrowserHelper:
     """
     Browser automation helper for Paysend API integration.
-    
+
     This class uses Playwright to automate browser interactions with Paysend,
     handling captcha challenges and maintaining authenticated sessions.
     """
-    
-    def __init__(self, 
-                 headless: bool = True, 
-                 timeout_seconds: int = 60,
-                 visible_for_seconds: int = 0,
-                 cookie_path: str = None):
+
+    def __init__(
+        self,
+        headless: bool = True,
+        timeout_seconds: int = 60,
+        visible_for_seconds: int = 0,
+        cookie_path: str = None,
+    ):
         """
         Initialize the browser helper.
-        
+
         Args:
             headless: Whether to run the browser in headless mode
             timeout_seconds: Maximum time to wait for operations
@@ -63,13 +67,15 @@ class PaysendBrowserHelper:
         self.headless = headless
         self.timeout_seconds = timeout_seconds
         self.visible_for_seconds = visible_for_seconds
-        self.cookie_path = cookie_path or os.path.join(os.path.dirname(__file__), "paysend_cookies.json")
-        
+        self.cookie_path = cookie_path or os.path.join(
+            os.path.dirname(__file__), "paysend_cookies.json"
+        )
+
         self._playwright = None
         self._browser = None
         self._context = None
         self._browser_logs = []
-        
+
         # Country name mappings for URL construction (ISO 2-letter code to URL-friendly name)
         self.COUNTRY_NAMES = {
             "US": "the-united-states-of-america",
@@ -119,7 +125,7 @@ class PaysendBrowserHelper:
             "LK": "sri-lanka",
             "NP": "nepal",
         }
-        
+
         # Currency ID mappings (ISO code to numeric ID used by Paysend)
         self.CURRENCY_IDS = {
             "USD": "840",  # US Dollar
@@ -163,29 +169,29 @@ class PaysendBrowserHelper:
             "AMD": "051",  # Armenia Dram
             "DZD": "012",  # Algeria Dinar
         }
-        
+
     async def __aenter__(self):
         """Context manager entry point"""
         await self.start()
         return self
-        
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit point"""
         await self.close()
-        
+
     async def start(self):
         """Initialize and start the browser"""
         try:
             self._playwright = await async_playwright().start()
             self._browser = await self._playwright.chromium.launch(
-                headless=self.headless, 
+                headless=self.headless,
                 args=[
                     "--disable-blink-features=AutomationControlled",
                     "--disable-web-security",
                     "--no-sandbox",
                 ],
             )
-            
+
             # Create a browser context with specific options to reduce fingerprinting
             self._context = await self._browser.new_context(
                 viewport={"width": 1920, "height": 1080},
@@ -194,7 +200,7 @@ class PaysendBrowserHelper:
                 timezone_id="America/New_York",
                 has_touch=False,
             )
-            
+
             # Load cookies if they exist
             if os.path.exists(self.cookie_path):
                 try:
@@ -204,38 +210,38 @@ class PaysendBrowserHelper:
                         logger.info(f"Loaded {len(cookies)} cookies from {self.cookie_path}")
                 except Exception as e:
                     logger.warning(f"Failed to load cookies: {str(e)}")
-                    
+
             return self
         except Exception as e:
             self._browser_logs.append(f"Browser startup error: {str(e)}")
             logger.error(f"Failed to start browser: {str(e)}")
             await self.close()
             raise
-    
+
     async def close(self):
         """Close all browser resources"""
         try:
             if self._context:
                 await self._context.close()
                 self._context = None
-                
+
             if self._browser:
                 await self._browser.close()
                 self._browser = None
-                
+
             if self._playwright:
                 await self._playwright.stop()
                 self._playwright = None
-                
+
         except Exception as e:
             logger.warning(f"Error during browser cleanup: {str(e)}")
-    
+
     async def save_cookies(self):
         """Save browser cookies to a file"""
         if not self._context:
             logger.warning("Cannot save cookies: Browser context not initialized")
             return False
-            
+
         try:
             cookies = await self._context.cookies()
             with open(self.cookie_path, "w") as f:
@@ -245,31 +251,31 @@ class PaysendBrowserHelper:
         except Exception as e:
             logger.error(f"Failed to save cookies: {str(e)}")
             return False
-    
+
     async def new_page(self) -> Tuple[Optional[Page], str]:
         """Create a new page with error handling"""
         if not self._context:
             error_msg = "Browser context not initialized"
             logger.error(error_msg)
             return None, error_msg
-            
+
         try:
             page = await self._context.new_page()
-            
+
             # Configure page to intercept console messages for logging
             page.on("console", lambda msg: self._browser_logs.append(f"CONSOLE: {msg.text}"))
-            
+
             # Add event listeners for errors
             page.on("pageerror", lambda err: self._browser_logs.append(f"PAGE ERROR: {err}"))
             page.on("crash", lambda: self._browser_logs.append("PAGE CRASHED"))
-            
+
             return page, ""
         except Exception as e:
             error_msg = f"Failed to create page: {str(e)}"
             self._browser_logs.append(error_msg)
             logger.error(error_msg)
             return None, error_msg
-    
+
     async def navigate_to_paysend(self, retry_count: int = 2) -> Tuple[Optional[Page], str]:
         """Navigate to Paysend website with retry logic"""
         for attempt in range(retry_count + 1):
@@ -277,21 +283,23 @@ class PaysendBrowserHelper:
                 page, error = await self.new_page()
                 if not page:
                     return None, error
-                
+
                 # Construct a default URL for US to India as a fallback
                 from_country_name = self.COUNTRY_NAMES.get("US", "the-united-states-of-america")
                 to_country_name = self.COUNTRY_NAMES.get("IN", "india")
                 from_curr_id = self.CURRENCY_IDS.get("USD", "840")
                 to_curr_id = self.CURRENCY_IDS.get("INR", "356")
-                
+
                 default_url = f"https://paysend.com/en-us/send-money/from-{from_country_name}-to-{to_country_name}?fromCurrId={from_curr_id}&toCurrId={to_curr_id}&isFrom=true"
-                
+
                 logger.info(f"Navigating to default URL: {default_url}")
-                
-                await page.goto(default_url, 
-                              wait_until="networkidle", 
-                              timeout=self.timeout_seconds * 1000)
-                
+
+                await page.goto(
+                    default_url,
+                    wait_until="networkidle",
+                    timeout=self.timeout_seconds * 1000,
+                )
+
                 # Check if we hit a captcha page
                 if await self._is_captcha_page(page):
                     if self.headless:
@@ -303,19 +311,22 @@ class PaysendBrowserHelper:
                         if await self._is_captcha_page(page):
                             return None, "Captcha not solved within timeout"
                         logger.info("Captcha appears to be solved!")
-                
+
                 return page, ""
-                
+
             except Exception as e:
                 logger.warning(f"Navigation attempt {attempt+1}/{retry_count+1} failed: {str(e)}")
                 if page:
                     await page.close()
-                
+
                 if attempt < retry_count:
                     await asyncio.sleep(2)
                 else:
-                    return None, f"Navigation failed after {retry_count+1} attempts: {str(e)}"
-    
+                    return (
+                        None,
+                        f"Navigation failed after {retry_count+1} attempts: {str(e)}",
+                    )
+
     async def _is_captcha_page(self, page: Page) -> bool:
         """Check if the current page is a captcha challenge"""
         try:
@@ -325,13 +336,13 @@ class PaysendBrowserHelper:
                 "iframe[src*='captcha']",
                 "iframe[src*='cloudflare']",
                 ".cf-browser-verification",
-                "#cf-please-wait"
+                "#cf-please-wait",
             ]
-            
+
             for selector in captcha_selectors:
                 if await page.locator(selector).count() > 0:
                     return True
-                    
+
             # Check page content for captcha keywords
             content = await page.content()
             captcha_keywords = [
@@ -340,40 +351,46 @@ class PaysendBrowserHelper:
                 "security check",
                 "cloudflare",
                 "browser verification",
-                "browser check"
+                "browser check",
             ]
-            
+
             return any(keyword in content.lower() for keyword in captcha_keywords)
-            
+
         except Exception as e:
             logger.warning(f"Error checking for captcha: {str(e)}")
             return False
-    
-    async def get_quote(self, from_currency: str, to_currency: str, amount: float,
-                       from_country: str = "US", to_country: str = "IN") -> Optional[Dict[str, Any]]:
+
+    async def get_quote(
+        self,
+        from_currency: str,
+        to_currency: str,
+        amount: float,
+        from_country: str = "US",
+        to_country: str = "IN",
+    ) -> Optional[Dict[str, Any]]:
         """
         Get a quote from Paysend using browser automation.
-        
+
         Args:
             from_currency: Source currency code (e.g., "USD")
             to_currency: Destination currency code (e.g., "INR")
             amount: Amount to convert
             from_country: Source country code
             to_country: Destination country code
-            
+
         Returns:
             Quote data dictionary or None if failed
         """
         if not self._browser:
             await self.start()
-            
+
         # Build the proper URL with country and currency IDs
         # Get country names and currency IDs from our mappings
         from_country_name = self.COUNTRY_NAMES.get(from_country, from_country.lower())
         to_country_name = self.COUNTRY_NAMES.get(to_country, to_country.lower())
         from_curr_id = self.CURRENCY_IDS.get(from_currency, "840")  # Default to USD if not found
         to_curr_id = self.CURRENCY_IDS.get(to_currency)
-        
+
         if not to_curr_id:
             logger.warning(f"Currency ID not found for {to_currency}, using default URL")
             page, error = await self.navigate_to_paysend()
@@ -381,12 +398,16 @@ class PaysendBrowserHelper:
             # Construct the URL with proper country names and currency IDs
             url = f"https://paysend.com/en-us/send-money/from-{from_country_name}-to-{to_country_name}?fromCurrId={from_curr_id}&toCurrId={to_curr_id}&isFrom=true"
             logger.info(f"Navigating to URL: {url}")
-            
+
             page, error = await self.new_page()
             if page:
                 try:
-                    await page.goto(url, wait_until="networkidle", timeout=self.timeout_seconds * 1000)
-                    
+                    await page.goto(
+                        url,
+                        wait_until="networkidle",
+                        timeout=self.timeout_seconds * 1000,
+                    )
+
                     # Check if we hit a captcha page
                     if await self._is_captcha_page(page):
                         if self.headless:
@@ -405,50 +426,54 @@ class PaysendBrowserHelper:
                     if page:
                         await page.close()
                     page, error = await self.navigate_to_paysend()
-        
+
         if not page:
             logger.error(f"Failed to navigate to Paysend: {error}")
             self._browser_logs.append(f"Navigation error: {error}")
             return None
-            
+
         try:
             # Try to interact with calculator form
             logger.info(f"Attempting to get quote for {from_currency} to {to_currency}")
-            
+
             # Fill calculator form (implementation depends on actual Paysend UI)
             # This is a placeholder - actual implementation would need to adapt to Paysend's form
             await page.fill("#amount", str(amount))
             await page.select_option("#from-currency", from_currency)
             await page.select_option("#to-currency", to_currency)
             await page.click("#calculate-button")
-            
+
             # Wait for results and extract data
             await page.wait_for_selector("#result-container", timeout=30000)
-            
+
             # Extract quote data (implementation depends on actual Paysend UI)
-            exchange_rate = await page.evaluate("() => document.querySelector('#exchange-rate').textContent")
+            exchange_rate = await page.evaluate(
+                "() => document.querySelector('#exchange-rate').textContent"
+            )
             fee = await page.evaluate("() => document.querySelector('#fee').textContent")
-            receive_amount = await page.evaluate("() => document.querySelector('#receive-amount').textContent")
-            
+            receive_amount = await page.evaluate(
+                "() => document.querySelector('#receive-amount').textContent"
+            )
+
             # Save cookies for future use
             await self.save_cookies()
-            
+
             # Clean up
             await page.close()
-            
+
             if self.visible_for_seconds > 0:
                 logger.info(f"Keeping browser open for {self.visible_for_seconds} seconds")
                 await asyncio.sleep(self.visible_for_seconds)
-            
+
             return {
                 "success": True,
                 "exchange_rate": float(exchange_rate),
                 "fee": float(fee),
                 "receive_amount": float(receive_amount),
                 "currency_from": from_currency,
-                "currency_to": to_currency
+                "currency_to": to_currency,
             }
-            
+
         except Exception as e:
             if page:
                 # Capture screenshot for debugging
@@ -458,32 +483,33 @@ class PaysendBrowserHelper:
                     logger.info(f"Error screenshot saved to {screenshot_path}")
                 except Exception as screenshot_err:
                     logger.warning(f"Failed to capture error screenshot: {str(screenshot_err)}")
-                
+
                 # Close the page
                 await page.close()
-            
+
             logger.error(f"Error during quote retrieval: {str(e)}")
             self._browser_logs.append(f"Quote error: {str(e)}")
-            
+
             return None
-    
+
     def get_browser_logs(self) -> str:
         """Get browser logs as a string"""
-        return "\n".join(self._browser_logs) 
+        return "\n".join(self._browser_logs)
 
 
 # Add the synchronous functions that are referenced in the integration.py file
 
+
 def get_browser_cookies_sync() -> Optional[Dict]:
     """
     Synchronous wrapper for getting browser cookies.
-    
+
     Returns:
         Dictionary of cookies or None if failed
     """
     # Path to cookie file
     cookie_path = os.path.join(os.path.dirname(__file__), "paysend_cookies.json")
-    
+
     try:
         if os.path.exists(cookie_path):
             with open(cookie_path, "r") as f:
@@ -503,11 +529,11 @@ def run_browser_helper_sync(
     to_country: str = "IN",
     url: Optional[str] = None,
     headless: bool = True,
-    timeout_seconds: int = 120  # Increased timeout for manual captcha solving
+    timeout_seconds: int = 120,  # Increased timeout for manual captcha solving
 ) -> Optional[Dict[str, Any]]:
     """
     Synchronous wrapper for running browser automation to get a quote.
-    
+
     Args:
         from_currency: Source currency code
         to_currency: Destination currency code
@@ -517,22 +543,24 @@ def run_browser_helper_sync(
         url: Optional specific URL to navigate to
         headless: Whether to run browser in headless mode
         timeout_seconds: Timeout for browser operations
-        
+
     Returns:
         Quote data dictionary or None if failed
     """
     try:
         # Create an event loop and run the async function
-        result = asyncio.run(_run_browser_helper_async(
-            from_currency=from_currency,
-            to_currency=to_currency,
-            amount=amount,
-            from_country=from_country,
-            to_country=to_country,
-            url=url,
-            headless=headless,
-            timeout_seconds=timeout_seconds
-        ))
+        result = asyncio.run(
+            _run_browser_helper_async(
+                from_currency=from_currency,
+                to_currency=to_currency,
+                amount=amount,
+                from_country=from_country,
+                to_country=to_country,
+                url=url,
+                headless=headless,
+                timeout_seconds=timeout_seconds,
+            )
+        )
         return result
     except Exception as e:
         logger.error(f"Error running browser helper: {e}")
@@ -547,11 +575,11 @@ async def _run_browser_helper_async(
     to_country: str = "IN",
     url: Optional[str] = None,
     headless: bool = True,
-    timeout_seconds: int = 120
+    timeout_seconds: int = 120,
 ) -> Optional[Dict[str, Any]]:
     """
     Async function to run browser automation to get a quote.
-    
+
     Args:
         from_currency: Source currency code
         to_currency: Destination currency code
@@ -561,7 +589,7 @@ async def _run_browser_helper_async(
         url: Optional specific URL to navigate to
         headless: Whether to run browser in headless mode
         timeout_seconds: Timeout for browser operations
-        
+
     Returns:
         Quote data dictionary or None if failed
     """
@@ -569,29 +597,29 @@ async def _run_browser_helper_async(
     helper = PaysendBrowserHelper(
         headless=headless,
         timeout_seconds=timeout_seconds,
-        visible_for_seconds=30  # Keep browser visible for 30 seconds after operation
+        visible_for_seconds=30,  # Keep browser visible for 30 seconds after operation
     )
-    
+
     try:
         # Start the browser
         await helper.start()
-        
+
         # Get quote using the helper
         result = await helper.get_quote(
             from_currency=from_currency,
             to_currency=to_currency,
             amount=amount,
             from_country=from_country,
-            to_country=to_country
+            to_country=to_country,
         )
-        
+
         # Make sure to save cookies for future use
         await helper.save_cookies()
-        
+
         return result
     except Exception as e:
         logger.error(f"Error in browser helper async: {e}")
         return None
     finally:
         # Make sure we close the browser
-        await helper.close() 
+        await helper.close()

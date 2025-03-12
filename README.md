@@ -251,6 +251,55 @@ python manage.py runserver
 
 See `API_DOCUMENTATION.md` for detailed API documentation.
 
+## Code Style and Quality
+
+RemitScout follows strict code style and quality guidelines to ensure maintainable and reliable code. We use several tools to enforce these standards:
+
+### Setup Development Environment
+
+To set up the development environment with all necessary code style tools:
+
+```bash
+./setup_dev_environment.sh
+```
+
+This script will:
+1. Install required Python dependencies
+2. Install pre-commit
+3. Set up pre-commit hooks that run automatically on each commit
+
+### Code Style Tools
+
+- **Black**: Code formatter that enforces a consistent style
+- **isort**: Sorts and organizes imports
+- **Flake8**: Linter that checks for style and potential errors
+- **MyPy**: Static type checker for Python
+- **pre-commit**: Framework for managing git pre-commit hooks
+
+### Running Code Style Checks
+
+To manually run all code style checks:
+
+```bash
+./code_style.sh
+```
+
+For more detailed information about our code style guidelines and tools, see [CODE_STYLE.md](CODE_STYLE.md).
+
+### Helper Scripts
+
+We provide several helper scripts to assist with code quality:
+
+- **fix_type_annotations.py**: Identifies common type annotation issues
+  ```bash
+  ./fix_type_annotations.py apps
+  ```
+
+- **fix_flake8_issues.py**: Identifies common flake8 issues
+  ```bash
+  ./fix_flake8_issues.py apps
+  ```
+
 ## Usage Examples
 
 ### Basic Usage
@@ -336,3 +385,48 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Multi-level caching system with automatic invalidation
 - RESTful API for quote retrieval
 - Flexible filtering and sorting options 
+
+## Development Setup
+
+### Code Style & Organization
+
+This project follows strict code style standards using several tools:
+
+1. **Install Development Dependencies**:
+   ```bash
+   pip install -r requirements-dev.txt
+   ```
+   
+   Or run the setup script to create a virtual environment and install all dependencies:
+   ```bash
+   ./setup_dev_env.sh
+   ```
+
+2. **Code Formatting**:
+   - We use [Black](https://black.readthedocs.io/) for consistent code formatting
+   - Run with: `black .`
+
+3. **Import Sorting**:
+   - [isort](https://pycqa.github.io/isort/) is configured to organize imports
+   - Run with: `isort .`
+
+4. **Linting**:
+   - [Flake8](https://flake8.pycqa.org/) checks for code quality issues
+   - Run with: `flake8`
+
+5. **Type Checking**:
+   - We use [MyPy](https://mypy.readthedocs.io/) with strict type checking
+   - Run with: `mypy .`
+
+All tools are configured to work together with consistent settings in `pyproject.toml` and `.flake8`.
+
+### IDE Integration
+
+VSCode settings are provided in `.vscode/settings.json` to automatically:
+- Format code on save using Black
+- Sort imports with isort on save
+- Enable Flake8 and MyPy linting
+
+### Pre-commit Hook
+
+The setup script installs a Git pre-commit hook that runs all code quality tools before each commit. 

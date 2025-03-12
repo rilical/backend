@@ -6,71 +6,77 @@ and response formatting in the RemitScout platform.
 
 Version: 1.0
 """
+import json
+import logging
+import random
 from decimal import Decimal, InvalidOperation
-from django.utils import timezone
-from django.core.cache import cache, caches
+
+import redis
 from django.conf import settings
-from rest_framework.views import APIView
-from rest_framework.response import Response
+from django.core.cache import cache, caches
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import AllowAny
-import random
-import logging
-import redis
-import json
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from apps.aggregator.aggregator import Aggregator
-from .models import Provider, FeeQuote, QuoteQueryLog
-from .key_generators import get_quote_cache_key, get_corridor_cache_key
-from .cache_utils import get_quotes_from_corridor_rates, cache_corridor_rate_data
+
+from .cache_utils import cache_corridor_rate_data, get_quotes_from_corridor_rates
+from .key_generators import get_corridor_cache_key, get_quote_cache_key
+from .models import FeeQuote, Provider, QuoteQueryLog
 
 logger = logging.getLogger(__name__)
+
 
 class QuoteAPIView(APIView):
     """
     API endpoint to fetch remittance quotes from multiple providers.
-    
+
     This endpoint allows clients to request quotes for a specific money transfer
     corridor (source country to destination country) with a specified amount.
     It returns sorted quotes from various providers with detailed price and
     delivery information.
-    
+
     The endpoint implements a multi-level caching strategy to ensure fast response
     times while maintaining data freshness. Results can be sorted by different
     criteria and filtered based on various parameters.
-    
+
     This is a public endpoint - no authentication required.
-    
+
     Version: 1.0
     """
+
     permission_classes = [AllowAny]
-    
+
     def get(self, request):
         """
         Get quotes for a specific corridor and amount.
-        
+
         Retrieves quotes from multiple remittance providers for the specified
         parameters, applying caching, sorting, and filtering as requested.
-        
+
         Returns:
             Response: A Django REST framework response object containing
                      the quotes and metadata.
         """
         try:
-            source_country = request.query_params.get('source_country')
-            dest_country = request.query_params.get('dest_country')
-            source_currency = request.query_params.get('source_currency')
-            dest_currency = request.query_params.get('dest_currency')
-            amount = request.query_params.get('amount')
-            sort_by = request.query_params.get('sort_by', 'best_rate')
-            force_refresh = request.query_params.get('force_refresh', 'false').lower() == 'true'
-            
+            source_country = request.query_params.get("source_country")
+            dest_country = request.query_params.get("dest_country")
+            source_currency = request.query_params.get("source_currency")
+            dest_currency = request.query_params.get("dest_currency")
+            amount = request.query_params.get("amount")
+            sort_by = request.query_params.get("sort_by", "best_rate")
+            force_refresh = request.query_params.get("force_refresh", "false").lower() == "true"
+
             if not all([source_country, dest_country, source_currency, dest_currency, amount]):
                 return Response(
-                    {"error": "Missing required parameters. Please provide source_country, dest_country, source_currency, dest_currency, and amount."},
-                    status=status.HTTP_400_BAD_REQUEST
+                    {
+                        "error": "Missing required parameters. Please provide source_country, dest_country, source_currency, dest_currency, and amount."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
-            
+
             try:
                 amount_decimal = Decimal(amount)
                 if amount_decimal <= 0:
@@ -78,39 +84,53 @@ class QuoteAPIView(APIView):
             except (InvalidOperation, ValueError):
                 return Response(
                     {"error": "Invalid amount. Please provide a valid positive number."},
-                    status=status.HTTP_400_BAD_REQUEST
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
-            
+
             self._log_query(
-                source_country, dest_country, source_currency, dest_currency, amount_decimal, request
+                source_country,
+                dest_country,
+                source_currency,
+                dest_currency,
+                amount_decimal,
+                request,
             )
-            
+
             if force_refresh:
                 logger.info("Force refresh requested, bypassing all caches")
                 return self._fetch_and_return_fresh_quotes(
-                    source_country, dest_country, source_currency, dest_currency, 
-                    amount_decimal, sort_by, cache_results=True
+                    source_country,
+                    dest_country,
+                    source_currency,
+                    dest_currency,
+                    amount_decimal,
+                    sort_by,
+                    cache_results=True,
                 )
-            
+
             cache_key = get_quote_cache_key(
-                source_country, dest_country, source_currency, dest_currency, amount_decimal
+                source_country,
+                dest_country,
+                source_currency,
+                dest_currency,
+                amount_decimal,
             )
-            
+
             print(f"DEBUG: Looking for cache key: {cache_key}")
-            
+
             exact_match = None
-            
+
             exact_match = cache.get(cache_key)
             print(f"DEBUG: Django cache.get result: {exact_match is not None}")
-            
+
             if not exact_match:
                 try:
-                    r = redis.Redis.from_url(settings.CACHES['default']['LOCATION'])
+                    r = redis.Redis.from_url(settings.CACHES["default"]["LOCATION"])
                     redis_key_json = f"{settings.CACHES['default']['KEY_PREFIX']}:json:{cache_key}"
                     print(f"DEBUG: Direct Redis lookup for JSON key: {redis_key_json}")
                     redis_match = r.get(redis_key_json)
                     print(f"DEBUG: Redis JSON lookup result: {redis_match is not None}")
-                    
+
                     if redis_match:
                         try:
                             exact_match = json.loads(redis_match)
@@ -119,151 +139,215 @@ class QuoteAPIView(APIView):
                             print(f"DEBUG: Error deserializing Redis JSON data: {str(e)}")
                 except Exception as e:
                     print(f"DEBUG: Error in direct Redis JSON lookup: {str(e)}")
-            
+
             if exact_match:
-                exact_match['cache_hit'] = True
+                exact_match["cache_hit"] = True
                 logger.info(f"Exact cache hit for key: {cache_key}")
                 return Response(exact_match)
-            
+
             corridor_key = get_corridor_cache_key(source_country, dest_country)
             corridor_available = cache.get(corridor_key)
-            
+
             if corridor_available is not None and not corridor_available:
-                logger.info(f"Skipping known unavailable corridor: {source_country}->{dest_country}")
-                return Response({
-                    "success": False,
-                    "error": "This corridor is not currently supported by any provider.",
-                    "source_country": source_country,
-                    "dest_country": dest_country,
-                    "cache_hit": True
-                })
-            
+                logger.info(
+                    f"Skipping known unavailable corridor: {source_country}->{dest_country}"
+                )
+                return Response(
+                    {
+                        "success": False,
+                        "error": "This corridor is not currently supported by any provider.",
+                        "source_country": source_country,
+                        "dest_country": dest_country,
+                        "cache_hit": True,
+                    }
+                )
+
             corridor_rate_response = get_quotes_from_corridor_rates(
-                source_country, dest_country, source_currency, dest_currency, amount_decimal
+                source_country,
+                dest_country,
+                source_currency,
+                dest_currency,
+                amount_decimal,
             )
-            
+
             if corridor_rate_response:
-                logger.info(f"Using cached corridor rates to calculate quotes for amount: {amount_decimal}")
-                
-                self._sort_quotes(corridor_rate_response.get('quotes', []), sort_by)
-                
-                if 'filters_applied' not in corridor_rate_response:
-                    corridor_rate_response['filters_applied'] = {}
-                corridor_rate_response['filters_applied']['sort_by'] = sort_by
-                
+                logger.info(
+                    f"Using cached corridor rates to calculate quotes for amount: {amount_decimal}"
+                )
+
+                self._sort_quotes(corridor_rate_response.get("quotes", []), sort_by)
+
+                if "filters_applied" not in corridor_rate_response:
+                    corridor_rate_response["filters_applied"] = {}
+                corridor_rate_response["filters_applied"]["sort_by"] = sort_by
+
                 jitter = random.randint(-settings.JITTER_MAX_SECONDS, settings.JITTER_MAX_SECONDS)
                 ttl = settings.QUOTE_CACHE_TTL + jitter
                 cache.set(cache_key, corridor_rate_response, timeout=ttl)
-                
-                logger.info(f"Cached calculated response for amount {amount_decimal} with key: {cache_key}")
+
+                logger.info(
+                    f"Cached calculated response for amount {amount_decimal} with key: {cache_key}"
+                )
                 return Response(corridor_rate_response)
-            
+
             logger.info(f"No cache hits, fetching fresh quotes from aggregator")
             return self._fetch_and_return_fresh_quotes(
-                source_country, dest_country, source_currency, dest_currency, 
-                amount_decimal, sort_by, cache_results=True
+                source_country,
+                dest_country,
+                source_currency,
+                dest_currency,
+                amount_decimal,
+                sort_by,
+                cache_results=True,
             )
-            
+
         except Exception as e:
             logger.exception(f"Error in QuoteAPIView: {str(e)}")
             return Response(
                 {"error": f"An error occurred: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-    
-    def _fetch_and_return_fresh_quotes(self, source_country, dest_country, source_currency, 
-                                      dest_currency, amount_decimal, sort_by, cache_results=True):
+
+    def _fetch_and_return_fresh_quotes(
+        self,
+        source_country,
+        dest_country,
+        source_currency,
+        dest_currency,
+        amount_decimal,
+        sort_by,
+        cache_results=True,
+    ):
         """Fetch fresh quotes from the aggregator and cache appropriately"""
-        logger.info(f"Fetching quotes from aggregator for {amount_decimal} {source_currency} -> {dest_currency}")
-        raw_response = self._get_quotes_from_aggregator(
-            source_country, dest_country, source_currency, dest_currency, amount_decimal, sort_by
+        logger.info(
+            f"Fetching quotes from aggregator for {amount_decimal} {source_currency} -> {dest_currency}"
         )
-        
-        response_data = self._transform_response(raw_response, source_country, dest_country, 
-                                                source_currency, dest_currency, amount_decimal, sort_by)
-        
+        raw_response = self._get_quotes_from_aggregator(
+            source_country,
+            dest_country,
+            source_currency,
+            dest_currency,
+            amount_decimal,
+            sort_by,
+        )
+
+        response_data = self._transform_response(
+            raw_response,
+            source_country,
+            dest_country,
+            source_currency,
+            dest_currency,
+            amount_decimal,
+            sort_by,
+        )
+
         if not cache_results:
             return Response(response_data)
-        
-        all_quotes = response_data.get('quotes', [])
-        successful_quotes = [q for q in all_quotes if q.get('success', False)]
+
+        all_quotes = response_data.get("quotes", [])
+        successful_quotes = [q for q in all_quotes if q.get("success", False)]
         has_quotes = len(successful_quotes) > 0
-        
+
         corridor_key = get_corridor_cache_key(source_country, dest_country)
         corridor_ttl = settings.CORRIDOR_CACHE_TTL
         cache.set(corridor_key, has_quotes, timeout=corridor_ttl)
-        
+
         if has_quotes:
             specific_key = get_quote_cache_key(
-                source_country, dest_country, source_currency, dest_currency, amount_decimal
+                source_country,
+                dest_country,
+                source_currency,
+                dest_currency,
+                amount_decimal,
             )
             jitter = random.randint(-settings.JITTER_MAX_SECONDS, settings.JITTER_MAX_SECONDS)
             ttl = settings.QUOTE_CACHE_TTL + jitter
-            
-            if 'cache_hit' in response_data:
-                response_data['cache_hit'] = False
+
+            if "cache_hit" in response_data:
+                response_data["cache_hit"] = False
             else:
-                response_data.update({'cache_hit': False})
-            
+                response_data.update({"cache_hit": False})
+
             print(f"DEBUG: Setting cache with key: {specific_key}, TTL: {ttl}")
-            
+
             try:
                 cache.set(specific_key, response_data, timeout=ttl)
                 print(f"DEBUG: Django cache.set for key: {specific_key}")
-                
-                r = redis.Redis.from_url(settings.CACHES['default']['LOCATION'])
-                
+
+                r = redis.Redis.from_url(settings.CACHES["default"]["LOCATION"])
+
                 redis_key_original = f"{settings.CACHES['default']['KEY_PREFIX']}:1:{specific_key}"
                 redis_key_json = f"{settings.CACHES['default']['KEY_PREFIX']}:json:{specific_key}"
-                
+
                 serialized_data = json.dumps(response_data)
                 r.setex(redis_key_json, ttl, serialized_data)
                 print(f"DEBUG: Stored JSON data in Redis with key: {redis_key_json}")
-                
+
                 redis_result = r.get(redis_key_json)
                 print(f"DEBUG: Redis verification result: {redis_result is not None}")
-                
-                logger.info(f"Cached specific amount response for {ttl} seconds with key: {specific_key}")
+
+                logger.info(
+                    f"Cached specific amount response for {ttl} seconds with key: {specific_key}"
+                )
             except Exception as e:
                 print(f"DEBUG: Error setting cache: {str(e)}")
                 logger.exception(f"Error setting cache: {str(e)}")
-            
+
             cache_corridor_rate_data(
-                source_country, dest_country, source_currency, dest_currency, successful_quotes
+                source_country,
+                dest_country,
+                source_currency,
+                dest_currency,
+                successful_quotes,
             )
-            
+
             self._store_quotes(response_data)
         else:
             specific_key = get_quote_cache_key(
-                source_country, dest_country, source_currency, dest_currency, amount_decimal
+                source_country,
+                dest_country,
+                source_currency,
+                dest_currency,
+                amount_decimal,
             )
             short_ttl = min(300, settings.QUOTE_CACHE_TTL)
             cache.set(specific_key, response_data, timeout=short_ttl)
             logger.info(f"Cached failed response for {short_ttl} seconds: {specific_key}")
-        
+
         return Response(response_data)
-    
+
     def _sort_quotes(self, quotes, sort_by):
         """Sort quotes based on the specified criteria"""
         if not quotes or not sort_by:
             return
-            
+
         if sort_by == "best_rate":
             quotes.sort(key=lambda q: (-(q.get("exchange_rate", 0) or 0)))
         elif sort_by == "lowest_fee":
             quotes.sort(key=lambda q: (q.get("fee", float("inf")) or float("inf")))
         elif sort_by == "fastest_time":
-            quotes.sort(key=lambda q: (q.get("delivery_time_minutes", float("inf")) or float("inf")))
+            quotes.sort(
+                key=lambda q: (q.get("delivery_time_minutes", float("inf")) or float("inf"))
+            )
         elif sort_by == "best_value":
+
             def value_score(quote):
                 rate_score = quote.get("exchange_rate", 0) or 0
                 fee_score = 100 - (quote.get("fee", 0) or 0) * 10
                 time_score = 100 - min(100, ((quote.get("delivery_time_minutes", 0) or 0) / 30))
                 return rate_score * 0.5 + fee_score * 0.3 + time_score * 0.2
-            
+
             quotes.sort(key=value_score, reverse=True)
-    
-    def _log_query(self, source_country, dest_country, source_currency, dest_currency, amount, request):
+
+    def _log_query(
+        self,
+        source_country,
+        dest_country,
+        source_currency,
+        dest_currency,
+        amount,
+        request,
+    ):
         """Log the query for analytics (anonymously)"""
         try:
             user_ip = self._get_client_ip(request)
@@ -273,22 +357,30 @@ class QuoteAPIView(APIView):
                 source_currency=source_currency,
                 destination_currency=dest_currency,
                 send_amount=amount,
-                user_ip=user_ip
+                user_ip=user_ip,
             )
         except Exception as e:
             logger.warning(f"Failed to log query: {str(e)}")
             pass
-    
+
     def _get_client_ip(self, request):
         """Extract client IP from request"""
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
         if x_forwarded_for:
-            ip = x_forwarded_for.split(',')[0]
+            ip = x_forwarded_for.split(",")[0]
         else:
-            ip = request.META.get('REMOTE_ADDR')
+            ip = request.META.get("REMOTE_ADDR")
         return ip
-    
-    def _get_quotes_from_aggregator(self, source_country, dest_country, source_currency, dest_currency, amount, sort_by):
+
+    def _get_quotes_from_aggregator(
+        self,
+        source_country,
+        dest_country,
+        source_currency,
+        dest_currency,
+        amount,
+        sort_by,
+    ):
         """Get quotes from the aggregator service"""
         return Aggregator.get_all_quotes(
             source_country=source_country,
@@ -296,10 +388,19 @@ class QuoteAPIView(APIView):
             source_currency=source_currency,
             dest_currency=dest_currency,
             amount=amount,
-            sort_by=sort_by
+            sort_by=sort_by,
         )
-    
-    def _transform_response(self, raw_response, source_country, dest_country, source_currency, dest_currency, amount, sort_by):
+
+    def _transform_response(
+        self,
+        raw_response,
+        source_country,
+        dest_country,
+        source_currency,
+        dest_currency,
+        amount,
+        sort_by,
+    ):
         """Transform aggregator response to standardized format for API and caching"""
         response = {
             "success": raw_response.get("success", False),
@@ -317,74 +418,81 @@ class QuoteAPIView(APIView):
                 "sort_by": sort_by,
                 "max_delivery_time_minutes": None,
                 "max_fee": None,
-            }
+            },
         }
-        
+
         return response
-    
+
     def _store_quotes(self, response_data):
         """Store successful quotes in the database"""
         try:
-            quotes = response_data.get('quotes', [])
+            quotes = response_data.get("quotes", [])
             stored_count = 0
-            
+
             for quote in quotes:
-                if not quote.get('success', False):
+                if not quote.get("success", False):
                     continue
-                    
-                if not all([
-                    quote.get('provider_id'),
-                    quote.get('exchange_rate'),
-                    quote.get('fee') is not None,
-                    quote.get('destination_amount')
-                ]):
-                    logger.warning(f"Skipping quote from {quote.get('provider_id')} - missing essential data")
+
+                if not all(
+                    [
+                        quote.get("provider_id"),
+                        quote.get("exchange_rate"),
+                        quote.get("fee") is not None,
+                        quote.get("destination_amount"),
+                    ]
+                ):
+                    logger.warning(
+                        f"Skipping quote from {quote.get('provider_id')} - missing essential data"
+                    )
                     continue
-                
-                provider_id = quote.get('provider_id')
+
+                provider_id = quote.get("provider_id")
                 provider, _ = Provider.objects.get_or_create(
-                    id=provider_id,
-                    defaults={'name': provider_id}
+                    id=provider_id, defaults={"name": provider_id}
                 )
-                
-                payment_method = quote.get('payment_method')
-                if not payment_method or payment_method == 'unknown':
-                    payment_method = 'Card'
-                    
-                delivery_method = quote.get('delivery_method')
-                if not delivery_method or delivery_method == 'unknown':
-                    delivery_method = 'bank_deposit'
-                
+
+                payment_method = quote.get("payment_method")
+                if not payment_method or payment_method == "unknown":
+                    payment_method = "Card"
+
+                delivery_method = quote.get("delivery_method")
+                if not delivery_method or delivery_method == "unknown":
+                    delivery_method = "bank_deposit"
+
                 try:
-                    send_amount = Decimal(str(response_data.get('amount', 0)))
-                    fee_amount = Decimal(str(quote.get('fee', 0)))
-                    exchange_rate = Decimal(str(quote.get('exchange_rate', 0)))
-                    destination_amount = Decimal(str(quote.get('destination_amount', 0)))
-                    delivery_time_minutes = int(quote.get('delivery_time_minutes', 0))
+                    send_amount = Decimal(str(response_data.get("amount", 0)))
+                    fee_amount = Decimal(str(quote.get("fee", 0)))
+                    exchange_rate = Decimal(str(quote.get("exchange_rate", 0)))
+                    destination_amount = Decimal(str(quote.get("destination_amount", 0)))
+                    delivery_time_minutes = int(quote.get("delivery_time_minutes", 0))
                 except (ValueError, TypeError, InvalidOperation) as e:
-                    logger.warning(f"Skipping quote from {provider_id} - numeric conversion error: {str(e)}")
+                    logger.warning(
+                        f"Skipping quote from {provider_id} - numeric conversion error: {str(e)}"
+                    )
                     continue
-                
+
                 FeeQuote.objects.update_or_create(
                     provider=provider,
-                    source_country=response_data.get('source_country'),
-                    destination_country=response_data.get('dest_country'),
-                    source_currency=response_data.get('source_currency'),
-                    destination_currency=response_data.get('dest_currency'),
+                    source_country=response_data.get("source_country"),
+                    destination_country=response_data.get("dest_country"),
+                    source_currency=response_data.get("source_currency"),
+                    destination_currency=response_data.get("dest_currency"),
                     payment_method=payment_method,
                     delivery_method=delivery_method,
                     send_amount=send_amount,
                     defaults={
-                        'fee_amount': fee_amount,
-                        'exchange_rate': exchange_rate,
-                        'delivery_time_minutes': delivery_time_minutes,
-                        'destination_amount': destination_amount,
-                        'last_updated': timezone.now()
-                    }
+                        "fee_amount": fee_amount,
+                        "exchange_rate": exchange_rate,
+                        "delivery_time_minutes": delivery_time_minutes,
+                        "destination_amount": destination_amount,
+                        "last_updated": timezone.now(),
+                    },
                 )
                 stored_count += 1
-                
-            logger.info(f"Stored {stored_count} valid quotes in database out of {len([q for q in quotes if q.get('success', False)])} successful quotes")
+
+            logger.info(
+                f"Stored {stored_count} valid quotes in database out of {len([q for q in quotes if q.get('success', False)])} successful quotes"
+            )
         except Exception as e:
             logger.warning(f"Failed to store quotes: {str(e)}")
-            pass 
+            pass

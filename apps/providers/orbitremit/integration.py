@@ -6,21 +6,24 @@ fee information.
 """
 
 import logging
-import requests
-from decimal import Decimal
-from typing import Any, Dict, Optional, List
 from datetime import datetime
+from decimal import Decimal
+from typing import Any, Dict, List, Optional
+
+import requests
 
 from apps.providers.base.provider import RemittanceProvider
+
 from .exceptions import (
-    OrbitRemitError,
-    OrbitRemitConnectionError,
     OrbitRemitApiError,
-    OrbitRemitResponseError,
+    OrbitRemitConnectionError,
     OrbitRemitCorridorUnsupportedError,
+    OrbitRemitError,
+    OrbitRemitResponseError,
 )
 
 logger = logging.getLogger("providers.orbitremit")
+
 
 class OrbitRemitProvider(RemittanceProvider):
     """
@@ -31,10 +34,10 @@ class OrbitRemitProvider(RemittanceProvider):
     FEES_ENDPOINT = "/api/fees"
     RATES_ENDPOINT = "/api/rates"
     HISTORIC_RATES_ENDPOINT = "/api/historic-rates"
-    
+
     # Common source currencies
     SUPPORTED_SOURCE_CURRENCIES = ["AUD", "NZD", "GBP", "EUR", "CAD", "USD"]
-    
+
     # Known supported corridors (source→target pairs)
     SUPPORTED_CORRIDORS = {
         "AUD": ["PHP", "INR", "PKR", "BDT", "FJD", "LKR", "NPR", "USD", "VND"],
@@ -44,7 +47,7 @@ class OrbitRemitProvider(RemittanceProvider):
         "CAD": ["PHP", "INR", "PKR", "BDT", "LKR", "NPR", "VND"],
         "USD": ["PHP", "INR", "PKR", "BDT", "LKR", "NPR", "VND"],
     }
-    
+
     # Mapping of country codes to currencies
     COUNTRY_TO_CURRENCY = {
         "PH": "PHP",  # Philippines
@@ -57,44 +60,71 @@ class OrbitRemitProvider(RemittanceProvider):
         "VN": "VND",  # Vietnam
         "US": "USD",  # United States
     }
-    
+
     # Approximated exchange rates for fallback calculation
     EXCHANGE_RATES = {
         "AUD": {
-            "PHP": Decimal("35.50"), "INR": Decimal("55.20"), "PKR": Decimal("217.40"),
-            "BDT": Decimal("75.30"), "FJD": Decimal("1.50"), "LKR": Decimal("215.75"),
-            "NPR": Decimal("89.15"), "USD": Decimal("0.66"),  "VND": Decimal("16250.00"),
+            "PHP": Decimal("35.50"),
+            "INR": Decimal("55.20"),
+            "PKR": Decimal("217.40"),
+            "BDT": Decimal("75.30"),
+            "FJD": Decimal("1.50"),
+            "LKR": Decimal("215.75"),
+            "NPR": Decimal("89.15"),
+            "USD": Decimal("0.66"),
+            "VND": Decimal("16250.00"),
         },
         "NZD": {
-            "PHP": Decimal("33.20"), "INR": Decimal("51.75"), "PKR": Decimal("203.50"),
-            "BDT": Decimal("70.40"), "FJD": Decimal("1.40"), "LKR": Decimal("201.80"),
-            "NPR": Decimal("83.45"), "VND": Decimal("15200.00"),
+            "PHP": Decimal("33.20"),
+            "INR": Decimal("51.75"),
+            "PKR": Decimal("203.50"),
+            "BDT": Decimal("70.40"),
+            "FJD": Decimal("1.40"),
+            "LKR": Decimal("201.80"),
+            "NPR": Decimal("83.45"),
+            "VND": Decimal("15200.00"),
         },
         "GBP": {
-            "PHP": Decimal("67.80"), "INR": Decimal("105.60"), "PKR": Decimal("415.25"),
-            "BDT": Decimal("143.70"), "LKR": Decimal("411.90"), "NPR": Decimal("170.30"),
+            "PHP": Decimal("67.80"),
+            "INR": Decimal("105.60"),
+            "PKR": Decimal("415.25"),
+            "BDT": Decimal("143.70"),
+            "LKR": Decimal("411.90"),
+            "NPR": Decimal("170.30"),
             "VND": Decimal("31000.00"),
         },
         "EUR": {
-            "PHP": Decimal("59.40"), "INR": Decimal("92.50"), "PKR": Decimal("363.80"),
-            "BDT": Decimal("125.95"), "LKR": Decimal("360.90"), "NPR": Decimal("149.25"),
+            "PHP": Decimal("59.40"),
+            "INR": Decimal("92.50"),
+            "PKR": Decimal("363.80"),
+            "BDT": Decimal("125.95"),
+            "LKR": Decimal("360.90"),
+            "NPR": Decimal("149.25"),
             "VND": Decimal("27150.00"),
         },
         "CAD": {
-            "PHP": Decimal("39.65"), "INR": Decimal("61.75"), "PKR": Decimal("242.85"),
-            "BDT": Decimal("84.10"), "LKR": Decimal("241.00"), "NPR": Decimal("99.65"),
+            "PHP": Decimal("39.65"),
+            "INR": Decimal("61.75"),
+            "PKR": Decimal("242.85"),
+            "BDT": Decimal("84.10"),
+            "LKR": Decimal("241.00"),
+            "NPR": Decimal("99.65"),
             "VND": Decimal("18130.00"),
         },
         "USD": {
-            "PHP": Decimal("53.90"), "INR": Decimal("83.95"), "PKR": Decimal("330.15"),
-            "BDT": Decimal("114.25"), "LKR": Decimal("327.60"), "NPR": Decimal("135.55"),
+            "PHP": Decimal("53.90"),
+            "INR": Decimal("83.95"),
+            "PKR": Decimal("330.15"),
+            "BDT": Decimal("114.25"),
+            "LKR": Decimal("327.60"),
+            "NPR": Decimal("135.55"),
             "VND": Decimal("24650.00"),
-        }
+        },
     }
-    
+
     # When these rates were last updated
     RATES_LAST_UPDATED = datetime(2023, 3, 2)
-    
+
     # Fixed fees by currency (fallback values)
     FIXED_FEES = {
         "AUD": Decimal("4.00"),
@@ -116,17 +146,23 @@ class OrbitRemitProvider(RemittanceProvider):
         self.session = requests.Session()
 
         # Example default headers that match your logs
-        self.session.headers.update({
-            "User-Agent": ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                           "AppleWebKit/605.1.15 (KHTML, like Gecko) "
-                           "Version/18.3 Safari/605.1.15"),
-            "Accept": "*/*",
-            "Content-Type": "application/json",
-            "Cache-Control": "no-cache",
-            "Pragma": "no-cache",
-        })
+        self.session.headers.update(
+            {
+                "User-Agent": (
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/605.1.15 (KHTML, like Gecko) "
+                    "Version/18.3 Safari/605.1.15"
+                ),
+                "Accept": "*/*",
+                "Content-Type": "application/json",
+                "Cache-Control": "no-cache",
+                "Pragma": "no-cache",
+            }
+        )
 
-    def standardize_response(self, raw_result: Dict[str, Any], provider_specific_data: bool = False) -> Dict[str, Any]:
+    def standardize_response(
+        self, raw_result: Dict[str, Any], provider_specific_data: bool = False
+    ) -> Dict[str, Any]:
         """
         Convert local fields -> aggregator-friendly keys.
         Typically aggregator wants:
@@ -140,95 +176,95 @@ class OrbitRemitProvider(RemittanceProvider):
         # If aggregator specifically wants "rate", we can unify them
         if final_rate is None:
             final_rate = final_exchange_rate
-            
-        final_target_currency = raw_result.get("target_currency") or raw_result.get("destination_currency")
-        
+
+        final_target_currency = raw_result.get("target_currency") or raw_result.get(
+            "destination_currency"
+        )
+
         standardized = {
             "provider_id": self.name,
             "success": raw_result.get("success", False),
             "error_message": raw_result.get("error_message"),
-
             "send_amount": raw_result.get("send_amount", 0.0),
             "source_currency": (raw_result.get("source_currency") or "").upper(),
-
             "destination_amount": raw_result.get("destination_amount"),
             "destination_currency": (raw_result.get("destination_currency") or "").upper(),
-
             "exchange_rate": final_exchange_rate,
             "fee": raw_result.get("fee"),
             "delivery_time_minutes": raw_result.get("delivery_time_minutes"),
             "timestamp": raw_result.get("timestamp") or datetime.now().isoformat(),
-
             "rate": final_rate,
             "target_currency": (final_target_currency or "").upper(),
         }
-        
+
         if provider_specific_data and "raw_response" in raw_result:
             standardized["raw_response"] = raw_result["raw_response"]
-            
+
         return standardized
 
     def _get_exchange_rate(self, source_currency: str, target_currency: str) -> Optional[Decimal]:
         """
         Get the exchange rate from our embedded rate database.
-        
+
         Args:
             source_currency: Source currency code (e.g. 'USD')
             target_currency: Target currency code (e.g. 'PHP')
-            
+
         Returns:
             Exchange rate as a Decimal or None if not found
         """
         source_currency = source_currency.upper()
         target_currency = target_currency.upper()
-        
+
         if source_currency in self.EXCHANGE_RATES:
             if target_currency in self.EXCHANGE_RATES[source_currency]:
                 return self.EXCHANGE_RATES[source_currency][target_currency]
-        
+
         logger.warning(f"No exchange rate found for {source_currency} to {target_currency}")
         return None
 
-    def get_rates(self, send_currency: str, dest_currency: str, amount: Optional[float] = None) -> Dict[str, Any]:
+    def get_rates(
+        self, send_currency: str, dest_currency: str, amount: Optional[float] = None
+    ) -> Dict[str, Any]:
         """
         Attempt to get exchange rate from OrbitRemit's /api/rates endpoint.
         If it fails or doesn't find a rate, we'll fallback to embedded EXCHANGE_RATES.
         """
         local_result = {
-            'success': False,
-            'source_currency': send_currency.upper(),
-            'target_currency': dest_currency.upper(),
-            'rate': None,
-            'error_message': None,
-            'timestamp': datetime.now().isoformat()
+            "success": False,
+            "source_currency": send_currency.upper(),
+            "target_currency": dest_currency.upper(),
+            "rate": None,
+            "error_message": None,
+            "timestamp": datetime.now().isoformat(),
         }
 
         try:
             # Update parameter names to match the API's expected format
             payload = {
-                'send': send_currency.upper(),
-                'payout': dest_currency.upper(),
-                'send_amount': str(float(amount)) if amount else '1000.00'
+                "send": send_currency.upper(),
+                "payout": dest_currency.upper(),
+                "send_amount": str(float(amount)) if amount else "1000.00",
             }
             headers = {
-                'Content-Type': 'application/json',
-                'Pragma': 'no-cache',
-                'Accept': 'application/json, text/plain, */*',
-                'Sec-Fetch-Site': 'same-origin',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Sec-Fetch-Mode': 'cors',
-                'Cache-Control': 'no-cache',
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
-                              '(KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-                'Referer': 'https://www.orbitremit.com/',
-                'Sec-Fetch-Dest': 'empty',
-                'Priority': 'u=1, i'
+                "Content-Type": "application/json",
+                "Pragma": "no-cache",
+                "Accept": "application/json, text/plain, */*",
+                "Sec-Fetch-Site": "same-origin",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Sec-Fetch-Mode": "cors",
+                "Cache-Control": "no-cache",
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+                "Referer": "https://www.orbitremit.com/",
+                "Sec-Fetch-Dest": "empty",
+                "Priority": "u=1, i",
             }
 
             url = f"{self.BASE_URL}/api/rates"
             logger.info(f"OrbitRemit GET /api/rates -> POST {url} with payload: {payload}")
-            timeout = getattr(self, 'timeout', 15)
+            timeout = getattr(self, "timeout", 15)
             response = requests.post(url, json=payload, headers=headers, timeout=timeout)
             response.raise_for_status()
 
@@ -237,40 +273,40 @@ class OrbitRemitProvider(RemittanceProvider):
 
             # Update response parsing to match expected format
             # Check for the new response format first
-            if data.get('code') == 200 and data.get('status') == 'success' and 'data' in data:
-                if 'rate' in data['data']:
-                    local_result['success'] = True
-                    local_result['rate'] = Decimal(str(data['data']['rate']))
+            if data.get("code") == 200 and data.get("status") == "success" and "data" in data:
+                if "rate" in data["data"]:
+                    local_result["success"] = True
+                    local_result["rate"] = Decimal(str(data["data"]["rate"]))
                     return local_result
-                
+
             # Fallback to previous response handling patterns
             # Extract rate from nested structure
             # Typical new structure => data->data->attributes->rate
             # or top-level 'data': { 'attributes': {...} }
-            elif data.get('type') == 'success' and 'data' in data:
-                attr = data['data'].get('data', {}).get('attributes', {})
-                rate_val = attr.get('rate') or attr.get('promotion_rate')
+            elif data.get("type") == "success" and "data" in data:
+                attr = data["data"].get("data", {}).get("attributes", {})
+                rate_val = attr.get("rate") or attr.get("promotion_rate")
             else:
                 # fallback attempt
                 rate_val = None
 
             if rate_val:
-                local_result['rate'] = Decimal(str(rate_val))
-                local_result['success'] = True
+                local_result["rate"] = Decimal(str(rate_val))
+                local_result["success"] = True
             else:
                 error_msg = f"Could not find a valid 'rate' in response: {data}"
                 logger.error(error_msg)
-                local_result['error_message'] = error_msg
+                local_result["error_message"] = error_msg
 
         except requests.RequestException as e:
             error_msg = f"OrbitRemit rates request failed: {str(e)}"
             logger.error(error_msg)
-            local_result['error_message'] = error_msg
+            local_result["error_message"] = error_msg
 
         except (ValueError, TypeError) as e:
             error_msg = f"Error processing exchange rate data: {str(e)}"
             logger.error(error_msg)
-            local_result['error_message'] = error_msg
+            local_result["error_message"] = error_msg
 
         return local_result
 
@@ -280,7 +316,7 @@ class OrbitRemitProvider(RemittanceProvider):
         payout_currency: str,
         send_amount: Decimal,
         recipient_type: str = "bank_account",
-        **kwargs
+        **kwargs,
     ) -> Dict[str, Any]:
         """
         Retrieve fee from OrbitRemit's /api/fees endpoint.
@@ -314,10 +350,10 @@ class OrbitRemitProvider(RemittanceProvider):
             "Sec-Fetch-Mode": "cors",
             "Cache-Control": "no-cache",
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                          "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
             "Referer": "https://www.orbitremit.com/",
             "Sec-Fetch-Dest": "empty",
-            "Priority": "u=1, i"
+            "Priority": "u=1, i",
         }
 
         try:
@@ -325,10 +361,10 @@ class OrbitRemitProvider(RemittanceProvider):
                 "send": send_currency.upper(),
                 "payout": payout_currency.upper(),
                 "amount": str(float(send_amount)),
-                "type": recipient_type
+                "type": recipient_type,
             }
             logger.info(f"OrbitRemit fees request to {endpoint_url}, params={params}")
-            timeout = getattr(self, 'timeout', 15)
+            timeout = getattr(self, "timeout", 15)
             resp = requests.get(endpoint_url, params=params, headers=headers, timeout=timeout)
             resp.raise_for_status()
 
@@ -336,7 +372,12 @@ class OrbitRemitProvider(RemittanceProvider):
             logger.info(f"OrbitRemit fees response: {data}")
 
             # Update response parsing to match the sample response structure
-            if "code" in data and data["code"] == 200 and data["status"] == "success" and "data" in data:
+            if (
+                "code" in data
+                and data["code"] == 200
+                and data["status"] == "success"
+                and "data" in data
+            ):
                 if "fee" in data["data"]:
                     result["fee"] = float(data["data"]["fee"])
                     result["success"] = True
@@ -379,7 +420,7 @@ class OrbitRemitProvider(RemittanceProvider):
         dest_country=None,
         payment_method=None,
         receiving_method=None,
-        **kwargs
+        **kwargs,
     ) -> Dict[str, Any]:
         """
         Aggregator-style get_quote: returns standardized aggregator keys.
@@ -399,18 +440,23 @@ class OrbitRemitProvider(RemittanceProvider):
 
         # Validate required
         if not amount or not source_currency or not dest_currency:
-            local_result["error_message"] = "Missing required params: amount, source_currency, dest_currency"
+            local_result[
+                "error_message"
+            ] = "Missing required params: amount, source_currency, dest_currency"
             return self.standardize_response(local_result)
 
         # Validate supported corridor
         src_curr = source_currency.upper()
         dst_curr = dest_currency.upper()
-        
+
         if src_curr not in self.SUPPORTED_SOURCE_CURRENCIES:
             local_result["error_message"] = f"Unsupported source currency: {src_curr}"
             return self.standardize_response(local_result)
-            
-        if src_curr in self.SUPPORTED_CORRIDORS and dst_curr not in self.SUPPORTED_CORRIDORS[src_curr]:
+
+        if (
+            src_curr in self.SUPPORTED_CORRIDORS
+            and dst_curr not in self.SUPPORTED_CORRIDORS[src_curr]
+        ):
             local_result["error_message"] = f"Unsupported corridor: {src_curr}->{dst_curr}"
             return self.standardize_response(local_result)
 
@@ -419,7 +465,7 @@ class OrbitRemitProvider(RemittanceProvider):
             fee_info = self.get_fee_info(
                 send_currency=source_currency,
                 payout_currency=dest_currency,
-                send_amount=Decimal(str(amount))
+                send_amount=Decimal(str(amount)),
             )
             if fee_info.get("success"):
                 fee_val = Decimal(str(fee_info.get("fee", "6.00")))
@@ -436,7 +482,7 @@ class OrbitRemitProvider(RemittanceProvider):
         logger.info("Using embedded exchange rates fallback")
         src_map = self.EXCHANGE_RATES.get(src_curr, {})
         rate = src_map.get(dst_curr)
-        
+
         if not rate:
             # Try API as last resort
             try:
@@ -447,7 +493,7 @@ class OrbitRemitProvider(RemittanceProvider):
                     logger.warning(f"Rate call returned error: {rate_data.get('error_message')}")
             except Exception as e:
                 logger.warning(f"Rate call failed: {str(e)}")
-            
+
             if not rate:
                 local_result["error_message"] = f"No exchange rate found for {src_curr}->{dst_curr}"
                 return self.standardize_response(local_result)
@@ -464,7 +510,9 @@ class OrbitRemitProvider(RemittanceProvider):
         local_result["destination_amount"] = float(destination_amount)
 
         local_result["success"] = True
-        return self.standardize_response(local_result, provider_specific_data=kwargs.get("include_raw", False))
+        return self.standardize_response(
+            local_result, provider_specific_data=kwargs.get("include_raw", False)
+        )
 
     def get_exchange_rate(
         self,
@@ -473,7 +521,7 @@ class OrbitRemitProvider(RemittanceProvider):
         source_country: str = None,
         target_country: str = None,
         amount: Decimal = Decimal("1000"),
-        **kwargs
+        **kwargs,
     ) -> Dict[str, Any]:
         """
         Aggregator-style get_exchange_rate returning standardized fields.
@@ -486,7 +534,7 @@ class OrbitRemitProvider(RemittanceProvider):
             dest_currency=target_currency,
             source_country=source_country,
             dest_country=target_country,
-            **kwargs
+            **kwargs,
         )
 
     def close(self):
@@ -503,13 +551,10 @@ class OrbitRemitProvider(RemittanceProvider):
         self.close()
 
     def get_historic_rates(
-        self, 
-        send_currency: str, 
-        payout_currency: str, 
-        timescale: str = "weekly"
+        self, send_currency: str, payout_currency: str, timescale: str = "weekly"
     ) -> Dict[str, Any]:
         """
-        Aggregator style function to get historical exchange rates from 
+        Aggregator style function to get historical exchange rates from
         OrbitRemit's /api/historic-rates.
         """
         try:
@@ -520,7 +565,7 @@ class OrbitRemitProvider(RemittanceProvider):
                     "error_message": "send_currency and payout_currency required",
                     "source_currency": send_currency,
                     "target_currency": payout_currency,
-                    "rates": []
+                    "rates": [],
                 }
 
             url = f"{self.BASE_URL}{self.HISTORIC_RATES_ENDPOINT}"
@@ -533,19 +578,19 @@ class OrbitRemitProvider(RemittanceProvider):
                 "Sec-Fetch-Mode": "cors",
                 "Cache-Control": "no-cache",
                 "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                              "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
                 "Referer": "https://www.orbitremit.com/",
                 "Sec-Fetch-Dest": "empty",
-                "Priority": "u=1, i"
+                "Priority": "u=1, i",
             }
             params = {
                 "send_currency": send_currency.upper(),
                 "payout_currency": payout_currency.upper(),
-                "timescale": timescale
+                "timescale": timescale,
             }
 
             logger.info(f"Requesting historic rates from {url} with {params}")
-            timeout = getattr(self, 'timeout', 15)
+            timeout = getattr(self, "timeout", 15)
             resp = requests.get(url, params=params, headers=headers, timeout=timeout)
             resp.raise_for_status()
 
@@ -559,17 +604,19 @@ class OrbitRemitProvider(RemittanceProvider):
                     for item in data["data"]:
                         if "attributes" in item:
                             attr = item["attributes"]
-                            all_rates.append({
-                                "date": attr.get("date"),
-                                "rate": float(attr.get("rate", 0))
-                            })
+                            all_rates.append(
+                                {
+                                    "date": attr.get("date"),
+                                    "rate": float(attr.get("rate", 0)),
+                                }
+                            )
 
                 return {
                     "success": True,
                     "error_message": None,
                     "source_currency": send_currency.upper(),
                     "target_currency": payout_currency.upper(),
-                    "rates": all_rates
+                    "rates": all_rates,
                 }
             else:
                 return {
@@ -577,7 +624,7 @@ class OrbitRemitProvider(RemittanceProvider):
                     "error_message": f"Unexpected response structure: {data}",
                     "source_currency": send_currency.upper(),
                     "target_currency": payout_currency.upper(),
-                    "rates": []
+                    "rates": [],
                 }
 
         except requests.RequestException as exc:
@@ -588,7 +635,7 @@ class OrbitRemitProvider(RemittanceProvider):
                 "error_message": error_msg,
                 "source_currency": send_currency.upper(),
                 "target_currency": payout_currency.upper(),
-                "rates": []
+                "rates": [],
             }
         except (ValueError, TypeError) as exc:
             error_msg = f"Error parsing historic rates: {exc}"
@@ -598,5 +645,5 @@ class OrbitRemitProvider(RemittanceProvider):
                 "error_message": error_msg,
                 "source_currency": send_currency.upper(),
                 "target_currency": payout_currency.upper(),
-                "rates": []
-            } 
+                "rates": [],
+            }

@@ -1,11 +1,13 @@
-import sys
-import os
-from decimal import Decimal
-from tabulate import tabulate
 import logging
+import os
+import sys
 from datetime import datetime
+from decimal import Decimal
+
+from tabulate import tabulate
 
 from apps.aggregator.aggregator import Aggregator
+
 
 def print_header(title):
     """Print a formatted header with the title centered"""
@@ -14,10 +16,11 @@ def print_header(title):
     except OSError:
         # Default width when running in non-interactive terminal
         terminal_width = 80
-    
+
     print("\n" + "=" * terminal_width)
     print(title.center(terminal_width))
     print("=" * terminal_width)
+
 
 def analyze_error_message(error_message: str) -> str:
     """
@@ -26,7 +29,7 @@ def analyze_error_message(error_message: str) -> str:
     """
     if not error_message:
         return "Unknown error"
-    
+
     em_lower = error_message.lower()
     if "unsupported" in em_lower or "not support" in em_lower:
         return "🛑 Unsupported corridor"
@@ -39,24 +42,22 @@ def analyze_error_message(error_message: str) -> str:
     else:
         return "❌ General failure"
 
+
 def test_us_mexico_corridor():
     """Test aggregator for US→MX (USD→MXN) with detailed table output."""
     # Configure logging to both console and file
     log_filename = f"us_mexico_test_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(log_filename),
-            logging.StreamHandler(sys.stdout)
-        ]
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[logging.FileHandler(log_filename), logging.StreamHandler(sys.stdout)],
     )
     logger = logging.getLogger(__name__)
-    
+
     print_header("REMITSCOUT PROVIDER TEST: US → MEXICO (USD → MXN)")
     print(f"Test started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
     print(f"Logging output to: {log_filename}\n")
-    
+
     # Test parameters
     test_params = {
         "source_country": "US",
@@ -65,83 +66,97 @@ def test_us_mexico_corridor():
         "dest_currency": "MXN",
         "amount": Decimal("500.00"),
         # Exclude providers known not to support this corridor (if you like)
-        "exclude_providers": ["SingXProvider", "DahabshiilProvider", "OrbitRemitProvider"],
+        "exclude_providers": [
+            "SingXProvider",
+            "DahabshiilProvider",
+            "OrbitRemitProvider",
+        ],
         "max_workers": 10,
-        "sort_by": "best_rate"
+        "sort_by": "best_rate",
     }
-    
+
     logger.info(f"Testing US->Mexico corridor with parameters: {test_params}")
-    
+
     start_time = datetime.now()
     result = Aggregator.get_all_quotes(**test_params)
     elapsed_time = (datetime.now() - start_time).total_seconds()
-    
+
     logger.info(f"Got results in {elapsed_time:.2f} seconds")
     logger.debug(f"Raw result: {result}")
-    
+
     table_data = []
-    provider_count = len(result.get('all_results', []))
+    provider_count = len(result.get("all_results", []))
     success_count = 0
-    
+
     # Keep track of working vs. non-working providers
     working_providers = []
     nonworking_providers = []
-    
+
     logger.info(f"Processing results for {provider_count} providers")
-    
-    for provider in result.get('all_results', []):
+
+    for provider in result.get("all_results", []):
         if not isinstance(provider, dict):
             logger.warning(f"Skipping invalid provider result: {provider}")
             continue  # skip if invalid result
-        provider_id = provider.get('provider_id', 'Unknown Provider')
-        
-        is_success = provider.get('success', False)
+        provider_id = provider.get("provider_id", "Unknown Provider")
+
+        is_success = provider.get("success", False)
         if is_success:
             success_count += 1
             status = "✅ Success"
-            
+
             # Extract numeric fields if present
-            exchange_rate = provider.get('exchange_rate', 'N/A')
-            fee = provider.get('fee', 'N/A')
-            dest_amount = provider.get('destination_amount', 'N/A')
-            delivery_time = provider.get('delivery_time_minutes', 'N/A')
-            
-            logger.info(f"Provider {provider_id} succeeded with rate: {exchange_rate}, fee: {fee}, "
-                       f"destination amount: {dest_amount}, delivery time: {delivery_time}")
-            
+            exchange_rate = provider.get("exchange_rate", "N/A")
+            fee = provider.get("fee", "N/A")
+            dest_amount = provider.get("destination_amount", "N/A")
+            delivery_time = provider.get("delivery_time_minutes", "N/A")
+
+            logger.info(
+                f"Provider {provider_id} succeeded with rate: {exchange_rate}, fee: {fee}, "
+                f"destination amount: {dest_amount}, delivery time: {delivery_time}"
+            )
+
             # Make them strings if numeric
-            exchange_rate_str = (f"{exchange_rate:.4f}" 
-                                 if isinstance(exchange_rate, (int, float, Decimal)) 
-                                 else "N/A")
-            fee_str = (f"${fee:.2f}" 
-                       if isinstance(fee, (int, float, Decimal)) 
-                       else "N/A")
-            dest_amount_str = (f"${dest_amount:.2f} MXN" 
-                               if isinstance(dest_amount, (int, float, Decimal)) 
-                               else "N/A")
-            delivery_time_str = (f"{delivery_time} min" 
-                                 if isinstance(delivery_time, (int, float)) 
-                                 else "N/A")
-            
-            row = [provider_id, status, exchange_rate_str, fee_str, 
-                   dest_amount_str, delivery_time_str]
+            exchange_rate_str = (
+                f"{exchange_rate:.4f}"
+                if isinstance(exchange_rate, (int, float, Decimal))
+                else "N/A"
+            )
+            fee_str = f"${fee:.2f}" if isinstance(fee, (int, float, Decimal)) else "N/A"
+            dest_amount_str = (
+                f"${dest_amount:.2f} MXN"
+                if isinstance(dest_amount, (int, float, Decimal))
+                else "N/A"
+            )
+            delivery_time_str = (
+                f"{delivery_time} min" if isinstance(delivery_time, (int, float)) else "N/A"
+            )
+
+            row = [
+                provider_id,
+                status,
+                exchange_rate_str,
+                fee_str,
+                dest_amount_str,
+                delivery_time_str,
+            ]
             working_providers.append(provider_id)
         else:
             status = "❌ Failed"
-            error_msg = provider.get('error_message', 'Unknown error')
+            error_msg = provider.get("error_message", "Unknown error")
             error_reason = analyze_error_message(error_msg)
             logger.warning(f"Provider {provider_id} failed with error: {error_msg}")
             row = [provider_id, status, "N/A", "N/A", "N/A", error_reason]
             nonworking_providers.append(provider_id)
-        
+
         table_data.append(row)
-    
+
     # Print the main table
     print_header("TEST RESULTS")
     headers = ["Provider", "Status", "Rate", "Fee", "Recipient Gets", "Details"]
     print(f"\nCorridor: US→Mexico / USD→MXN (Amount: $500.00)")
     print(tabulate(table_data, headers=headers, tablefmt="grid"))
-    
+
     # Summaries
     print_header("PROVIDER SUPPORT SUMMARY")
     # Working table
@@ -151,17 +166,17 @@ def test_us_mexico_corridor():
         print(tabulate(working_table, headers=["#", "Provider ID"], tablefmt="simple"))
     else:
         print("No working providers in this corridor.")
-    
+
     # Non-working table
     print("\n❌ NON-WORKING PROVIDERS")
     if nonworking_providers:
-        # We already have their errors from the main table, 
+        # We already have their errors from the main table,
         # so we can just list them by provider ID
         nonworking_table = [[i, p] for i, p in enumerate(nonworking_providers, 1)]
         print(tabulate(nonworking_table, headers=["#", "Provider ID"], tablefmt="simple"))
     else:
         print("All tested providers succeeded for this corridor!")
-    
+
     # Summary
     print_header("SUMMARY")
     print(f"Total Providers: {provider_count}")
@@ -170,17 +185,18 @@ def test_us_mexico_corridor():
     if provider_count > 0:
         print(f"Success Rate: {(success_count/provider_count)*100:.1f}%")
     print(f"Total Execution Time: {elapsed_time:.2f} seconds")
-    
+
     logger.info(f"Test completed with {success_count}/{provider_count} successful providers")
-    
-    # Instead of failing if aggregator 'success' is false, 
+
+    # Instead of failing if aggregator 'success' is false,
     # pass if at least one provider succeeded
     if success_count == 0:
         logger.error("No providers succeeded for this corridor!")
         raise AssertionError("No providers succeeded for this corridor!")
-    
+
     print("\n✅ Test completed successfully!")
     print(f"\nDetailed log file saved to: {log_filename}")
+
 
 if __name__ == "__main__":
     test_us_mexico_corridor()

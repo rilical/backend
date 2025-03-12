@@ -2,11 +2,11 @@
 Base class for remittance providers.
 """
 import abc
-import uuid
-import time
 import datetime
+import time
+import uuid
 from decimal import Decimal
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 
 class RemittanceProvider(abc.ABC):
@@ -28,15 +28,13 @@ class RemittanceProvider(abc.ABC):
         dest_country: str,
         payment_method: Optional[str] = None,
         delivery_method: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ) -> Dict[str, Any]:
         """Get standardized quote for money transfer between currencies."""
         raise NotImplementedError
 
     def standardize_response(
-        self,
-        raw_result: Dict[str, Any],
-        provider_specific_data: bool = False
+        self, raw_result: Dict[str, Any], provider_specific_data: bool = False
     ) -> Dict[str, Any]:
         """
         Standardize the response shape for aggregator consumption.

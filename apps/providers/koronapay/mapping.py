@@ -22,7 +22,7 @@ CURRENCY_IDS = {
     "VND": "704",  # Vietnamese Dong
     "PHP": "608",  # Philippine Peso
     "THB": "764",  # Thai Baht
-    "MYR": "458"   # Malaysian Ringgit
+    "MYR": "458",  # Malaysian Ringgit
 }
 
 # Country mappings (ISO-3166-1 alpha-3 -> KoronaPay internal ID)
@@ -60,56 +60,57 @@ COUNTRY_IDS = {
     "ESP": "ESP",  # Spain
     "SWE": "SWE",  # Sweden
     "GBR": "GBR",  # United Kingdom
-    
     # Destination Countries
     "IDN": "IDN",  # Indonesia
     "TUR": "TUR",  # Turkey
     "VNM": "VNM",  # Vietnam
     "PHL": "PHL",  # Philippines
     "THA": "THA",  # Thailand
-    "MYS": "MYS"   # Malaysia
+    "MYS": "MYS",  # Malaysia
 }
 
 # Payment method mappings
-PAYMENT_METHODS = {
-    "debit_card": "debitCard",
-    "bank_account": "bankAccount"
-}
+PAYMENT_METHODS = {"debit_card": "debitCard", "bank_account": "bankAccount"}
 
 # Receiving method mappings
-RECEIVING_METHODS = {
-    "cash": "cash",
-    "card": "card"
-}
+RECEIVING_METHODS = {"cash": "cash", "card": "card"}
+
 
 def get_currency_id(currency_code: str) -> str:
     """Get KoronaPay internal currency ID from ISO-4217 code."""
     return CURRENCY_IDS.get(currency_code.upper())
 
+
 def get_country_id(country_code: str) -> str:
     """Get KoronaPay internal country ID from ISO-3166-1 alpha-3 code."""
     return COUNTRY_IDS.get(country_code.upper())
+
 
 def get_payment_method(method: str) -> str:
     """Get KoronaPay internal payment method ID."""
     return PAYMENT_METHODS.get(method.lower())
 
+
 def get_receiving_method(method: str) -> str:
     """Get KoronaPay internal receiving method ID."""
     return RECEIVING_METHODS.get(method.lower())
+
 
 def get_supported_currencies() -> list:
     """Get list of supported ISO-4217 currency codes."""
     return list(CURRENCY_IDS.keys())
 
+
 def get_supported_countries() -> list:
     """Get list of supported ISO-3166-1 alpha-3 country codes."""
     return list(COUNTRY_IDS.keys())
+
 
 def get_supported_payment_methods() -> list:
     """Get list of supported payment methods."""
     return list(PAYMENT_METHODS.keys())
 
+
 def get_supported_receiving_methods() -> list:
     """Get list of supported receiving methods."""
-    return list(RECEIVING_METHODS.keys()) 
+    return list(RECEIVING_METHODS.keys())

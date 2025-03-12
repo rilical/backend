@@ -20,9 +20,9 @@ import json
 import logging
 import os
 import pprint
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Dict, Optional, Any, List
+from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
 
 import requests
@@ -30,19 +30,21 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from apps.providers.base.provider import RemittanceProvider
+
 from .exceptions import (
-    PangeaError,
     PangeaAuthenticationError,
     PangeaConnectionError,
+    PangeaError,
+    PangeaRateLimitError,
     PangeaValidationError,
-    PangeaRateLimitError
 )
 
 logger = logging.getLogger(__name__)
 
 
-def log_request_details(logger, method: str, url: str, headers: Dict,
-                       params: Dict = None, data: Dict = None):
+def log_request_details(
+    logger, method: str, url: str, headers: Dict, params: Dict = None, data: Dict = None
+):
     """Log details of outgoing API requests."""
     logger.debug("\n" + "=" * 80 + f"\nOUTGOING REQUEST DETAILS:\n{'='*80}")
     logger.debug(f"Method: {method}")
@@ -51,7 +53,7 @@ def log_request_details(logger, method: str, url: str, headers: Dict,
     masked_headers = headers.copy()
     for key in ("Authorization", "Cookie"):
         if key in masked_headers:
-            masked_headers[key] = '***MASKED***'
+            masked_headers[key] = "***MASKED***"
 
     logger.debug("\nHeaders:")
     logger.debug(pprint.pformat(masked_headers))
@@ -78,13 +80,13 @@ def log_response_details(logger, response):
         logger.debug(pprint.pformat(body))
     except ValueError:
         body = response.text
-        content_type = response.headers.get('content-type', '').lower()
-        if 'html' in content_type:
+        content_type = response.headers.get("content-type", "").lower()
+        if "html" in content_type:
             logger.debug("\nHTML Response (truncated):")
-            logger.debug(body[:500] + '...' if len(body) > 500 else body)
+            logger.debug(body[:500] + "..." if len(body) > 500 else body)
         else:
             logger.debug("\nPlain Text Response:")
-            logger.debug(body[:1000] + '...' if len(body) > 1000 else body)
+            logger.debug(body[:1000] + "..." if len(body) > 1000 else body)
 
     logger.debug("=" * 80)
 
@@ -131,10 +133,24 @@ class PangeaProvider(RemittanceProvider):
 
     # Sample supported corridors
     SUPPORTED_CORRIDORS = [
-        ("US", "MX"), ("US", "CO"), ("US", "GT"), ("US", "DO"), ("US", "SV"),
-        ("US", "PE"), ("US", "EC"), ("US", "BR"), ("US", "BO"), ("US", "PY"),
-        ("US", "NI"), ("US", "HN"), ("US", "PH"), ("US", "IN"),
-        ("CA", "MX"), ("CA", "CO"), ("CA", "IN"), ("CA", "PH"),
+        ("US", "MX"),
+        ("US", "CO"),
+        ("US", "GT"),
+        ("US", "DO"),
+        ("US", "SV"),
+        ("US", "PE"),
+        ("US", "EC"),
+        ("US", "BR"),
+        ("US", "BO"),
+        ("US", "PY"),
+        ("US", "NI"),
+        ("US", "HN"),
+        ("US", "PH"),
+        ("US", "IN"),
+        ("CA", "MX"),
+        ("CA", "CO"),
+        ("CA", "IN"),
+        ("CA", "PH"),
     ]
 
     def __init__(self, timeout: int = 30, user_agent: Optional[str] = None):
@@ -146,7 +162,7 @@ class PangeaProvider(RemittanceProvider):
         self.user_agent = user_agent or os.environ.get(
             "PANGEA_DEFAULT_UA",
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15"
+            "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15",
         )
 
         self._session = requests.Session()
@@ -158,19 +174,21 @@ class PangeaProvider(RemittanceProvider):
         self.logger.debug("Initializing Pangea session...")
 
         # Default HTTP headers
-        self._session.headers.update({
-            "Accept": "application/json, text/javascript, */*; q=0.01",
-            "Accept-Language": "en-US,en;q=0.9",
-            "User-Agent": self.user_agent,
-            "Origin": "https://pangeamoneytransfer.com",
-            "Referer": "https://pangeamoneytransfer.com/",
-            "Sec-Fetch-Dest": "empty",
-            "Sec-Fetch-Mode": "cors",
-            "Sec-Fetch-Site": "cross-site",
-            "Cache-Control": "no-cache",
-            "Pragma": "no-cache",
-            "Connection": "keep-alive"
-        })
+        self._session.headers.update(
+            {
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "Accept-Language": "en-US,en;q=0.9",
+                "User-Agent": self.user_agent,
+                "Origin": "https://pangeamoneytransfer.com",
+                "Referer": "https://pangeamoneytransfer.com/",
+                "Sec-Fetch-Dest": "empty",
+                "Sec-Fetch-Mode": "cors",
+                "Sec-Fetch-Site": "cross-site",
+                "Cache-Control": "no-cache",
+                "Pragma": "no-cache",
+                "Connection": "keep-alive",
+            }
+        )
 
         self.logger.debug(f"Session headers: {self._session.headers}")
 
@@ -179,7 +197,7 @@ class PangeaProvider(RemittanceProvider):
             total=3,
             backoff_factor=0.5,
             status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["GET", "POST"]
+            allowed_methods=["GET", "POST"],
         )
         adapter = HTTPAdapter(max_retries=retry_strategy)
         self._session.mount("https://", adapter)
@@ -209,7 +227,7 @@ class PangeaProvider(RemittanceProvider):
             "delivery_time_minutes": local_data.get("delivery_time_minutes"),
             "timestamp": local_data.get("timestamp") or datetime.now(UTC).isoformat(),
             "rate": final_rate,  # aggregator also expects "rate"
-            "target_currency": (final_target_currency or "").upper()
+            "target_currency": (final_target_currency or "").upper(),
         }
 
         # If aggregator wants raw, attach it
@@ -225,7 +243,7 @@ class PangeaProvider(RemittanceProvider):
         receive_country: str,
         receive_currency: Optional[str] = None,
         send_country: str = "US",
-        **kwargs
+        **kwargs,
     ) -> Dict[str, Any]:
         """Aggregator style get_exchange_rate returning standardized fields."""
         # local dict to store raw info
@@ -260,7 +278,7 @@ class PangeaProvider(RemittanceProvider):
                 source_country=send_country,
                 target_country=receive_country,
                 source_currency=send_currency,
-                target_currency=receive_currency
+                target_currency=receive_currency,
             )
             if not fees_data:
                 local_result["error_message"] = "Empty or invalid FeesAndFX data from Pangea"
@@ -273,7 +291,10 @@ class PangeaProvider(RemittanceProvider):
                 return self.standardize_response(local_result)
 
             # find 'Regular' rate
-            regular_rate = next((r for r in exchange_rates if r.get("ExchangeRateType") == "Regular"), None)
+            regular_rate = next(
+                (r for r in exchange_rates if r.get("ExchangeRateType") == "Regular"),
+                None,
+            )
             if not regular_rate:
                 local_result["error_message"] = "No 'Regular' exchange rate found"
                 return self.standardize_response(local_result)
@@ -308,7 +329,9 @@ class PangeaProvider(RemittanceProvider):
             self.logger.error(f"Unexpected error in get_exchange_rate: {exc}")
             local_result["error_message"] = f"Unexpected error: {exc}"
 
-        return self.standardize_response(local_result, provider_specific_data=kwargs.get("include_raw", False))
+        return self.standardize_response(
+            local_result, provider_specific_data=kwargs.get("include_raw", False)
+        )
 
     def get_quote(
         self,
@@ -317,7 +340,7 @@ class PangeaProvider(RemittanceProvider):
         target_currency: str,
         source_country: str = "US",
         target_country: str = "MX",
-        **kwargs
+        **kwargs,
     ) -> Dict[str, Any]:
         """Aggregator style get_quote. Calls get_exchange_rate internally."""
         return self.get_exchange_rate(
@@ -326,7 +349,7 @@ class PangeaProvider(RemittanceProvider):
             receive_country=target_country,
             receive_currency=target_currency,
             send_country=source_country,
-            **kwargs
+            **kwargs,
         )
 
     def get_fees_and_fx(
@@ -334,12 +357,14 @@ class PangeaProvider(RemittanceProvider):
         source_country: str,
         target_country: str,
         source_currency: str,
-        target_currency: str
+        target_currency: str,
     ) -> Dict[str, Any]:
         """Get fees and exchange rate data from Pangea's API (raw JSON)."""
         try:
             # Construct exchange param: {sourceCur}-{targetCur}|{sourceCountry}-{targetCountry}
-            exchange_param = f"{source_currency}-{target_currency}|{source_country}-{target_country}"
+            exchange_param = (
+                f"{source_currency}-{target_currency}|{source_country}-{target_country}"
+            )
             url = urljoin(self.BASE_URL, self.FEES_AND_FX_ENDPOINT)
             params = {"exchange": exchange_param, "senderId": ""}
 
@@ -352,7 +377,9 @@ class PangeaProvider(RemittanceProvider):
             if response.status_code != 200:
                 try:
                     error_json = response.json()
-                    self.logger.warning(f"Non-200 status from Pangea: {response.status_code}, error_json={error_json}")
+                    self.logger.warning(
+                        f"Non-200 status from Pangea: {response.status_code}, error_json={error_json}"
+                    )
                 except Exception:
                     pass
                 response.raise_for_status()
@@ -363,20 +390,18 @@ class PangeaProvider(RemittanceProvider):
                 raise PangeaValidationError(
                     "Invalid JSON response from Pangea",
                     error_code="INVALID_JSON",
-                    details={"raw_response_text": response.text[:500]}
+                    details={"raw_response_text": response.text[:500]},
                 )
 
             if not data:
                 raise PangeaValidationError(
-                    "Empty JSON from Pangea",
-                    error_code="EMPTY_RESPONSE",
-                    details={}
+                    "Empty JSON from Pangea", error_code="EMPTY_RESPONSE", details={}
                 )
             if "ExchangeRates" not in data:
                 raise PangeaValidationError(
                     "Missing ExchangeRates field in Pangea response",
                     error_code="INVALID_RESPONSE",
-                    details={"partial_response": data}
+                    details={"partial_response": data},
                 )
 
             return data
@@ -388,45 +413,44 @@ class PangeaProvider(RemittanceProvider):
                 raise PangeaAuthenticationError(
                     "Authentication failed with Pangea API",
                     error_code="AUTH_FAILED",
-                    details={"original_error": str(e), "response": resp_text}
+                    details={"original_error": str(e), "response": resp_text},
                 )
             elif status_code == 400:
                 raise PangeaValidationError(
                     "Invalid request parameters to Pangea",
                     error_code="INVALID_PARAMETERS",
-                    details={"original_error": str(e), "response": resp_text}
+                    details={"original_error": str(e), "response": resp_text},
                 )
             elif status_code == 429:
                 raise PangeaRateLimitError(
                     "Rate limit exceeded for Pangea API",
                     error_code="RATE_LIMIT",
-                    details={"original_error": str(e), "response": resp_text}
+                    details={"original_error": str(e), "response": resp_text},
                 )
             else:
                 raise PangeaConnectionError(
                     f"HTTP error from Pangea: {status_code}",
                     error_code="HTTP_ERROR",
-                    details={"original_error": str(e), "response": resp_text}
+                    details={"original_error": str(e), "response": resp_text},
                 )
 
         except requests.RequestException as e:
             raise PangeaConnectionError(
                 f"Failed to connect to Pangea API: {e}",
                 error_code="CONNECTION_FAILED",
-                details={"original_error": str(e)}
+                details={"original_error": str(e)},
             )
         except Exception as e:
             raise PangeaError(
                 f"Unexpected error: {e}",
                 error_code="UNEXPECTED_ERROR",
-                details={"original_error": str(e)}
+                details={"original_error": str(e)},
             )
 
     def get_supported_corridors(self) -> List[Dict]:
         """List aggregator style corridors."""
         return [
-            {"source_country": src, "target_country": tgt}
-            for src, tgt in self.SUPPORTED_CORRIDORS
+            {"source_country": src, "target_country": tgt} for src, tgt in self.SUPPORTED_CORRIDORS
         ]
 
     def get_payment_methods(self, source_country: str, target_country: str) -> List[str]:
@@ -447,4 +471,4 @@ class PangeaProvider(RemittanceProvider):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self._session:
-            self._session.close() 
+            self._session.close()
