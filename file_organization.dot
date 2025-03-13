@@ -1,0 +1,72 @@
+digraph FileOrganization {
+  rankdir=TB;
+  node [shape=box, style=filled, fontname="Arial", margin="0.2,0.1"];
+  edge [fontname="Arial", dir=none];
+  
+  // Main project
+  Backend [label="RemitScout Backend\n/Users/omarghabyen/Desktop/RemitScout/backend", shape=folder, fillcolor=lightblue];
+  
+  // Main Packages
+  Aggregator [label="aggregator/\nAggregation Framework", shape=folder, fillcolor=orange];
+  Providers [label="providers/\nProvider Implementations", shape=folder, fillcolor=lightskyblue];
+  Quotes [label="quotes/\nQuote Management & Caching", shape=folder, fillcolor=lightgreen];
+  Users [label="users/\nUser Management", shape=folder, fillcolor=lightgrey];
+  RemitScout [label="remit_scout/\nMain Django Settings", shape=folder, fillcolor=lightgrey];
+  Docs [label="docs/\nDocumentation", shape=folder, fillcolor=lightgrey];
+  Scripts [label="scripts/\nUtility Scripts", shape=folder, fillcolor=lightgrey];
+  
+  // Provider Packages
+  XE [label="providers/xe/\nXE Provider", shape=folder, fillcolor=lightskyblue];
+  Wise [label="providers/wise/\nWise Provider", shape=folder, fillcolor=lightskyblue];
+  Remitly [label="providers/remitly/\nRemitly Provider", shape=folder, fillcolor=lightskyblue];
+  WesternUnion [label="providers/westernunion/\nWestern Union Provider", shape=folder, fillcolor=lightskyblue];
+  TransferGo [label="providers/transfergo/\nTransferGo Provider", shape=folder, fillcolor=lightskyblue];
+  Xoom [label="providers/xoom/\nXoom Provider", shape=folder, fillcolor=lightskyblue];
+  Paysend [label="providers/paysend/\nPaysend Provider", shape=folder, fillcolor=lightskyblue];
+  OtherProviders [label="providers/*/\n15+ More Provider Implementations", shape=folder, fillcolor=lightskyblue];
+  
+  // Base Provider Package
+  Base [label="providers/base/\nBase Provider Framework", shape=folder, fillcolor=lightyellow];
+  Utils [label="providers/utils/\nShared Utilities", shape=folder, fillcolor=lightgrey];
+  
+  // Key Files in Aggregator
+  AggregatorPy [label="aggregator.py\nMain Aggregator Logic", shape=note, fillcolor=white];
+  ViewsPy [label="views.py\nAPI Views", shape=note, fillcolor=white];
+  FiltersPy [label="filters.py\nQuote Filtering", shape=note, fillcolor=white];
+  
+  // Key Files in Providers
+  FactoryPy [label="factory.py\nProvider Factory", shape=note, fillcolor=white];
+  InitPy [label="__init__.py\nProvider Entry Point", shape=note, fillcolor=white];
+  
+  // Key Files in Base
+  ProviderPy [label="provider.py\nBase Provider Class", shape=note, fillcolor=white];
+  ExceptionsPy [label="exceptions.py\nBase Exceptions", shape=note, fillcolor=white];
+  
+  // Key Files in Utils
+  CountryCurrencyPy [label="country_currency_standards.py\nCountry/Currency Utils", shape=note, fillcolor=white];
+  CurrencyMappingPy [label="currency_mapping.py\nCurrency Mappings", shape=note, fillcolor=white];
+  
+  // Key Files in each Provider (using XE as example)
+  XEIntegrationPy [label="integration.py\nProvider Implementation", shape=note, fillcolor=white];
+  XEExceptionsPy [label="exceptions.py\nProvider Exceptions", shape=note, fillcolor=white];
+  XECurrencyMappingPy [label="currency_mapping.py\nProvider-specific Mappings", shape=note, fillcolor=white];
+  
+  // Directory Structure
+  Backend -> {Aggregator Providers Quotes Users RemitScout Docs Scripts};
+  Providers -> {XE Wise Remitly WesternUnion TransferGo Xoom Paysend OtherProviders Base Utils};
+  
+  // File Structure - Aggregator
+  Aggregator -> {AggregatorPy ViewsPy FiltersPy};
+  
+  // File Structure - Providers Main
+  Providers -> {FactoryPy InitPy};
+  
+  // File Structure - Base
+  Base -> {ProviderPy ExceptionsPy};
+  
+  // File Structure - Utils
+  Utils -> {CountryCurrencyPy CurrencyMappingPy};
+  
+  // File Structure - XE (example provider)
+  XE -> {XEIntegrationPy XEExceptionsPy XECurrencyMappingPy};
+} 

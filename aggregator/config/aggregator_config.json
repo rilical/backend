@@ -1,7 +1,7 @@
 {
   "enabled_providers": [
     "WireBarleyProvider",
-    "XEAggregatorProvider",
+    "XEProvider",
     "PangeaProvider",
     "OrbitRemitProvider",
     "KoronaPayProvider",

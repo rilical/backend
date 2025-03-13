@@ -1,0 +1,88 @@
+digraph QuoteFlow {
+  rankdir=LR;
+  node [shape=box, style=filled, fontname="Arial", margin="0.2,0.1"];
+  edge [fontname="Arial", fontsize=10];
+  
+  // Client & Entry Points
+  Client [label="API Client", shape=ellipse, fillcolor=lightgrey];
+  
+  // Core Components
+  QuoteAPIView [label="QuoteAPIView\n(quotes/views.py)", fillcolor=lightblue];
+  AggregatorRatesView [label="AggregatorRatesView\n(aggregator/views.py)", fillcolor=lightblue];
+  GetQuoteFunction [label="get_quote()\n(providers/__init__.py)", fillcolor=orange];
+  Aggregator [label="Aggregator.get_all_quotes()\n(aggregator/aggregator.py)", fillcolor=orange];
+  ProviderFactory [label="ProviderFactory\n(providers/factory.py)", fillcolor=orange];
+  CacheUtils [label="Cache Utils\n(quotes/cache_utils.py)", fillcolor=lightgrey];
+  
+  // Provider Instances (Sample)
+  XEProvider [label="XEProvider\n(providers/xe/integration.py)", fillcolor=lightskyblue];
+  WiseProvider [label="WiseProvider\n(providers/wise/integration.py)", fillcolor=lightskyblue];
+  RemitlyProvider [label="RemitlyProvider\n(providers/remitly/integration.py)", fillcolor=lightskyblue];
+  OtherProviders [label="Other Providers\n(20+ implementations)", fillcolor=lightskyblue];
+  
+  // Data Flow for direct provider call
+  subgraph cluster_direct_flow {
+    label="Direct Provider Quote Flow";
+    style=filled;
+    color=lightgrey;
+    
+    Client -> QuoteAPIView [label="1. GET /api/quotes/\n?source_country=US&source_currency=USD\n&dest_country=MX&dest_currency=MXN&amount=1000"];
+    QuoteAPIView -> GetQuoteFunction [label="2. Calls with params"];
+    GetQuoteFunction -> ProviderFactory [label="3. Get specific provider"];
+    ProviderFactory -> XEProvider [label="4a. Create XE provider instance"];
+    GetQuoteFunction -> XEProvider [label="5a. provider.get_quote(params)"];
+    XEProvider -> ExternalAPI1 [label="6a. API Call"];
+    ExternalAPI1 -> XEProvider [label="7a. Response"];
+    XEProvider -> GetQuoteFunction [label="8a. Standardized Quote"];
+    GetQuoteFunction -> QuoteAPIView [label="9. Provider Quote"];
+    QuoteAPIView -> Client [label="10. JSON Response"];
+  }
+  
+  // Data Flow for aggregated providers
+  subgraph cluster_aggregated_flow {
+    label="Aggregated Providers Quote Flow";
+    style=filled;
+    color=lightblue;
+    
+    Client -> AggregatorRatesView [label="1. GET /api/aggregator/rates/\n?source_country=US&source_currency=USD\n&dest_country=MX&amount=1000"];
+    AggregatorRatesView -> Aggregator [label="2. Call with params"];
+    Aggregator -> CacheUtils [label="3. Check cache"];
+    CacheUtils -> Aggregator [label="4. Cache miss"];
+    Aggregator -> ProviderFactory [label="5. Get all providers"];
+    
+    ProviderFactory -> XEProvider [label="6a. Create XE instance"];
+    ProviderFactory -> WiseProvider [label="6b. Create Wise instance"];
+    ProviderFactory -> RemitlyProvider [label="6c. Create Remitly instance"];
+    ProviderFactory -> OtherProviders [label="6d. Create other instances"];
+    
+    Aggregator -> XEProvider [label="7a. Parallel: get_quote()"];
+    Aggregator -> WiseProvider [label="7b. Parallel: get_quote()"];
+    Aggregator -> RemitlyProvider [label="7c. Parallel: get_quote()"];
+    Aggregator -> OtherProviders [label="7d. Parallel: get_quote()"];
+    
+    XEProvider -> ExternalAPI1 [label="8a. API Call"];
+    WiseProvider -> ExternalAPI2 [label="8b. API Call"];
+    RemitlyProvider -> ExternalAPI3 [label="8c. API Call"];
+    OtherProviders -> ExternalAPIN [label="8d. API Calls"];
+    
+    ExternalAPI1 -> XEProvider [label="9a. Response"];
+    ExternalAPI2 -> WiseProvider [label="9b. Response"];
+    ExternalAPI3 -> RemitlyProvider [label="9c. Response"];
+    ExternalAPIN -> OtherProviders [label="9d. Responses"];
+    
+    XEProvider -> Aggregator [label="10a. Standardized Quote"];
+    WiseProvider -> Aggregator [label="10b. Standardized Quote"];
+    RemitlyProvider -> Aggregator [label="10c. Standardized Quote"];
+    OtherProviders -> Aggregator [label="10d. Standardized Quotes"];
+    
+    Aggregator -> CacheUtils [label="11. Cache results"];
+    Aggregator -> AggregatorRatesView [label="12. Combined Results"];
+    AggregatorRatesView -> Client [label="13. JSON Response"];
+  }
+  
+  // External APIs
+  ExternalAPI1 [label="XE API\nhttps://launchpad-api.xe.com", shape=cylinder, fillcolor=lightpink];
+  ExternalAPI2 [label="Wise API\nhttps://api.transferwise.com", shape=cylinder, fillcolor=lightpink];
+  ExternalAPI3 [label="Remitly API\nhttps://api.remitly.com", shape=cylinder, fillcolor=lightpink];
+  ExternalAPIN [label="Other Provider APIs", shape=cylinder, fillcolor=lightpink];
+} 

@@ -109,9 +109,15 @@ GET /api/quotes/?source_country=US&dest_country=MX&source_currency=USD&dest_curr
 
 ### List Available Providers
 
-`GET /api/providers/`
+`GET /api/providers/providers/list/`
 
-Returns a list of all supported remittance providers in the system.
+Returns a list of all supported remittance providers in the system with their IDs, display names, and logo URLs (if available).
+
+#### Example Request
+
+```
+GET /api/providers/providers/list/
+```
 
 #### Example Response
 
@@ -119,22 +125,83 @@ Returns a list of all supported remittance providers in the system.
 {
   "providers": [
     {
-      "id": "wise",
-      "name": "Wise (TransferWise)",
-      "url": "https://wise.com",
-      "logo_url": "https://example.com/logos/wise.png",
-      "active": true
+      "id": "XE",
+      "name": "XE Money Transfer",
+      "logo_url": "https://remitscout.com/logos/XE.png"
     },
     {
-      "id": "xoom",
-      "name": "Xoom (PayPal)",
-      "url": "https://xoom.com",
-      "logo_url": "https://example.com/logos/xoom.png",
-      "active": true
+      "id": "WISE",
+      "name": "Wise",
+      "logo_url": "https://remitscout.com/logos/WISE.png"
+    },
+    {
+      "id": "REMITLY",
+      "name": "Remitly",
+      "logo_url": "https://remitscout.com/logos/REMITLY.png"
+    },
+    {
+      "id": "WESTERNUNION",
+      "name": "Western Union",
+      "logo_url": "https://remitscout.com/logos/WESTERNUNION.png"
     }
-  ]
+  ],
+  "count": 4
 }
 ```
+
+#### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `providers` | array | List of provider objects |
+| `providers[].id` | string | Unique identifier for the provider (used in API calls) |
+| `providers[].name` | string | Human-readable display name of the provider |
+| `providers[].logo_url` | string | URL to the provider's logo image (if available) |
+| `count` | integer | Total number of providers returned |
+
+### Get Provider Details
+
+`GET /api/providers/providers/{provider_id}/details/`
+
+Returns basic information about a specific remittance provider, including supported payment and delivery methods.
+
+#### Path Parameters
+
+| Parameter | Required | Description | Example |
+|-----------|----------|-------------|---------|
+| `provider_id` | Yes | The unique identifier of the provider | "XE" |
+
+#### Example Request
+
+```
+GET /api/providers/providers/XE/details/
+```
+
+#### Example Response
+
+```json
+{
+  "id": "XE",
+  "name": "XE Money Transfer",
+  "logo_url": "https://remitscout.com/logos/XE.png",
+  "website": "https://www.xe.com/send-money/",
+  "transfer_types": ["international"],
+  "supported_payment_methods": ["bank_transfer", "debit_card", "credit_card"],
+  "supported_delivery_methods": ["bank_deposit"]
+}
+```
+
+#### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique identifier for the provider |
+| `name` | string | Human-readable display name of the provider |
+| `logo_url` | string | URL to the provider's logo image |
+| `website` | string | URL to the provider's website |
+| `transfer_types` | array | Types of transfers supported (e.g., "international", "domestic") |
+| `supported_payment_methods` | array | List of supported payment methods |
+| `supported_delivery_methods` | array | List of supported delivery methods |
 
 ## Error Handling
 

@@ -1,0 +1,226 @@
+digraph AggregatorFlow {
+    // Global graph settings
+    graph [
+        label="RemitScout Aggregator Flow",
+        labelloc="t",
+        fontsize="20",
+        fontname="Arial",
+        rankdir="LR"
+    ];
+    node [fontname="Arial", fontsize="10", shape=box, style="filled"];
+    edge [fontname="Arial", fontsize="9"];
+
+    // -----------------------------------------------------------------
+    // Client API requests
+    // -----------------------------------------------------------------
+    client [label="API Client\n(External)", shape=ellipse, fillcolor="#EEEEEE"];
+    
+    // -----------------------------------------------------------------
+    // API Views (Entry Points)
+    // -----------------------------------------------------------------
+    subgraph cluster_api_views {
+        label = "API Views (aggregator/views.py)";
+        style = "rounded";
+        color = "gray50";
+        bgcolor = "#E6F3FF";
+        
+        quote_api_view [label="QuoteAPIView\nGET /api/quotes/<provider>/", fillcolor="#AED6F1"];
+        aggregator_view [label="AggregatorRatesView\nGET /api/aggregator/rates/", fillcolor="#AED6F1"];
+    }
+    
+    // -----------------------------------------------------------------
+    // Aggregator Core
+    // -----------------------------------------------------------------
+    subgraph cluster_aggregator_core {
+        label = "Aggregator Core (aggregator/aggregator.py)";
+        style = "rounded";
+        color = "gray50";
+        bgcolor = "#FFEEEE";
+        
+        aggregator_instance [label="Aggregator\nClass Instance", fillcolor="#F5B7B1"];
+        get_all_quotes [label="get_all_quotes()\n- Fetches quotes from all providers\n- Handles parallel execution\n- Aggregates results", fillcolor="#F5B7B1"];
+        get_quote [label="get_quote()\n- Fetches quote from specific provider\n- Handles standardization", fillcolor="#F5B7B1"];
+        handle_exceptions [label="handle_exceptions()\n- Catches provider errors\n- Returns error responses", fillcolor="#F5B7B1"];
+        filter_results [label="filter_results()\n- Applies filtering criteria\n- Sorts by exchange rate, fee, or time", fillcolor="#F5B7B1"];
+    }
+    
+    // -----------------------------------------------------------------
+    // Provider Factory
+    // -----------------------------------------------------------------
+    subgraph cluster_provider_factory {
+        label = "Provider Factory (providers/factory.py)";
+        style = "rounded";
+        color = "gray50";
+        bgcolor = "#E8F8F5";
+        
+        factory_instance [label="ProviderFactory\nClass Instance", fillcolor="#A3E4D7"];
+        get_provider [label="get_provider(name)\n- Creates provider instance by name", fillcolor="#A3E4D7"];
+        list_providers [label="list_providers()\n- Returns available provider names", fillcolor="#A3E4D7"];
+        register_provider [label="register_provider(name, class)\n- Registers provider with factory", fillcolor="#A3E4D7"];
+    }
+    
+    // -----------------------------------------------------------------
+    // Caching System
+    // -----------------------------------------------------------------
+    subgraph cluster_caching {
+        label = "Caching System (quotes/cache_utils.py)";
+        style = "rounded";
+        color = "gray50";
+        bgcolor = "#FFF9E6";
+        
+        check_cache [label="check_cache(key)\n- Looks for cached quotes", fillcolor="#FAD7A0"];
+        store_cache [label="store_cache(key, value, ttl)\n- Stores quotes in cache", fillcolor="#FAD7A0"];
+        generate_key [label="generate_cache_key(params)\n- Creates standardized cache keys", fillcolor="#FAD7A0"];
+    }
+    
+    // -----------------------------------------------------------------
+    // Provider Base Class
+    // -----------------------------------------------------------------
+    subgraph cluster_provider_base {
+        label = "Provider Base (providers/base/provider.py)";
+        style = "rounded";
+        color = "gray50";
+        bgcolor = "#F4ECF7";
+        
+        base_provider [label="RemittanceProvider\nAbstract Base Class", fillcolor="#D7BDE2"];
+        get_provider_id [label="get_provider_id()\n- Returns unique provider ID", fillcolor="#D7BDE2"];
+        get_display_name [label="get_display_name()\n- Returns human-readable name", fillcolor="#D7BDE2"];
+        get_quote_method [label="get_quote()\n- Core method to fetch quotes\n- Each provider implements this", fillcolor="#D7BDE2"];
+    }
+    
+    // -----------------------------------------------------------------
+    // Provider Examples (a few specific providers)
+    // -----------------------------------------------------------------
+    subgraph cluster_providers {
+        label = "Provider Implementations";
+        style = "rounded";
+        color = "gray50";
+        bgcolor = "#EAF2F8";
+        
+        // XE Provider
+        xe_provider [label="XEProvider\n(providers/xe/integration.py)", fillcolor="#D6EAF8"];
+        xe_get_quote [label="XE.get_quote()\n- Calls XE API\n- Formats response", fillcolor="#D6EAF8"];
+        xe_standardize [label="XE.standardize_response()\n- Normalizes response format", fillcolor="#D6EAF8"];
+        
+        // Wise Provider
+        wise_provider [label="WiseProvider\n(providers/wise/integration.py)", fillcolor="#D6EAF8"];
+        wise_get_quote [label="Wise.get_quote()\n- Calls Wise API\n- Formats response", fillcolor="#D6EAF8"];
+        wise_standardize [label="Wise.standardize_response()\n- Normalizes response format", fillcolor="#D6EAF8"];
+        
+        // Remitly Provider
+        remitly_provider [label="RemitlyProvider\n(providers/remitly/integration.py)", fillcolor="#D6EAF8"];
+        remitly_get_quote [label="Remitly.get_quote()\n- Calls Remitly API\n- Formats response", fillcolor="#D6EAF8"];
+        remitly_standardize [label="Remitly.standardize_response()\n- Normalizes response format", fillcolor="#D6EAF8"];
+    }
+    
+    // -----------------------------------------------------------------
+    // External APIs
+    // -----------------------------------------------------------------
+    xe_api [label="XE API\nhttps://launchpad-api.xe.com", shape=cylinder, fillcolor="#F8C471"];
+    wise_api [label="Wise API\nhttps://api.transferwise.com", shape=cylinder, fillcolor="#F8C471"];
+    remitly_api [label="Remitly API\nhttps://api.remitly.com", shape=cylinder, fillcolor="#F8C471"];
+    other_apis [label="Other Provider APIs\n(20+ external services)", shape=cylinder, fillcolor="#F8C471"];
+    
+    // -----------------------------------------------------------------
+    // Utility Functions
+    // -----------------------------------------------------------------
+    subgraph cluster_utils {
+        label = "Utilities";
+        style = "rounded";
+        color = "gray50";
+        bgcolor = "#E5E8E8";
+        
+        country_utils [label="Country/Currency Utils\n(providers/utils/country_currency_standards.py)", fillcolor="#D5DBDB"];
+        currency_mapping [label="Currency Mapping\n(providers/utils/currency_mapping.py)", fillcolor="#D5DBDB"];
+        error_handling [label="Error Handling\n(providers/base/exceptions.py)", fillcolor="#D5DBDB"];
+    }
+    
+    // -----------------------------------------------------------------
+    // Data Flow Connections
+    // -----------------------------------------------------------------
+    
+    // Client to API Views
+    client -> quote_api_view [label="1. GET /api/quotes/xe/\nwith currency & amount params"];
+    client -> aggregator_view [label="1. GET /api/aggregator/rates/\nwith currency & amount params"];
+    
+    // API Views to Aggregator
+    quote_api_view -> get_quote [label="2. Calls with provider name\nand parameters"];
+    aggregator_view -> get_all_quotes [label="2. Calls with parameters"];
+    
+    // Aggregator to Cache
+    get_all_quotes -> check_cache [label="3. Check if result\nis cached"];
+    check_cache -> get_all_quotes [label="4. Return cached result\nor cache miss"];
+    
+    // Cache Key Generation
+    check_cache -> generate_key [label="Uses"];
+    store_cache -> generate_key [label="Uses"];
+    
+    // Aggregator to Factory (getting providers)
+    get_quote -> get_provider [label="5a. Get specific\nprovider instance"];
+    get_all_quotes -> list_providers [label="5b. Get list of\navailable providers"];
+    list_providers -> get_all_quotes [label="Returns provider names"];
+    get_all_quotes -> get_provider [label="6. Create instance\nfor each provider"];
+    
+    // Factory to Provider Base & Implementations
+    get_provider -> base_provider [label="Creates instance of"];
+    base_provider -> xe_provider [label="extends"];
+    base_provider -> wise_provider [label="extends"];
+    base_provider -> remitly_provider [label="extends"];
+    
+    // Aggregator to Providers (get_quote calls)
+    get_quote -> get_quote_method [label="7a. Single provider:\ncalls get_quote()"];
+    get_all_quotes -> get_quote_method [label="7b. All providers:\nparallel get_quote() calls"];
+    
+    // Provider implementation details (inside each provider)
+    xe_provider -> xe_get_quote [style="dashed"];
+    xe_get_quote -> xe_api [label="8a. API Request"];
+    xe_api -> xe_get_quote [label="9a. API Response"];
+    xe_get_quote -> xe_standardize [label="10a. Format response"];
+    
+    wise_provider -> wise_get_quote [style="dashed"];
+    wise_get_quote -> wise_api [label="8b. API Request"];
+    wise_api -> wise_get_quote [label="9b. API Response"];
+    wise_get_quote -> wise_standardize [label="10b. Format response"];
+    
+    remitly_provider -> remitly_get_quote [style="dashed"];
+    remitly_get_quote -> remitly_api [label="8c. API Request"];
+    remitly_api -> remitly_get_quote [label="9c. API Response"];
+    remitly_get_quote -> remitly_standardize [label="10c. Format response"];
+    
+    // Other providers (generalized)
+    get_quote_method -> other_apis [label="8d. API Requests"];
+    other_apis -> get_quote_method [label="9d. API Responses"];
+    
+    // Utility Usage by Providers
+    xe_provider -> country_utils [label="uses", style="dotted"];
+    xe_provider -> currency_mapping [label="uses", style="dotted"];
+    xe_provider -> error_handling [label="uses", style="dotted"];
+    
+    wise_provider -> country_utils [label="uses", style="dotted"];
+    wise_provider -> currency_mapping [label="uses", style="dotted"];
+    wise_provider -> error_handling [label="uses", style="dotted"];
+    
+    remitly_provider -> country_utils [label="uses", style="dotted"];
+    remitly_provider -> currency_mapping [label="uses", style="dotted"];
+    remitly_provider -> error_handling [label="uses", style="dotted"];
+    
+    // Error Handling Flow
+    get_quote_method -> handle_exceptions [label="Errors caught"];
+    handle_exceptions -> get_quote [label="Returns error response"];
+    handle_exceptions -> get_all_quotes [label="Returns partial results"];
+    
+    // Filtering and Result Processing
+    get_all_quotes -> filter_results [label="11. Apply filters\nand sorting"];
+    filter_results -> get_all_quotes [label="Returns filtered results"];
+    
+    // Caching the results
+    get_all_quotes -> store_cache [label="12. Store results\nin cache"];
+    
+    // Return to API Views
+    get_quote -> quote_api_view [label="13a. Single provider quote"];
+    get_all_quotes -> aggregator_view [label="13b. All provider quotes"];
+    
+    // Final Response to Client
+    quote_api_view -> client [label="14a. JSON Response\nwith standardized quote"];
+    aggregator_view -> client [label="14b. JSON Response\nwith multiple quotes"];
+} 

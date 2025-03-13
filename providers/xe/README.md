@@ -155,7 +155,7 @@ Testing with the direct quotes API has shown:
 
 ## Aggregator-Ready Implementation (April 2025)
 
-We have developed a new aggregator-ready implementation for XE in the `XEAggregatorProvider` class (aliased as `XEProvider` for backward compatibility). This implementation is designed to work with a unified aggregator system and follows strict guidelines:
+We have developed a new aggregator-ready implementation for XE in the `XEProvider` class (aliased as `XEProvider` for backward compatibility). This implementation is designed to work with a unified aggregator system and follows strict guidelines:
 
 ### Key Features
 
@@ -204,12 +204,12 @@ To use this provider with an aggregator system:
 
 1. Import the provider:
    ```python
-   from apps.providers.xe.integration import XEAggregatorProvider
+   from apps.providers.xe.integration import XEProvider
    ```
 
 2. Create an instance:
    ```python
-   provider = XEAggregatorProvider()
+   provider = XEProvider()
    ```
 
 3. Get a quote:

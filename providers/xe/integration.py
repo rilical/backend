@@ -38,7 +38,7 @@ from .exceptions import (
 logger = logging.getLogger(__name__)
 
 
-class XEAggregatorProvider(RemittanceProvider):
+class XEProvider(RemittanceProvider):
     """
     Aggregator-ready XE integration with no fallback or mock data.
 
@@ -452,7 +452,3 @@ class XEAggregatorProvider(RemittanceProvider):
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Clean up on context manager exit."""
         self.close()
-
-
-# Legacy compatibility - keep the original class name as an alias
-XEProvider = XEAggregatorProvider

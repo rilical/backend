@@ -1,0 +1,95 @@
+digraph ProviderDetail {
+  rankdir=TB;
+  node [shape=box, style=filled, fontname="Arial", margin="0.2,0.1"];
+  edge [fontname="Arial"];
+  
+  // Base Provider Definition
+  subgraph cluster_base {
+    label="Base Provider Framework";
+    style=filled;
+    color=lightgrey;
+    
+    RemittanceProvider [label="RemittanceProvider\n(Abstract Base Class)", shape=record, fillcolor=lightyellow, style="filled,rounded", 
+    label="{RemittanceProvider|+ get_provider_id(): str\l+ get_display_name(): str\l+ get_quote(amount, source_currency, dest_currency, ...): Dict\l}"];
+    
+    BaseException [label="ProviderError\n(Base Exception)", shape=record, fillcolor=mistyrose, style="filled,rounded"];
+  }
+  
+  // Provider Factory
+  ProviderFactory [label="ProviderFactory\n(Factory Pattern)", shape=record, fillcolor=orange, style="filled", 
+  label="{ProviderFactory|+ get_provider(name): RemittanceProvider\l+ list_providers(): List[str]\l+ register_provider(name, provider_class)\l}"];
+  
+  // Provider Integration Example (XE)
+  subgraph cluster_xe {
+    label="XE Provider Implementation";
+    style=filled;
+    color=lightblue;
+    
+    XEProvider [label="XEProvider", shape=record, fillcolor=lightskyblue, style="filled",
+    label="{XEProvider|+ API_BASE_URL\l+ QUOTES_API_URL\l+ __init__()\l+ get_quote()\l+ standardize_response()\l+ get_exchange_rate()\l- _build_fail()\l- _parse_delivery_time()\l}"];
+    
+    XEExceptions [label="XE Exceptions", shape=record, fillcolor=mistyrose, style="filled",
+    label="{XEExceptions|+ XEError\l+ XEConnectionError\l+ XEApiError\l+ XEQuoteError\l+ XERateLimitError\l}"];
+    
+    XEMapping [label="XE Mappings", shape=record, fillcolor=lightgrey, style="filled",
+    label="{XE_Mappings|+ SUPPORTED_CORRIDORS\l+ get_xe_currency_for_country()\l+ is_xe_corridor_supported()\l}"];
+  }
+  
+  // Provider Integration Example (Wise)
+  subgraph cluster_wise {
+    label="Wise Provider Implementation";
+    style=filled;
+    color=lightgreen;
+    
+    WiseProvider [label="WiseProvider", shape=record, fillcolor=lightgreen, style="filled",
+    label="{WiseProvider|+ API_BASE_URL\l+ __init__()\l+ get_quote()\l+ get_exchange_rate()\l+ standardize_response()\l- _create_session()\l- _check_corridor_support()\l}"];
+    
+    WiseExceptions [label="Wise Exceptions", shape=record, fillcolor=mistyrose, style="filled",
+    label="{WiseExceptions|+ WiseError\l+ WiseConnectionError\l+ WiseApiError\l+ WiseRateLimitError\l}"];
+  }
+  
+  // Provider Integration Example (Remitly)
+  subgraph cluster_remitly {
+    label="Remitly Provider Implementation";
+    style=filled;
+    color=lightpink;
+    
+    RemitlyProvider [label="RemitlyProvider", shape=record, fillcolor=lightpink, style="filled",
+    label="{RemitlyProvider|+ BASE_URL\l+ API_URL\l+ __init__()\l+ get_quote()\l+ standardize_response()\l+ get_exchange_rate()\l- _prepare_session()\l- _fetch_exchange_rate()\l}"];
+    
+    RemitlyExceptions [label="Remitly Exceptions", shape=record, fillcolor=mistyrose, style="filled",
+    label="{RemitlyExceptions|+ RemitlyError\l+ RemitlyConnectionError\l+ RemitlyApiError\l}"];
+  }
+  
+  // Utility Classes
+  CountryCurrencyUtils [label="Country/Currency Utilities", shape=record, fillcolor=lightgrey, style="filled",
+  label="{utils.country_currency_standards|+ normalize_country_code()\l+ validate_corridor()\l+ get_country_name()\l+ get_default_currency_for_country()\l}"];
+  
+  CurrencyMapping [label="Currency Mappings", shape=record, fillcolor=lightgrey, style="filled",
+  label="{utils.currency_mapping|+ CURRENCY_NAMES\l+ COUNTRY_NAMES\l+ COUNTRY_CURRENCIES\l+ get_currency_name()\l+ get_country_name()\l}"];
+  
+  // Relationships
+  
+  // Inheritance relationships
+  RemittanceProvider -> XEProvider [arrowhead=empty, label="extends"];
+  RemittanceProvider -> WiseProvider [arrowhead=empty, label="extends"];
+  RemittanceProvider -> RemitlyProvider [arrowhead=empty, label="extends"];
+  BaseException -> XEExceptions [arrowhead=empty, label="extends"];
+  BaseException -> WiseExceptions [arrowhead=empty, label="extends"];
+  BaseException -> RemitlyExceptions [arrowhead=empty, label="extends"];
+  
+  // Usage relationships
+  ProviderFactory -> RemittanceProvider [label="creates"];
+  XEProvider -> XEExceptions [label="uses"];
+  XEProvider -> XEMapping [label="uses"];
+  WiseProvider -> WiseExceptions [label="uses"];
+  RemitlyProvider -> RemitlyExceptions [label="uses"];
+  
+  // Utility usage
+  XEProvider -> CountryCurrencyUtils [label="uses"];
+  WiseProvider -> CountryCurrencyUtils [label="uses"];
+  RemitlyProvider -> CountryCurrencyUtils [label="uses"];
+  XEProvider -> CurrencyMapping [label="uses"];
+  WiseProvider -> CurrencyMapping [label="uses"];
+  RemitlyProvider -> CurrencyMapping [label="uses"];
+} 

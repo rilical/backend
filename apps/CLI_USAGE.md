@@ -65,7 +65,7 @@ python3 apps/cli.py --list-providers
 python3 apps/cli.py --amount 1000 --from-country US --to-country IN --from-currency USD --to-currency INR --exclude-providers PangeaProvider,MukuruProvider,DahabshiilProvider
 
 # Only include specific providers
-python3 apps/cli.py --amount 1000 --from-country US --to-country IN --from-currency USD --to-currency INR --include-only WiseProvider,XEAggregatorProvider,RemitlyProvider
+python3 apps/cli.py --amount 1000 --from-country US --to-country IN --from-currency USD --to-currency INR --include-only WiseProvider,XEProvider,RemitlyProvider
 ```
 
 ## Advanced Options

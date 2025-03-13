@@ -7,7 +7,9 @@ from rest_framework.routers import DefaultRouter
 from . import views
 
 router = DefaultRouter()
-router.register(r"compare", views.RateComparisonViewSet, basename="rates")
+# Removed compare endpoint - redundant with quotes endpoint
+# Register only the provider-specific endpoints
+router.register(r"providers", views.RateComparisonViewSet, basename="providers")
 
 urlpatterns = [
     path("", include(router.urls)),

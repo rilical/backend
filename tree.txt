@@ -1,0 +1,346 @@
+.
+├── API_DOCUMENTATION.md
+├── CODE_STYLE.md
+├── README.md
+├── aggregator
+│   ├── __init__.py
+│   ├── aggregator.py
+│   ├── apps.py
+│   ├── config
+│   │   ├── __init__.py
+│   │   └── aggregator_config.json
+│   ├── exceptions.py
+│   ├── filters.py
+│   ├── tests
+│   │   ├── __init__.py
+│   │   ├── results
+│   │   │   ├── __init__.py
+│   │   │   └── corridor_support.json
+│   │   ├── test_all_providers.py
+│   │   ├── test_corridor_support.py
+│   │   ├── test_corridors.py
+│   │   ├── test_minimal.py
+│   │   ├── test_multiple_corridors.py
+│   │   ├── test_providers.py
+│   │   ├── test_real_providers.py
+│   │   ├── test_single_corridor.py
+│   │   ├── test_ten_corridors.py
+│   │   ├── test_uk_india_corridor.py
+│   │   ├── test_us_mexico_corridor.py
+│   │   └── test_xoom.py
+│   ├── utils.py
+│   └── views.py
+├── apps
+│   ├── CLI_USAGE.md
+│   ├── __init__.py
+│   ├── cli.py
+│   └── providers
+│       └── utils
+│           ├── __init__.py
+│           ├── country_currency_standards.py
+│           └── currency_mapping.py
+├── db.sqlite3
+├── docs
+│   ├── API_DOCUMENTATION.md
+│   ├── CODE_STYLE.md
+│   ├── README.md
+│   └── caching_implementation.md
+├── manage.py
+├── mypy.ini
+├── providers
+│   ├── README.md
+│   ├── __init__.py
+│   ├── aggregator.py
+│   ├── alansari
+│   │   ├── README.md
+│   │   ├── __init__.py
+│   │   ├── exceptions.py
+│   │   └── integration.py
+│   ├── apps.py
+│   ├── base
+│   │   ├── __init__.py
+│   │   ├── exceptions.py
+│   │   └── provider.py
+│   ├── dahabshiil
+│   │   ├── README.md
+│   │   ├── __init__.py
+│   │   ├── exceptions.py
+│   │   └── integration.py
+│   ├── factory.py
+│   ├── instarem
+│   │   ├── README.md
+│   │   ├── __init__.py
+│   │   ├── exceptions.py
+│   │   └── integration.py
+│   ├── intermex
+│   │   ├── README.md
+│   │   ├── __init__.py
+│   │   ├── exceptions.py
+│   │   ├── integration.py
+│   │   └── mapping.py
+│   ├── koronapay
+│   │   ├── __init__.py
+│   │   ├── exceptions.py
+│   │   ├── integration.py
+│   │   └── mapping.py
+│   ├── models.py
+│   ├── mukuru
+│   │   ├── README.md
+│   │   ├── __init__.py
+│   │   ├── exceptions.py
+│   │   ├── integration.py
+│   │   └── mapping.py
+│   ├── orbitremit
+│   │   ├── README.md
+│   │   ├── __init__.py
+│   │   ├── exceptions.py
+│   │   └── integration.py
+│   ├── pangea
+│   │   ├── __init__.py
+│   │   ├── exceptions.py
+│   │   └── integration.py
+│   ├── paysend
+│   │   ├── README.md
+│   │   ├── __init__.py
+│   │   ├── browser_helper.py
+│   │   ├── country_list.json
+│   │   ├── exceptions.py
+│   │   └── integration.py
+│   ├── placid
+│   │   ├── README.md
+│   │   ├── __init__.py
+│   │   ├── exceptions.py
+│   │   ├── integration.py
+│   │   └── mapping.py
+│   ├── remitbee
+│   │   ├── README.md
+│   │   ├── __init__.py
+│   │   ├── countries_data.json
+│   │   ├── exceptions.py
+│   │   └── integration.py
+│   ├── remitguru
+│   │   ├── README.md
+│   │   ├── __init__.py
+│   │   └── integration.py
+│   ├── remitly
+│   │   ├── README.md
+│   │   ├── __init__.py
+│   │   ├── exceptions.py
+│   │   └── integration.py
+│   ├── rewire
+│   │   ├── README.md
+│   │   ├── __init__.py
+│   │   ├── exceptions.py
+│   │   └── integration.py
+│   ├── ria
+│   │   ├── README.md
+│   │   ├── __init__.py
+│   │   ├── exceptions.py
+│   │   └── integration.py
+│   ├── sendwave
+│   │   ├── README.md
+│   │   ├── __init__.py
+│   │   ├── exceptions.py
+│   │   ├── integration.py
+│   │   └── sendwave_mappings.py
+│   ├── singx
+│   │   ├── __init__.py
+│   │   ├── exceptions.py
+│   │   ├── integration.py
+│   │   └── singx_mappings.py
+│   ├── tasks.py
+│   ├── tests
+│   │   ├── __init__.py
+│   │   ├── alansari
+│   │   │   ├── __init__.py
+│   │   │   ├── test_alansari.py
+│   │   │   └── test_alansari_main.py
+│   │   ├── base
+│   │   │   └── __init__.py
+│   │   ├── dahabshiil
+│   │   │   ├── __init__.py
+│   │   │   └── test_dahabshiil_main.py
+│   │   ├── instarem
+│   │   │   ├── __init__.py
+│   │   │   └── test_instarem.py
+│   │   ├── intermex
+│   │   │   ├── __init__.py
+│   │   │   ├── test_intermex.py
+│   │   │   ├── test_intermex_main.py
+│   │   │   └── verify_integration.py
+│   │   ├── koronapay
+│   │   │   ├── __init__.py
+│   │   │   ├── test_koronapay.py
+│   │   │   ├── test_koronapay_main.py
+│   │   │   ├── test_live.py
+│   │   │   └── verify_aggregator.py
+│   │   ├── mukuru
+│   │   │   ├── __init__.py
+│   │   │   ├── test_mukuru_main.py
+│   │   │   └── verify_aggregator.py
+│   │   ├── orbitremit
+│   │   │   ├── __init__.py
+│   │   │   ├── test_orbitremit_main.py
+│   │   │   └── test_output
+│   │   ├── pangea
+│   │   │   ├── __init__.py
+│   │   │   └── test_pangea_main.py
+│   │   ├── paysend
+│   │   │   ├── __init__.py
+│   │   │   └── test_paysend_main.py
+│   │   ├── placid
+│   │   │   ├── __init__.py
+│   │   │   ├── test_output
+│   │   │   ├── test_placid_main.py
+│   │   │   └── test_provider.py
+│   │   ├── remitbee
+│   │   │   ├── __init__.py
+│   │   │   ├── test_provider.py
+│   │   │   └── test_remitbee_comprehensive.py
+│   │   ├── remitguru
+│   │   │   ├── __init__.py
+│   │   │   ├── test_provider.py
+│   │   │   └── test_remitguru.py
+│   │   ├── remitly
+│   │   │   ├── __init__.py
+│   │   │   └── test.py
+│   │   ├── rewire
+│   │   │   ├── __init__.py
+│   │   │   └── test_rewire_main.py
+│   │   ├── ria
+│   │   │   ├── __init__.py
+│   │   │   └── test_ria_main.py
+│   │   ├── sendwave
+│   │   │   ├── __init__.py
+│   │   │   ├── test_sendwave.py
+│   │   │   └── test_wave_cli.py
+│   │   ├── singx
+│   │   │   ├── __init__.py
+│   │   │   ├── test_aggregator.py
+│   │   │   ├── test_live.py
+│   │   │   └── test_singx_main.py
+│   │   ├── transfergo
+│   │   │   ├── __init__.py
+│   │   │   ├── test.py
+│   │   │   └── test_aggregator.py
+│   │   ├── utils
+│   │   │   └── __init__.py
+│   │   ├── westernunion
+│   │   │   ├── __init__.py
+│   │   │   ├── test_aggregator_integration.py
+│   │   │   └── test_delivery_methods.py
+│   │   ├── wirebarley
+│   │   │   ├── __init__.py
+│   │   │   ├── test_aggregator.py
+│   │   │   ├── test_api_simple.py
+│   │   │   ├── test_findings.py
+│   │   │   ├── test_wirebarley_api.py
+│   │   │   ├── test_wirebarley_browser.py
+│   │   │   ├── test_wirebarley_live.py
+│   │   │   ├── test_wirebarley_main.py
+│   │   │   └── test_wirebarley_simple.py
+│   │   ├── wise
+│   │   │   ├── __init__.py
+│   │   │   ├── test_aggregator.py
+│   │   │   └── test_wise_main.py
+│   │   ├── xe
+│   │   │   ├── __init__.py
+│   │   │   ├── test_aggregator.py
+│   │   │   └── test_xe_main.py
+│   │   └── xoom
+│   │       ├── __init__.py
+│   │       ├── test_aggregator.py
+│   │       └── test_xoom_main.py
+│   ├── transfergo
+│   │   ├── README.md
+│   │   ├── __init__.py
+│   │   ├── aggregator_integration.py
+│   │   ├── exceptions.py
+│   │   ├── integration.py
+│   │   └── transfergo_mappings.py
+│   ├── urls.py
+│   ├── utils
+│   │   ├── __init__.py
+│   │   ├── country_currency_standards.py
+│   │   └── currency_mapping.py
+│   ├── views.py
+│   ├── views_aggregator.py
+│   ├── westernunion
+│   │   ├── README.md
+│   │   ├── __init__.py
+│   │   ├── exceptions.py
+│   │   ├── integration.py
+│   │   └── westernunion_mappings.py
+│   ├── wirebarley
+│   │   ├── README.md
+│   │   ├── __init__.py
+│   │   ├── exceptions.py
+│   │   └── integration.py
+│   ├── wise
+│   │   ├── README.md
+│   │   ├── __init__.py
+│   │   ├── exceptions.py
+│   │   └── integration.py
+│   ├── xe
+│   │   ├── README.md
+│   │   ├── __init__.py
+│   │   ├── currency_mapping.py
+│   │   ├── exceptions.py
+│   │   └── integration.py
+│   └── xoom
+│       ├── README.md
+│       ├── __init__.py
+│       ├── exceptions.py
+│       └── integration.py
+├── pyproject.toml
+├── quotes
+│   ├── README.md
+│   ├── __init__.py
+│   ├── admin.py
+│   ├── apps.py
+│   ├── cache_utils.py
+│   ├── key_generators.py
+│   ├── management
+│   │   ├── __init__.py
+│   │   └── commands
+│   │       ├── __init__.py
+│   │       └── cache_utils.py
+│   ├── models.py
+│   ├── signals.py
+│   ├── tasks.py
+│   ├── urls.py
+│   └── views.py
+├── remit_scout
+│   ├── __init__.py
+│   ├── asgi.py
+│   ├── celery.py
+│   ├── settings.py
+│   ├── urls.py
+│   └── wsgi.py
+├── requirements-dev.txt
+├── requirements.txt
+├── scripts
+│   ├── code_style.sh
+│   ├── fix_flake8_issues.py
+│   ├── fix_type_annotations.py
+│   ├── run_mypy.py
+│   ├── setup_dev_env.sh
+│   └── setup_dev_environment.sh
+├── setup.cfg
+├── swagger_patch.py
+├── tests
+│   └── __init__.py
+├── tree.txt
+└── users
+    ├── __init__.py
+    ├── admin.py
+    ├── apps.py
+    ├── models.py
+    ├── serializers.py
+    ├── signals.py
+    ├── tests
+    │   └── __init__.py
+    ├── urls.py
+    └── views.py
+
+71 directories, 273 files

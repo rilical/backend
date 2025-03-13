@@ -1,0 +1,429 @@
+digraph RemitScoutArchitecture {
+    // Global graph settings
+    graph [
+        label="RemitScout Project Architecture",
+        labelloc="t",
+        fontsize="20",
+        fontname="Arial"
+    ];
+    node [fontname="Arial", fontsize="10", shape=box];
+    edge [arrowhead="none"];
+
+    // -----------------------------------------------------------------
+    // Top-Level (Project Root)
+    // -----------------------------------------------------------------
+    subgraph cluster_root {
+        label = "Project Root /";
+        style = "rounded";
+        color = "gray50";
+        
+        // Top-level files (omitting __pycache__ directories)
+        root_API_DOCUMENTATION_md     [label="API_DOCUMENTATION.md"];
+        root_CODE_STYLE_md            [label="CODE_STYLE.md"];
+        root_README_md                [label="README.md"];
+        root_db_sqlite3               [label="db.sqlite3"];
+        root_manage_py                [label="manage.py"];
+        root_mypy_ini                 [label="mypy.ini"];
+        root_pyproject_toml           [label="pyproject.toml"];
+        root_quote_flow_dot           [label="quote_flow.dot"];
+        root_remitscout_architecture_dot [label="remitscout_architecture.dot"];
+        root_remitscout_model_diagram_png [label="remitscout_model_diagram.png"];
+        root_requirements_dev_txt     [label="requirements-dev.txt"];
+        root_requirements_txt         [label="requirements.txt"];
+        root_setup_cfg                [label="setup.cfg"];
+        root_swagger_patch_py         [label="swagger_patch.py"];
+        root_tree_txt                 [label="tree.txt"];
+        root_xe_provider_diagram_png  [label="xe_provider_diagram.png"];
+        
+        // We'll show them as children of "root"
+        root -> root_API_DOCUMENTATION_md;
+        root -> root_CODE_STYLE_md;
+        root -> root_README_md;
+        root -> root_db_sqlite3;
+        root -> root_manage_py;
+        root -> root_mypy_ini;
+        root -> root_pyproject_toml;
+        root -> root_quote_flow_dot;
+        root -> root_remitscout_architecture_dot;
+        root -> root_remitscout_model_diagram_png;
+        root -> root_requirements_dev_txt;
+        root -> root_requirements_txt;
+        root -> root_setup_cfg;
+        root -> root_swagger_patch_py;
+        root -> root_tree_txt;
+        root -> root_xe_provider_diagram_png;
+    }
+
+    // Create a symbolic "root" node
+    root [label="(Project Root)", shape=ellipse, style="filled", fillcolor="#EEEEEE"];
+
+    // -----------------------------------------------------------------
+    // aggregator/
+    // -----------------------------------------------------------------
+    subgraph cluster_aggregator {
+        label = "aggregator/";
+        style = "rounded";
+        color = "lightblue";
+        
+        aggregator_init_py  [label="__init__.py"];
+        aggregator_py       [label="aggregator.py"];
+        aggregator_apps_py  [label="apps.py"];
+        aggregator_exceptions_py [label="exceptions.py"];
+        aggregator_filters_py    [label="filters.py"];
+        aggregator_utils_py      [label="utils.py"];
+        aggregator_views_py      [label="views.py"];
+
+        // aggregator/config/
+        subgraph cluster_aggregator_config {
+            label = "config/";
+            style = "dashed";
+            aggregator_config_init_py      [label="__init__.py"];
+            aggregator_config_json         [label="aggregator_config.json"];
+        }
+
+        // aggregator/tests/
+        subgraph cluster_aggregator_tests {
+            label = "tests/";
+            style = "dashed";
+            aggregator_tests_init_py   [label="__init__.py"];
+            
+            // aggregator/tests/results/
+            subgraph cluster_aggregator_tests_results {
+                label = "results/";
+                style = "dotted";
+                aggregator_tests_results_init_py [label="__init__.py"];
+                aggregator_tests_results_corridor_json [label="corridor_support.json"];
+            }
+            aggregator_test_all_providers_py       [label="test_all_providers.py"];
+            aggregator_test_corridor_support_py    [label="test_corridor_support.py"];
+            aggregator_test_corridors_py           [label="test_corridors.py"];
+            aggregator_test_minimal_py             [label="test_minimal.py"];
+            aggregator_test_multiple_corridors_py  [label="test_multiple_corridors.py"];
+            aggregator_test_providers_py           [label="test_providers.py"];
+            aggregator_test_real_providers_py      [label="test_real_providers.py"];
+            aggregator_test_single_corridor_py     [label="test_single_corridor.py"];
+            aggregator_test_ten_corridors_py       [label="test_ten_corridors.py"];
+            aggregator_test_uk_india_corridor_py   [label="test_uk_india_corridor.py"];
+            aggregator_test_us_mexico_corridor_py  [label="test_us_mexico_corridor.py"];
+            aggregator_test_xoom_py                [label="test_xoom.py"];
+        }
+
+        // aggregator/migrations/ (empty or not shown in detail)
+        aggregator_migrations [label="migrations/ (directory)"];
+
+        // Wiring aggregator nodes
+        aggregator -> aggregator_init_py;
+        aggregator -> aggregator_py;
+        aggregator -> aggregator_apps_py;
+        aggregator -> aggregator_exceptions_py;
+        aggregator -> aggregator_filters_py;
+        aggregator -> aggregator_utils_py;
+        aggregator -> aggregator_views_py;
+        aggregator -> cluster_aggregator_config;
+        aggregator -> aggregator_migrations;
+        aggregator -> cluster_aggregator_tests;
+        
+        cluster_aggregator_config -> aggregator_config_init_py;
+        cluster_aggregator_config -> aggregator_config_json;
+
+        cluster_aggregator_tests -> aggregator_tests_init_py;
+        cluster_aggregator_tests -> cluster_aggregator_tests_results;
+        cluster_aggregator_tests -> aggregator_test_all_providers_py;
+        cluster_aggregator_tests -> aggregator_test_corridor_support_py;
+        cluster_aggregator_tests -> aggregator_test_corridors_py;
+        cluster_aggregator_tests -> aggregator_test_minimal_py;
+        cluster_aggregator_tests -> aggregator_test_multiple_corridors_py;
+        cluster_aggregator_tests -> aggregator_test_providers_py;
+        cluster_aggregator_tests -> aggregator_test_real_providers_py;
+        cluster_aggregator_tests -> aggregator_test_single_corridor_py;
+        cluster_aggregator_tests -> aggregator_test_ten_corridors_py;
+        cluster_aggregator_tests -> aggregator_test_uk_india_corridor_py;
+        cluster_aggregator_tests -> aggregator_test_us_mexico_corridor_py;
+        cluster_aggregator_tests -> aggregator_test_xoom_py;
+        
+        cluster_aggregator_tests_results -> aggregator_tests_results_init_py;
+        cluster_aggregator_tests_results -> aggregator_tests_results_corridor_json;
+    }
+    root -> cluster_aggregator;
+
+    // -----------------------------------------------------------------
+    // apps/
+    // -----------------------------------------------------------------
+    subgraph cluster_apps {
+        label = "apps/";
+        style = "rounded";
+        color = "lightyellow";
+
+        apps_cli_usage_md [label="CLI_USAGE.md"];
+        apps_init_py      [label="__init__.py"];
+        apps_cli_py       [label="cli.py"];
+
+        // apps/providers/utils
+        subgraph cluster_apps_providers {
+            label = "providers/utils/";
+            style = "dashed";
+            apps_providers_utils_init_py  [label="__init__.py"];
+            apps_providers_utils_country  [label="country_currency_standards.py"];
+            apps_providers_utils_mapping  [label="currency_mapping.py"];
+        }
+
+        apps -> apps_cli_usage_md;
+        apps -> apps_init_py;
+        apps -> apps_cli_py;
+        apps -> cluster_apps_providers;
+
+        cluster_apps_providers -> apps_providers_utils_init_py;
+        cluster_apps_providers -> apps_providers_utils_country;
+        cluster_apps_providers -> apps_providers_utils_mapping;
+    }
+    root -> cluster_apps;
+
+    // -----------------------------------------------------------------
+    // docs/
+    // -----------------------------------------------------------------
+    subgraph cluster_docs {
+        label = "docs/";
+        style = "rounded";
+        color = "pink";
+
+        docs_api_doc_md      [label="API_DOCUMENTATION.md"];
+        docs_code_style_md   [label="CODE_STYLE.md"];
+        docs_readme_md       [label="README.md"];
+        docs_caching_md      [label="caching_implementation.md"];
+
+        docs -> docs_api_doc_md;
+        docs -> docs_code_style_md;
+        docs -> docs_readme_md;
+        docs -> docs_caching_md;
+    }
+    root -> cluster_docs;
+
+    // -----------------------------------------------------------------
+    // providers/
+    // (Due to size, we show partial subfolders as an example)
+    // -----------------------------------------------------------------
+    subgraph cluster_providers {
+        label = "providers/";
+        style = "rounded";
+        color = "lightgreen";
+
+        providers_init_py [label="__init__.py"];
+        providers_aggregator_py [label="aggregator.py"];
+        providers_apps_py  [label="apps.py"];
+        providers_factory_py [label="factory.py"];
+        providers_models_py  [label="models.py"];
+        providers_urls_py    [label="urls.py"];
+        providers_views_py   [label="views.py"];
+        providers_tasks_py   [label="tasks.py"];
+        providers_readme_md  [label="README.md"];
+
+        // Example subfolder: providers/base/
+        subgraph cluster_providers_base {
+            label="base/";
+            style="dashed";
+            providers_base_init_py  [label="__init__.py"];
+            providers_base_exceptions_py [label="exceptions.py"];
+            providers_base_provider_py   [label="provider.py"];
+        }
+
+        // Example subfolder: providers/alansari/
+        subgraph cluster_providers_alansari {
+            label="alansari/";
+            style="dashed";
+            providers_alansari_init_py   [label="__init__.py"];
+            providers_alansari_exceptions_py [label="exceptions.py"];
+            providers_alansari_integration_py [label="integration.py"];
+            providers_alansari_readme_md [label="README.md"];
+        }
+
+        // (Repeat subgraphs for each provider: dahabshiil, instarem, etc.)
+
+        // Example: providers/tests/
+        subgraph cluster_providers_tests {
+            label = "tests/";
+            style="dashed";
+            providers_tests_init_py [label="__init__.py"];
+            // Then you'd have subfolders like providers/tests/alansari, etc.
+            // We'll omit for brevity...
+        }
+
+        // Wiring within providers cluster
+        providers -> providers_init_py;
+        providers -> providers_aggregator_py;
+        providers -> providers_apps_py;
+        providers -> providers_factory_py;
+        providers -> providers_models_py;
+        providers -> providers_urls_py;
+        providers -> providers_views_py;
+        providers -> providers_tasks_py;
+        providers -> providers_readme_md;
+        providers -> cluster_providers_base;
+        providers -> cluster_providers_alansari;
+        providers -> cluster_providers_tests;
+        
+        cluster_providers_base -> providers_base_init_py;
+        cluster_providers_base -> providers_base_exceptions_py;
+        cluster_providers_base -> providers_base_provider_py;
+
+        cluster_providers_alansari -> providers_alansari_init_py;
+        cluster_providers_alansari -> providers_alansari_exceptions_py;
+        cluster_providers_alansari -> providers_alansari_integration_py;
+        cluster_providers_alansari -> providers_alansari_readme_md;
+        
+        // ... similarly for other provider subfolders (dahabshiil, intermex, etc.)
+    }
+    root -> cluster_providers;
+
+    // -----------------------------------------------------------------
+    // quotes/
+    // -----------------------------------------------------------------
+    subgraph cluster_quotes {
+        label = "quotes/";
+        style = "rounded";
+        color = "gold";
+
+        quotes_init_py       [label="__init__.py"];
+        quotes_readme_md     [label="README.md"];
+        quotes_admin_py      [label="admin.py"];
+        quotes_apps_py       [label="apps.py"];
+        quotes_cache_utils_py[label="cache_utils.py"];
+        quotes_key_generators_py [label="key_generators.py"];
+        quotes_models_py     [label="models.py"];
+        quotes_signals_py    [label="signals.py"];
+        quotes_tasks_py      [label="tasks.py"];
+        quotes_urls_py       [label="urls.py"];
+        quotes_views_py      [label="views.py"];
+
+        // migrations/
+        quotes_migrations  [label="migrations/"];
+
+        // management/commands/
+        subgraph cluster_quotes_management {
+            label="management/commands/";
+            style="dashed";
+            quotes_mgmt_init_py  [label="__init__.py"];
+            quotes_mgmt_cache_utils_py [label="cache_utils.py"];
+        }
+
+        quotes -> quotes_init_py;
+        quotes -> quotes_readme_md;
+        quotes -> quotes_admin_py;
+        quotes -> quotes_apps_py;
+        quotes -> quotes_cache_utils_py;
+        quotes -> quotes_key_generators_py;
+        quotes -> quotes_models_py;
+        quotes -> quotes_signals_py;
+        quotes -> quotes_tasks_py;
+        quotes -> quotes_urls_py;
+        quotes -> quotes_views_py;
+        quotes -> quotes_migrations;
+        quotes -> cluster_quotes_management;
+
+        cluster_quotes_management -> quotes_mgmt_init_py;
+        cluster_quotes_management -> quotes_mgmt_cache_utils_py;
+    }
+    root -> cluster_quotes;
+
+    // -----------------------------------------------------------------
+    // remit_scout/
+    // -----------------------------------------------------------------
+    subgraph cluster_remit_scout {
+        label = "remit_scout/";
+        style = "rounded";
+        color = "lightcyan";
+
+        remit_scout_init_py [label="__init__.py"];
+        remit_scout_asgi_py [label="asgi.py"];
+        remit_scout_celery_py [label="celery.py"];
+        remit_scout_settings_py [label="settings.py"];
+        remit_scout_urls_py [label="urls.py"];
+        remit_scout_wsgi_py [label="wsgi.py"];
+        
+        remit_scout -> remit_scout_init_py;
+        remit_scout -> remit_scout_asgi_py;
+        remit_scout -> remit_scout_celery_py;
+        remit_scout -> remit_scout_settings_py;
+        remit_scout -> remit_scout_urls_py;
+        remit_scout -> remit_scout_wsgi_py;
+    }
+    root -> cluster_remit_scout;
+
+    // -----------------------------------------------------------------
+    // scripts/
+    // -----------------------------------------------------------------
+    subgraph cluster_scripts {
+        label = "scripts/";
+        style = "rounded";
+        color = "lightgray";
+        
+        scripts_code_style_sh        [label="code_style.sh"];
+        scripts_fix_flake8_issues_py [label="fix_flake8_issues.py"];
+        scripts_fix_type_annotations_py [label="fix_type_annotations.py"];
+        scripts_run_mypy_py          [label="run_mypy.py"];
+        scripts_setup_dev_env_sh     [label="setup_dev_env.sh"];
+        scripts_setup_dev_environment_sh [label="setup_dev_environment.sh"];
+
+        scripts -> scripts_code_style_sh;
+        scripts -> scripts_fix_flake8_issues_py;
+        scripts -> scripts_fix_type_annotations_py;
+        scripts -> scripts_run_mypy_py;
+        scripts -> scripts_setup_dev_env_sh;
+        scripts -> scripts_setup_dev_environment_sh;
+    }
+    root -> cluster_scripts;
+
+    // -----------------------------------------------------------------
+    // tests/ (top-level)
+    // -----------------------------------------------------------------
+    subgraph cluster_tests {
+        label = "tests/";
+        style = "rounded";
+        color = "white";
+        
+        tests_init_py [label="__init__.py"];
+        tests -> tests_init_py;
+    }
+    root -> cluster_tests;
+
+    // -----------------------------------------------------------------
+    // users/
+    // -----------------------------------------------------------------
+    subgraph cluster_users {
+        label = "users/";
+        style = "rounded";
+        color = "beige";
+
+        users_init_py   [label="__init__.py"];
+        users_admin_py  [label="admin.py"];
+        users_apps_py   [label="apps.py"];
+        users_models_py [label="models.py"];
+        users_serializers_py [label="serializers.py"];
+        users_signals_py     [label="signals.py"];
+        users_urls_py        [label="urls.py"];
+        users_views_py       [label="views.py"];
+
+        // migrations/ (not expanded)
+        users_migrations [label="migrations/"];
+
+        // tests/
+        subgraph cluster_users_tests {
+            label="tests/";
+            style="dashed";
+            users_tests_init_py [label="__init__.py"];
+        }
+
+        users -> users_init_py;
+        users -> users_admin_py;
+        users -> users_apps_py;
+        users -> users_models_py;
+        users -> users_serializers_py;
+        users -> users_signals_py;
+        users -> users_urls_py;
+        users -> users_views_py;
+        users -> users_migrations;
+        users -> cluster_users_tests;
+
+        cluster_users_tests -> users_tests_init_py;
+    }
+    root -> cluster_users;
+}

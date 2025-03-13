@@ -13,11 +13,11 @@ from providers.xe.exceptions import (
     XEResponseError,
     XEValidationError,
 )
-from providers.xe.integration import XEAggregatorProvider, XEProvider
+from providers.xe.integration import XEProvider, XEProvider
 
 __all__ = [
     "XEProvider",
-    "XEAggregatorProvider",
+    "XEProvider",
     "XEError",
     "XEConnectionError",
     "XEApiError",

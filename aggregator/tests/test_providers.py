@@ -42,7 +42,7 @@ def test_all_providers():
     provider_names = [p.__class__.__name__ for p in Aggregator.PROVIDERS]
     print(f"Providers: {', '.join(provider_names)}")
     print(
-        f"Original 6: XEAggregatorProvider, RemitlyProvider, RIAProvider, WiseProvider, TransferGoProvider, WesternUnionProvider"
+        f"Original 6: XEProvider, RemitlyProvider, RIAProvider, WiseProvider, TransferGoProvider, WesternUnionProvider"
     )
     print(f"Newly added 3: XoomProvider, SingXProvider, PaysendProvider")
 

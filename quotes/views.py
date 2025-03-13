@@ -15,6 +15,13 @@ import redis
 from django.conf import settings
 from django.core.cache import cache, caches
 from django.utils import timezone
+from drf_spectacular.utils import (
+    OpenApiExample,
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+    extend_schema_view,
+)
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -29,6 +36,181 @@ from .models import FeeQuote, Provider, QuoteQueryLog
 logger = logging.getLogger(__name__)
 
 
+@extend_schema_view(
+    get=extend_schema(
+        summary="Get quotes from specific providers",
+        description=(
+            "Retrieves quotes for a specific money transfer corridor from one or more providers. "
+            "Results include exchange rates, fees, and estimated delivery times. "
+            "Multi-level caching is implemented for performance."
+        ),
+        parameters=[
+            OpenApiParameter(
+                name="source_country", 
+                type=str, 
+                location=OpenApiParameter.QUERY,
+                description="Source country code (e.g., US, GB, CA)",
+                required=True,
+                examples=[
+                    OpenApiExample("United States", value="US"),
+                    OpenApiExample("United Kingdom", value="GB"),
+                ]
+            ),
+            OpenApiParameter(
+                name="dest_country", 
+                type=str, 
+                location=OpenApiParameter.QUERY,
+                description="Destination country code (e.g., MX, IN, PH)",
+                required=True,
+                examples=[
+                    OpenApiExample("Mexico", value="MX"),
+                    OpenApiExample("India", value="IN"),
+                ]
+            ),
+            OpenApiParameter(
+                name="source_currency", 
+                type=str, 
+                location=OpenApiParameter.QUERY,
+                description="Source currency code (e.g., USD, GBP, CAD)",
+                required=True,
+                examples=[
+                    OpenApiExample("US Dollar", value="USD"),
+                    OpenApiExample("British Pound", value="GBP"),
+                ]
+            ),
+            OpenApiParameter(
+                name="dest_currency", 
+                type=str, 
+                location=OpenApiParameter.QUERY,
+                description="Destination currency code (e.g., MXN, INR, PHP)",
+                required=True,
+                examples=[
+                    OpenApiExample("Mexican Peso", value="MXN"),
+                    OpenApiExample("Indian Rupee", value="INR"),
+                ]
+            ),
+            OpenApiParameter(
+                name="amount", 
+                type=float, 
+                location=OpenApiParameter.QUERY,
+                description="Amount to send in source currency",
+                required=True,
+                examples=[
+                    OpenApiExample("Standard Amount", value=1000.00),
+                ]
+            ),
+            OpenApiParameter(
+                name="sort_by", 
+                type=str, 
+                location=OpenApiParameter.QUERY,
+                description="How to sort the results",
+                required=False,
+                default="best_rate",
+                enum=["best_rate", "lowest_fee", "fastest", "value_score"],
+                examples=[
+                    OpenApiExample("Best Exchange Rate", value="best_rate"),
+                    OpenApiExample("Lowest Fee", value="lowest_fee"),
+                    OpenApiExample("Fastest Delivery", value="fastest"),
+                    OpenApiExample("Best Value", value="value_score"),
+                ]
+            ),
+            OpenApiParameter(
+                name="force_refresh", 
+                type=bool, 
+                location=OpenApiParameter.QUERY,
+                description="Whether to force refresh cached data",
+                required=False,
+                default=False,
+            ),
+        ],
+        responses={
+            200: OpenApiResponse(
+                description="Quotes retrieved successfully",
+                examples=[
+                    OpenApiExample(
+                        "Successful Response",
+                        summary="Example of successful quotes response",
+                        value={
+                            "success": True,
+                            "timestamp": "2023-09-15T12:34:56.789Z",
+                            "request": {
+                                "source_country": "US",
+                                "dest_country": "MX",
+                                "source_currency": "USD",
+                                "dest_currency": "MXN",
+                                "amount": 1000.00
+                            },
+                            "filters_applied": {
+                                "sort_by": "best_rate"
+                            },
+                            "quotes": [
+                                {
+                                    "provider_id": "xe",
+                                    "provider_name": "XE Money Transfer",
+                                    "logo_url": "https://example.com/xe-logo.png",
+                                    "exchange_rate": 17.85,
+                                    "fee": 4.99,
+                                    "amount_received": 17850.00,
+                                    "amount_sent": 1000.00,
+                                    "delivery_time_minutes": 60,
+                                    "delivery_time_display": "1 hour",
+                                    "source_currency": "USD",
+                                    "destination_currency": "MXN",
+                                    "success": True
+                                },
+                                {
+                                    "provider_id": "wise",
+                                    "provider_name": "Wise",
+                                    "logo_url": "https://example.com/wise-logo.png",
+                                    "exchange_rate": 17.82,
+                                    "fee": 8.50,
+                                    "amount_received": 17820.00,
+                                    "amount_sent": 1000.00,
+                                    "delivery_time_minutes": 180,
+                                    "delivery_time_display": "3 hours",
+                                    "source_currency": "USD",
+                                    "destination_currency": "MXN",
+                                    "success": True
+                                }
+                            ],
+                            "count": 2,
+                            "cache_hit": False
+                        }
+                    )
+                ]
+            ),
+            400: OpenApiResponse(
+                description="Invalid parameters",
+                examples=[
+                    OpenApiExample(
+                        "Missing Parameters",
+                        value={
+                            "error": "Missing required parameters. Please provide source_country, dest_country, source_currency, dest_currency, and amount."
+                        }
+                    ),
+                    OpenApiExample(
+                        "Invalid Amount",
+                        value={
+                            "error": "Invalid amount. Please provide a valid positive number."
+                        }
+                    )
+                ]
+            ),
+            500: OpenApiResponse(
+                description="Server error",
+                examples=[
+                    OpenApiExample(
+                        "Error Response",
+                        value={
+                            "error": "An error occurred: Internal server error"
+                        }
+                    )
+                ]
+            )
+        },
+        tags=["Quotes"],
+    )
+)
 class QuoteAPIView(APIView):
     """
     API endpoint to fetch remittance quotes from multiple providers.

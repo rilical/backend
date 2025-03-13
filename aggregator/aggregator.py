@@ -30,7 +30,7 @@ from providers.transfergo.integration import TransferGoProvider
 from providers.westernunion.integration import WesternUnionProvider
 from providers.wirebarley.integration import WireBarleyProvider
 from providers.wise.integration import WiseProvider
-from providers.xe.integration import XEAggregatorProvider
+from providers.xe.integration import XEProvider
 from providers.xoom.integration import XoomProvider
 
 logger = logging.getLogger(__name__)
@@ -41,12 +41,14 @@ def get_provider_quote_cache_key(
     provider_name, source_country, dest_country, source_currency, dest_currency, amount
 ):
     """Generate a cache key for individual provider quotes."""
-    return f"provider_quote:{provider_name}:{source_country}:{dest_country}:{source_currency}:{dest_currency}:{float(amount)}"
+    # Ensure provider name is uppercase for consistency
+    provider_name_upper = provider_name.upper()
+    return f"provider_quote:{provider_name_upper}:{source_country}:{dest_country}:{source_currency}:{dest_currency}:{float(amount)}"
 
 
 class Aggregator:
     PROVIDERS = [
-        XEAggregatorProvider(),
+        XEProvider(),
         RemitlyProvider(),
         RIAProvider(),
         WiseProvider(),
@@ -72,7 +74,7 @@ class Aggregator:
     ]
 
     PROVIDER_PARAMS = {
-        "RemitlyProvider": {
+        "REMITLYPROVIDER": {
             "get_quote": {
                 "amount": "amount",
                 "source_currency": "source_currency",
@@ -81,7 +83,7 @@ class Aggregator:
                 "dest_country": "dest_country",
             }
         },
-        "RIAProvider": {
+        "RIAPROVIDER": {
             "get_quote": {
                 "amount": "amount",
                 "source_currency": "source_currency",
@@ -92,7 +94,7 @@ class Aggregator:
                 "delivery_method": "bankDeposit",
             }
         },
-        "WiseProvider": {
+        "WISEPROVIDER": {
             "get_quote": {
                 "amount": "amount",
                 "source_currency": "source_currency",
@@ -493,3 +495,98 @@ class Aggregator:
             "successful_providers": len(all_quotes),
             "timestamp": datetime.datetime.now().isoformat(),
         }
+
+def get_cached_aggregated_rates(
+    send_amount: Decimal,
+    send_currency: str,
+    receive_country: str,
+    receive_currency: Optional[str] = None,
+    cache_timeout: int = 3600,
+) -> List[Dict[str, Any]]:
+    """
+    Get aggregated remittance rates from all available providers with caching.
+
+    This function fetches quotes from all registered providers for the specified
+    money transfer parameters and returns a consolidated list of standardized quotes.
+    Results are cached for improved performance.
+
+    Args:
+        send_amount: The amount to send in the source currency
+        send_currency: The source currency code (e.g., 'USD', 'EUR')
+        receive_country: The destination country code (e.g., 'MX', 'IN')
+        receive_currency: Optional destination currency code. If not provided,
+                          the default currency for the destination country will be used.
+        cache_timeout: Cache TTL in seconds (defaults to 1 hour)
+
+    Returns:
+        A list of standardized quote dictionaries from all available providers,
+        sorted by exchange rate (best first). Each quote contains:
+        - provider_id: Unique identifier of the provider
+        - provider_name: Human-readable name of the provider
+        - exchange_rate: The exchange rate offered
+        - fee: The fee charged for the transfer
+        - amount_received: The amount that will be received
+        - delivery_time_minutes: Estimated delivery time in minutes
+        - source_currency: Source currency code
+        - destination_currency: Destination currency code
+        - success: Boolean indicating if the quote was successfully retrieved
+
+    Example:
+        >>> quotes = get_cached_aggregated_rates(
+        ...     send_amount=Decimal("1000.00"),
+        ...     send_currency="USD",
+        ...     receive_country="MX"
+        ... )
+        >>> print(f"Found {len(quotes)} quotes")
+        Found 15 quotes
+    """
+    # Generate a cache key based on the parameters
+    cache_key = f"aggregated_rates:{send_currency}:{receive_country}:{float(send_amount)}"
+    if receive_currency:
+        cache_key += f":{receive_currency}"
+    
+    # Try to get cached results first
+    cached_results = cache.get(cache_key)
+    if cached_results and cache_timeout > 0:
+        logger.info(f"Using cached aggregated rates: {cache_key}")
+        return cached_results
+    
+    # Cache miss or force refresh, get fresh quotes
+    logger.info(f"Cache miss for {cache_key}, fetching fresh quotes")
+    
+    # Determine the destination currency if not provided
+    if not receive_currency:
+        # This would use a utility function to get the default currency for the country
+        # For now we'll just use a placeholder
+        if "utils" in globals() and hasattr(globals()["utils"], "get_default_currency_for_country"):
+            receive_currency = utils.get_default_currency_for_country(receive_country)
+        else:
+            # Fallback to USD for now (this should be replaced with proper logic)
+            # In a real implementation, this would look up the default currency
+            receive_currency = "USD"
+    
+    # Get fresh quotes from the aggregator
+    results = Aggregator.get_all_quotes(
+        source_country="US",  # This is hardcoded for now but should be determined based on currency
+        dest_country=receive_country,
+        source_currency=send_currency,
+        dest_currency=receive_currency,
+        amount=send_amount,
+        sort_by="best_rate",  # Sort by best exchange rate by default
+        use_cache=False,  # Don't use provider-level caching since we're caching the whole result
+    )
+    
+    # Extract just the standardized quotes from the response
+    quotes = results.get("quotes", [])
+    
+    # Only cache successful results that have at least one quote
+    if quotes and any(q.get("success", False) for q in quotes):
+        # Add some jitter to prevent thundering herd
+        jitter = random.randint(-60, 60)
+        actual_timeout = max(1, cache_timeout + jitter)  # Ensure timeout is at least 1 second
+        
+        # Cache the results
+        cache.set(cache_key, quotes, timeout=actual_timeout)
+        logger.info(f"Cached fresh aggregated rates for {cache_key}, TTL={actual_timeout}s")
+    
+    return quotes

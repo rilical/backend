@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Test script for XE Money Transfer Aggregator Provider.
-This demonstrates using the XEAggregatorProvider for getting quotes directly via the API.
+This demonstrates using the XEProvider for getting quotes directly via the API.
 """
 
 import argparse
@@ -19,7 +19,7 @@ from providers.xe.currency_mapping import (
     XE_COUNTRY_TO_CURRENCY,
     XE_SUPPORTED_CORRIDORS,
 )
-from providers.xe.integration import XEAggregatorProvider
+from providers.xe.integration import XEProvider
 
 # Configure logging
 logging.basicConfig(
@@ -64,7 +64,7 @@ def test_xe_aggregator(
         f"Testing XE Aggregator Provider: {source_currency} -> {target_country} for {amount}"
     )
 
-    with XEAggregatorProvider() as provider:
+    with XEProvider() as provider:
         result = provider.get_exchange_rate(
             send_amount=amount,
             send_currency=source_currency,
@@ -92,7 +92,7 @@ def test_supported_corridors(sample_size=None):
     if sample_size and sample_size < len(XE_SUPPORTED_CORRIDORS):
         test_corridors = random.sample(XE_SUPPORTED_CORRIDORS, sample_size)
 
-    with XEAggregatorProvider() as provider:
+    with XEProvider() as provider:
         for source_currency, target_country in test_corridors:
             logger.info(f"Testing corridor: {source_currency} -> {target_country}")
 
@@ -154,7 +154,7 @@ def test_new_country(source_currency="USD", sample_size=3):
     test_countries = random.sample(new_countries, min(sample_size, len(new_countries)))
 
     results = []
-    with XEAggregatorProvider() as provider:
+    with XEProvider() as provider:
         for country in test_countries:
             logger.info(f"Testing new country corridor: {source_currency} -> {country}")
 
@@ -205,7 +205,7 @@ def test_currency_country_mapping():
     results = []
 
     # Test known corridors
-    with XEAggregatorProvider() as provider:
+    with XEProvider() as provider:
         for source_currency, target_country in random.sample(XE_SUPPORTED_CORRIDORS, 3):
             is_supported = provider.is_corridor_supported(source_currency, target_country)
 
@@ -222,7 +222,7 @@ def test_currency_country_mapping():
     random_source = random.sample(XE_COMMON_SOURCE_CURRENCIES, 2)
     random_target = random.sample(list(XE_COUNTRY_TO_CURRENCY.keys()), 3)
 
-    with XEAggregatorProvider() as provider:
+    with XEProvider() as provider:
         for source in random_source:
             for target in random_target:
                 is_supported = provider.is_corridor_supported(source, target)
@@ -286,7 +286,7 @@ def test_aggregator_format():
     results = []
 
     # Test a successful corridor
-    with XEAggregatorProvider() as provider:
+    with XEProvider() as provider:
         # 1. Test a successful case
         success_result = provider.get_exchange_rate(
             send_amount=Decimal("100"), send_currency="USD", receive_country="DE"
@@ -350,7 +350,7 @@ def test_error_handling():
     """
     results = []
 
-    with XEAggregatorProvider() as provider:
+    with XEProvider() as provider:
         # 1. Test missing parameters
         missing_param_result = provider.get_exchange_rate(
             send_amount=Decimal("100"),
@@ -386,7 +386,7 @@ class TestXEAggregatorFormat(unittest.TestCase):
     """Unit tests for the XE Aggregator format validation."""
 
     def setUp(self):
-        self.provider = XEAggregatorProvider()
+        self.provider = XEProvider()
 
     def tearDown(self):
         self.provider.close()

@@ -25,18 +25,18 @@ class ProviderFactory:
 
     _providers: Dict[str, Type[RemittanceProvider]] = {
         # Include only the providers we've implemented and confirmed
-        "remitbee": RemitbeeProvider,
-        "remitguru": RemitGuruProvider,
-        "xe": XEProvider,
-        "sendwave": SendwaveProvider,
-        "rewire": RewireProvider,
-        "mukuru": MukuruProvider,
-        "dahabshiil": DahabshiilProvider,
-        "alansari": AlAnsariProvider,
-        "placid": PlacidProvider,
-        "orbitremit": OrbitRemitProvider,
-        "wirebarley": WireBarleyProvider,
-        "paysend": PaysendProvider,
+        "REMITBEE": RemitbeeProvider,
+        "REMITGURU": RemitGuruProvider,
+        "XE": XEProvider,
+        "SENDWAVE": SendwaveProvider,
+        "REWIRE": RewireProvider,
+        "MUKURU": MukuruProvider,
+        "DAHABSHIIL": DahabshiilProvider,
+        "ALANSARI": AlAnsariProvider,
+        "PLACID": PlacidProvider,
+        "ORBITREMIT": OrbitRemitProvider,
+        "WIREBARLEY": WireBarleyProvider,
+        "PAYSEND": PaysendProvider,
         # Add more providers as they are implemented and confirmed
     }
 
@@ -55,10 +55,12 @@ class ProviderFactory:
         Raises:
             ValueError: If the requested provider is not supported
         """
-        if provider_name not in cls._providers:
+        # Convert provider name to uppercase to ensure case-insensitive lookup
+        provider_name_upper = provider_name.upper()
+        if provider_name_upper not in cls._providers:
             raise ValueError(f"Unsupported provider: {provider_name}")
 
-        provider_class = cls._providers[provider_name]
+        provider_class = cls._providers[provider_name_upper]
         return provider_class(**kwargs)
 
     @classmethod

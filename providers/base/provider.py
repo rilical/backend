@@ -1,5 +1,5 @@
 """
-Base class for remittance providers.
+Base provider class for remittance providers.
 """
 import abc
 import datetime
@@ -11,8 +11,39 @@ from typing import Any, Dict, Optional
 
 class RemittanceProvider(abc.ABC):
     """
-    Abstract base class for standardized remittance provider interface.
+    Abstract base class for all remittance providers.
+    
+    This class defines the interface that all provider implementations must follow,
+    and provides default implementations that can be overridden by subclasses.
     """
+    
+    @classmethod
+    def get_provider_id(cls) -> str:
+        """
+        Get the unique identifier for this provider.
+        
+        Returns:
+            String identifier for the provider.
+        """
+        # Default implementation: Extract from class name
+        # e.g., WiseProvider -> "WISE"
+        class_name = cls.__name__
+        if class_name.endswith("Provider"):
+            return class_name[:-8].upper()
+        return class_name.upper()
+    
+    @classmethod
+    def get_display_name(cls) -> str:
+        """
+        Get the human-readable name for this provider.
+        
+        Returns:
+            Display name for the provider.
+        """
+        # Default implementation: Create from provider_id
+        # e.g., "WISE" -> "Wise"
+        provider_id = cls.get_provider_id()
+        return provider_id.replace('_', ' ').title()
 
     def __init__(self, name: str, base_url: str):
         self.name = name

@@ -37,7 +37,7 @@ TEST_CORRIDOR = {
 
 # Provider-specific parameter mappings
 PROVIDER_PARAMS = {
-    "XEAggregatorProvider": {
+    "XEProvider": {
         "get_quote": {
             "amount": "amount",
             "source_currency": "source_currency",
@@ -317,13 +317,13 @@ def main():
 
     # Try XE with its specific parameter requirements
     try:
-        from providers.xe.integration import XEAggregatorProvider
+        from providers.xe.integration import XEProvider
 
-        print("\n=== Testing XEAggregatorProvider ===")
-        result = test_provider(XEAggregatorProvider)
+        print("\n=== Testing XEProvider ===")
+        result = test_provider(XEProvider)
         all_results.append(result)
     except ImportError as e:
-        logger.error(f"Could not import XEAggregatorProvider: {e}")
+        logger.error(f"Could not import XEProvider: {e}")
 
     try:
         from providers.wise.integration import WiseProvider
@@ -388,10 +388,10 @@ def main():
                 from providers.transfergo.integration import TransferGoProvider
 
                 provider_classes.append(TransferGoProvider)
-            elif provider_id == "XEAggregatorProvider":
-                from providers.xe.integration import XEAggregatorProvider
+            elif provider_id == "XEProvider":
+                from providers.xe.integration import XEProvider
 
-                provider_classes.append(XEAggregatorProvider)
+                provider_classes.append(XEProvider)
             elif provider_id == "WiseProvider":
                 from providers.wise.integration import WiseProvider
 

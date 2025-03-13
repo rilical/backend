@@ -1,0 +1,103 @@
+digraph RemitScout {
+  rankdir=TB;
+  node [shape=box, style=filled, fillcolor=lightblue, fontname="Arial", margin="0.2,0.1"];
+  edge [fontname="Arial"];
+  
+  // Core components
+  subgraph cluster_core {
+    label="Core Components";
+    style=filled;
+    color=lightgrey;
+    
+    Aggregator [label="Aggregator\n(aggregator/aggregator.py)", fillcolor=orange];
+    ProviderFactory [label="ProviderFactory\n(providers/factory.py)", fillcolor=orange];
+    RemittanceProvider [label="RemittanceProvider\n(providers/base/provider.py)", shape=record, fillcolor=lightyellow, style="filled,rounded", label="{RemittanceProvider (Abstract Base Class)|+ get_provider_id()\l+ get_display_name()\l+ get_quote()\l}"];
+    ProviderUtils [label="Provider Utils\n(providers/utils)", fillcolor=lightgrey];
+  }
+  
+  // API and Views
+  subgraph cluster_api {
+    label="API Layer";
+    style=filled;
+    color=lightgrey;
+    
+    QuoteView [label="QuoteAPIView\n(quotes/views.py)"];
+    AggregatorView [label="AggregatorRatesView\n(aggregator/views.py)"];
+    ProviderView [label="RateComparisonViewSet\n(providers/views.py)"];
+  }
+  
+  // Providers Implementations
+  subgraph cluster_providers {
+    label="Provider Implementations";
+    style=filled;
+    color=lightblue;
+    node [fillcolor=lightskyblue, style=filled];
+    
+    XEProvider [label="XEProvider\n(providers/xe/integration.py)"];
+    WiseProvider [label="WiseProvider\n(providers/wise/integration.py)"];
+    RemitlyProvider [label="RemitlyProvider\n(providers/remitly/integration.py)"];
+    TransferGoProvider [label="TransferGoProvider\n(providers/transfergo/integration.py)"];
+    WesternUnionProvider [label="WesternUnionProvider\n(providers/westernunion/integration.py)"];
+    XoomProvider [label="XoomProvider\n(providers/xoom/integration.py)"];
+    // First row of additional providers
+    PaysendProvider [label="PaysendProvider\n(providers/paysend/integration.py)"];
+    AlAnsariProvider [label="AlAnsariProvider\n(providers/alansari/integration.py)"];
+    RemitbeeProvider [label="RemitbeeProvider\n(providers/remitbee/integration.py)"];
+    // Second row of additional providers
+    KoronaPayProvider [label="KoronaPayProvider\n(providers/koronapay/integration.py)"];
+    MukuruProvider [label="MukuruProvider\n(providers/mukuru/integration.py)"];
+    RewireProvider [label="RewireProvider\n(providers/rewire/integration.py)"];
+    // Adding more providers to showcase the scale
+    SendwaveProvider [label="SendwaveProvider\n(providers/sendwave/integration.py)"];
+    DahabshiilProvider [label="DahabshiilProvider\n(providers/dahabshiil/integration.py)"];
+    IntermexProvider [label="IntermexProvider\n(providers/intermex/integration.py)"];
+  }
+  
+  // Utility & Supporting Components
+  subgraph cluster_utils {
+    label="Utilities & Support";
+    style=filled;
+    color=lightgrey;
+    
+    CacheUtils [label="Cache Utils\n(quotes/cache_utils.py)"];
+    FilterUtils [label="Filter Utils\n(aggregator/filters.py)"];
+    CountryCurrencyUtils [label="Country/Currency Utils\n(providers/utils/country_currency_standards.py)"];
+  }
+  
+  // Relationships
+  
+  // API calls Aggregator
+  QuoteView -> Aggregator [label="gets quotes through"];
+  AggregatorView -> Aggregator [label="calls"];
+  ProviderView -> Aggregator [label="uses"];
+  
+  // Aggregator uses ProviderFactory
+  Aggregator -> ProviderFactory [label="creates providers through"];
+  
+  // ProviderFactory creates concrete providers
+  ProviderFactory -> XEProvider [label="instantiates"];
+  ProviderFactory -> WiseProvider [label="instantiates"];
+  ProviderFactory -> RemitlyProvider [label="instantiates"];
+  ProviderFactory -> TransferGoProvider [label="instantiates"];
+  ProviderFactory -> WesternUnionProvider [label="instantiates"];
+  ProviderFactory -> XoomProvider [label="instantiates"];
+  
+  // Providers inherit from base class
+  RemittanceProvider -> XEProvider [arrowhead=empty, label="extends"];
+  RemittanceProvider -> WiseProvider [arrowhead=empty, label="extends"];
+  RemittanceProvider -> RemitlyProvider [arrowhead=empty, label="extends"];
+  RemittanceProvider -> TransferGoProvider [arrowhead=empty, label="extends"];
+  RemittanceProvider -> WesternUnionProvider [arrowhead=empty, label="extends"];
+  RemittanceProvider -> XoomProvider [arrowhead=empty, label="extends"];
+  
+  // Utilities used by various components
+  ProviderUtils -> XEProvider [label="uses"];
+  ProviderUtils -> WiseProvider [label="uses"];
+  Aggregator -> CacheUtils [label="uses for caching"];
+  Aggregator -> FilterUtils [label="uses for filtering"];
+  
+  // Cache and utilities
+  CacheUtils -> Aggregator [style=dashed, label="supports"];
+  FilterUtils -> Aggregator [style=dashed, label="supports"];
+  CountryCurrencyUtils -> ProviderUtils [style=dashed, label="part of"];
+} 

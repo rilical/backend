@@ -12,7 +12,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Security settings
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "your-secret-key-here")
 DEBUG = os.getenv("DJANGO_DEBUG", "True") == "True"
-ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "*").split(",")
+
+# When in DEBUG mode, allow all hosts for ease of development
+if DEBUG:
+    ALLOWED_HOSTS = ["*"]
+else:
+    ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
 # Application definition
 INSTALLED_APPS = [
@@ -28,9 +33,10 @@ INSTALLED_APPS = [
     "django_filters",
     "corsheaders",  # Add CORS headers app
     "django_extensions",  # Added for debugging
+    "drf_spectacular",  # OpenAPI 3.0 schema generator
     # Local apps
-    "apps.providers",  # Provider rate comparison
-    "apps.aggregator",  # Aggregator service
+    "providers",  # Provider rate comparison (changed from apps.providers)
+    "aggregator",  # Aggregator service
     "quotes",  # Quote storage and caching
 ]
 
@@ -173,7 +179,26 @@ REST_FRAMEWORK = {
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
     ],
-    # No authentication classes required for public API
+    # Add Spectacular as the default schema generator
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+# DRF Spectacular settings
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'RemitScout API',
+    'DESCRIPTION': 'API for comparing remittance rates across multiple providers',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'SCHEMA_PATH_PREFIX': '/api/',
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,
+        'displayOperationId': False,
+        'defaultModelsExpandDepth': 3,
+        'defaultModelExpandDepth': 3,
+        'docExpansion': 'none',  # show only top level by default
+    }
 }
 
 # Logging configuration
