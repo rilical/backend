@@ -30,8 +30,8 @@ logging.basicConfig(
 logger = logging.getLogger("remitscout_cli")
 
 # Import aggregator components
-from apps.aggregator.aggregator import Aggregator
-from apps.aggregator.configurator import AggregatorConfig, get_configured_aggregator_params
+from aggregator.aggregator import Aggregator
+from aggregator.configurator import AggregatorConfig, get_configured_aggregator_params
 
 
 def parse_arguments():
@@ -71,7 +71,7 @@ def parse_arguments():
 
 def configure_aggregator(args):
     """Configure the aggregator based on command-line args."""
-    from apps.aggregator.aggregator import Aggregator
+    from aggregator.aggregator import Aggregator
 
     agg = Aggregator()
 
@@ -108,7 +108,7 @@ def configure_aggregator(args):
 
 def list_available_providers():
     """List all available providers in the system."""
-    from apps.aggregator.aggregator import Aggregator
+    from aggregator.aggregator import Aggregator
 
     agg = Aggregator()
     providers = agg.list_all_providers()

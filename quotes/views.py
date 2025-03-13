@@ -20,7 +20,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.aggregator.aggregator import Aggregator
+from aggregator.aggregator import Aggregator
 
 from .cache_utils import cache_corridor_rate_data, get_quotes_from_corridor_rates
 from .key_generators import get_corridor_cache_key, get_quote_cache_key
