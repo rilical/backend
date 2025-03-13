@@ -34,10 +34,12 @@ INSTALLED_APPS = [
     "corsheaders",  # Add CORS headers app
     "django_extensions",  # Added for debugging
     "drf_spectacular",  # OpenAPI 3.0 schema generator
+    "drf_spectacular_sidecar",  # Required for Swagger UI
     # Local apps
     "providers",  # Provider rate comparison (changed from apps.providers)
     "aggregator",  # Aggregator service
     "quotes",  # Quote storage and caching
+    "remit_scout",  # Added remit_scout app
 ]
 
 MIDDLEWARE = [
@@ -49,24 +51,49 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # Custom security middleware
+    "remit_scout.middleware.SecurityHeadersMiddleware",
+    "remit_scout.middleware.RequestIDMiddleware",
+    "remit_scout.middleware.SessionAuthMiddleware",  # Add session auth middleware
+    "remit_scout.middleware.RequestLoggingMiddleware",
+    "remit_scout.middleware.RateLimitMiddleware",
 ]
 
 # CORS settings
-CORS_ALLOW_ALL_ORIGINS = True  # In production, specify the allowed origins
-
-# For production, use the following instead:
-# CORS_ALLOWED_ORIGINS = [
-#     "http://localhost:3000",  # React default port
-#     "http://localhost:8080",  # Vue default port
-#     "http://yourdomain.com",
-# ]
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True  # Only in development
+else:
+    CORS_ALLOW_ALL_ORIGINS = False
+    CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+    CORS_ALLOW_CREDENTIALS = True
+    CORS_ALLOW_METHODS = [
+        "DELETE",
+        "GET",
+        "OPTIONS",
+        "PATCH",
+        "POST",
+        "PUT",
+    ]
+    CORS_ALLOW_HEADERS = [
+        "accept",
+        "accept-encoding",
+        "authorization",
+        "content-type",
+        "dnt",
+        "origin",
+        "user-agent",
+        "x-csrftoken",
+        "x-requested-with",
+        "x-api-key",
+        "x-request-id",
+    ]
 
 ROOT_URLCONF = "remit_scout.urls"
 
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "remit_scout" / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -82,16 +109,32 @@ TEMPLATES = [
 WSGI_APPLICATION = "remit_scout.wsgi.application"
 
 # Database
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("POSTGRES_DB", "remitscout"),
-        "USER": os.getenv("POSTGRES_USER", "postgres"),
-        "PASSWORD": os.getenv("POSTGRES_PASSWORD", "postgres"),
-        "HOST": os.getenv("POSTGRES_HOST", "localhost"),
-        "PORT": os.getenv("POSTGRES_PORT", "5432"),
+if os.getenv("DJANGO_ENV", "development") == "development":
+    # Use SQLite for development
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
     }
-}
+else:
+    # Use PostgreSQL for production
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.getenv("POSTGRES_DB", "remitscout"),
+            "USER": os.getenv("POSTGRES_USER", "postgres"),
+            "PASSWORD": os.getenv("POSTGRES_PASSWORD", "postgres"),
+            "HOST": os.getenv("POSTGRES_HOST", "localhost"),
+            "PORT": os.getenv("POSTGRES_PORT", "5432"),
+            # Add connection pooling for better performance
+            "CONN_MAX_AGE": 60,  # Keep connections alive for 60 seconds
+            # Add SSL settings for production only
+            "OPTIONS": {
+                "sslmode": "require",
+            },
+        }
+    }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -100,6 +143,9 @@ AUTH_PASSWORD_VALIDATORS = [
     },
     {
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {
+            "min_length": 10,  # Increased from default 8
+        },
     },
     {
         "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
@@ -109,6 +155,13 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# Password hashing - use stronger Argon2 hasher
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+]
+
 # Internationalization
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
@@ -116,8 +169,13 @@ USE_I18N = True
 USE_TZ = True
 
 # Static files
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Add staticfiles dirs to help Django find the Swagger UI files
+STATICFILES_DIRS = [
+    BASE_DIR / ".venv" / "lib" / "python3.12" / "site-packages" / "drf_spectacular_sidecar" / "static",
+]
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -130,6 +188,9 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+# Celery security settings
+CELERY_TASK_ACKS_LATE = True
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 1000  # Restart worker after 1000 tasks
 
 # Cache settings
 CACHES = {
@@ -146,6 +207,7 @@ CACHES = {
                 "max_connections": 100,
                 "retry_on_timeout": True,
             },
+            "PASSWORD": os.getenv("REDIS_PASSWORD", None),  # Redis password if set
         },
         "KEY_PREFIX": "remitscout",
     },
@@ -155,6 +217,7 @@ CACHES = {
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
             "IGNORE_EXCEPTIONS": True,
+            "PASSWORD": os.getenv("REDIS_PASSWORD", None),  # Redis password if set
         },
         "KEY_PREFIX": "provider",
     },
@@ -181,24 +244,51 @@ REST_FRAMEWORK = {
     ],
     # Add Spectacular as the default schema generator
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    # Add throttling for rate limiting
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle"
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": os.getenv("THROTTLE_RATE_ANON", "60/minute"),
+        "user": os.getenv("THROTTLE_RATE_USER", "300/minute"),
+    },
+    # Add authentication classes
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.TokenAuthentication",
+    ],
+    # Exception handling
+    "EXCEPTION_HANDLER": "rest_framework.views.exception_handler",
+    # Content type validation
+    "DEFAULT_PARSER_CLASSES": [
+        "rest_framework.parsers.JSONParser",
+        "rest_framework.parsers.FormParser",
+        "rest_framework.parsers.MultiPartParser",
+    ],
 }
 
 # DRF Spectacular settings
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'RemitScout API',
-    'DESCRIPTION': 'API for comparing remittance rates across multiple providers',
-    'VERSION': '1.0.0',
-    'SERVE_INCLUDE_SCHEMA': False,
-    'SCHEMA_PATH_PREFIX': '/api/',
-    'COMPONENT_SPLIT_REQUEST': True,
-    'SWAGGER_UI_SETTINGS': {
-        'deepLinking': True,
-        'persistAuthorization': True,
-        'displayOperationId': False,
-        'defaultModelsExpandDepth': 3,
-        'defaultModelExpandDepth': 3,
-        'docExpansion': 'none',  # show only top level by default
-    }
+    "TITLE": "RemitScout API",
+    "DESCRIPTION": "API for comparing remittance rates across providers",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    # Use SIDECAR values for Swagger UI instead of module paths
+    "SWAGGER_UI_DIST": "SIDECAR",
+    "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
+    "REDOC_DIST": "SIDECAR",
+    "SWAGGER_UI_SETTINGS": {
+        "deepLinking": True,
+        "persistAuthorization": True,
+        "displayOperationId": True,
+        "docExpansion": "list",
+        "syntaxHighlight.theme": "agate",
+        "filter": True,
+    },
+    "APPEND_COMPONENTS": {},
+    "DISABLE_ERRORS_AND_WARNINGS": False,
+    "SORT_OPERATIONS": False,
 }
 
 # Logging configuration
@@ -210,21 +300,130 @@ LOGGING = {
             "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
             "style": "{",
         },
+        "json": {
+            "()": "json_log_formatter.JSONFormatter",
+        },
+    },
+    "filters": {
+        "require_debug_false": {
+            "()": "django.utils.log.RequireDebugFalse",
+        },
+        "require_debug_true": {
+            "()": "django.utils.log.RequireDebugTrue",
+        },
     },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
             "formatter": "verbose",
         },
+        "json_file": {
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "filename": os.path.join(BASE_DIR, "logs/remitscout.json"),
+            "when": "midnight",
+            "interval": 1,
+            "backupCount": 30,
+            "formatter": "json",
+        },
+        "error_file": {
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "filename": os.path.join(BASE_DIR, "logs/error.log"),
+            "when": "midnight",
+            "interval": 1,
+            "backupCount": 30,
+            "formatter": "verbose",
+            "level": "ERROR",
+        },
+        "security_file": {
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "filename": os.path.join(BASE_DIR, "logs/security.log"),
+            "when": "midnight",
+            "interval": 1,
+            "backupCount": 90,  # Keep longer history for security logs
+            "formatter": "json",
+        },
+        "mail_admins": {
+            "level": "ERROR",
+            "filters": ["require_debug_false"],
+            "class": "django.utils.log.AdminEmailHandler",
+        },
     },
     "loggers": {
-        "apps.providers.aggregator": {
-            "handlers": ["console"],
+        "django": {
+            "handlers": ["console", "json_file"],
             "level": "INFO",
+        },
+        "django.server": {
+            "handlers": ["console", "json_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["console", "error_file", "mail_admins"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "django.security": {
+            "handlers": ["console", "security_file", "mail_admins"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "remit_scout": {
+            "handlers": ["console", "json_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "quotes": {
+            "handlers": ["console", "json_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "providers": {
+            "handlers": ["console", "json_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "aggregator": {
+            "handlers": ["console", "json_file"],
+            "level": "INFO",
+            "propagate": False,
         },
     },
     "root": {
-        "handlers": ["console"],
-        "level": "WARNING",
+        "handlers": ["console", "error_file"],
+        "level": os.getenv("DJANGO_LOG_LEVEL", "WARNING"),
     },
 }
+
+# Security settings for production
+if not DEBUG:
+    # HTTPS/SSL settings
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    
+    # Session and cookie settings
+    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    CSRF_COOKIE_SECURE = True
+    CSRF_COOKIE_HTTPONLY = True
+    CSRF_COOKIE_SAMESITE = "Lax"
+    
+    # Content security
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+    
+    # Email configuration for error reporting
+    ADMINS = [("Admin", os.getenv("ADMIN_EMAIL", "admin@example.com"))]
+    SERVER_EMAIL = os.getenv("SERVER_EMAIL", "errors@example.com")
+    EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.example.com")
+    EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+    EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+    EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+    EMAIL_USE_TLS = True
+
+# Ensure we have a logs directory
+os.makedirs(os.path.join(BASE_DIR, "logs"), exist_ok=True)

@@ -6,7 +6,7 @@ import datetime
 import time
 import uuid
 from decimal import Decimal
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Union
 
 
 class RemittanceProvider(abc.ABC):
@@ -75,24 +75,60 @@ class RemittanceProvider(abc.ABC):
             "payment_method", "delivery_method", "delivery_time_minutes",
             ... plus any others your provider added
         """
+        # Normalize timestamp
+        timestamp = raw_result.get("timestamp")
+        if timestamp is None:
+            timestamp = datetime.datetime.now().isoformat()
+        elif isinstance(timestamp, (int, float)):
+            # Convert unix timestamp to ISO format
+            timestamp = datetime.datetime.fromtimestamp(timestamp).isoformat()
+        
+        # Normalize numeric values
+        send_amount = self._normalize_numeric(raw_result.get("send_amount", 0.0))
+        destination_amount = self._normalize_numeric(raw_result.get("receive_amount", 0.0))
+        exchange_rate = self._normalize_numeric(raw_result.get("exchange_rate"))
+        fee = self._normalize_numeric(raw_result.get("fee", 0.0))
+        
+        # Handle multiple delivery methods
+        delivery_methods = raw_result.get("delivery_methods", [])
+        if not delivery_methods and raw_result.get("delivery_method"):
+            delivery_methods = [{"method": raw_result.get("delivery_method"), 
+                                "time_minutes": raw_result.get("delivery_time_minutes")}]
+        
         # Ensure required keys exist
         output = {
             "provider_id": self.name,
+            "provider_name": self.get_display_name(),
             "success": raw_result.get("success", False),
             "error_message": raw_result.get("error_message"),
-            "send_amount": raw_result.get("send_amount", 0.0),
-            "source_currency": raw_result.get("send_currency", "").upper(),
-            "destination_amount": raw_result.get("receive_amount", 0.0),
-            "destination_currency": raw_result.get("receive_currency", "").upper(),
-            "exchange_rate": raw_result.get("exchange_rate"),
-            "fee": raw_result.get("fee", 0.0),
+            "send_amount": send_amount,
+            "source_currency": str(raw_result.get("send_currency", "")).upper(),
+            "destination_amount": destination_amount,
+            "destination_currency": str(raw_result.get("receive_currency", "")).upper(),
+            "exchange_rate": exchange_rate,
+            "fee": fee,
             "payment_method": raw_result.get("payment_method"),
             "delivery_method": raw_result.get("delivery_method"),
             "delivery_time_minutes": raw_result.get("delivery_time_minutes"),
-            "timestamp": datetime.datetime.now().isoformat(),
+            "delivery_methods": delivery_methods,
+            "timestamp": timestamp,
         }
 
         if provider_specific_data:
             output["raw_response"] = raw_result.get("raw_response")
 
         return output
+    
+    def _normalize_numeric(self, value: Any) -> Union[float, None]:
+        """
+        Normalize numeric values to float type or None.
+        """
+        if value is None:
+            return None
+            
+        try:
+            if isinstance(value, str):
+                return float(value.replace(',', ''))
+            return float(value)
+        except (ValueError, TypeError):
+            return None

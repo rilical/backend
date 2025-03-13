@@ -32,6 +32,7 @@ from aggregator.aggregator import Aggregator
 from .cache_utils import cache_corridor_rate_data, get_quotes_from_corridor_rates
 from .key_generators import get_corridor_cache_key, get_quote_cache_key
 from .models import FeeQuote, Provider, QuoteQueryLog
+from .utils import transform_quotes_response
 
 logger = logging.getLogger(__name__)
 
@@ -584,7 +585,8 @@ class QuoteAPIView(APIView):
         sort_by,
     ):
         """Transform aggregator response to standardized format for API and caching"""
-        response = {
+        # First create the basic response structure
+        basic_response = {
             "success": raw_response.get("success", False),
             "elapsed_seconds": raw_response.get("execution_time", 0),
             "source_country": source_country,
@@ -602,8 +604,9 @@ class QuoteAPIView(APIView):
                 "max_fee": None,
             },
         }
-
-        return response
+        
+        # Now use our transformation pipeline to clean and standardize the response
+        return transform_quotes_response(basic_response)
 
     def _store_quotes(self, response_data):
         """Store successful quotes in the database"""
